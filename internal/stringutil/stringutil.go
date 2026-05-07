@@ -1,0 +1,298 @@
+// Package stringutil provides string utility functions.
+package stringutil
+
+import (
+	"crypto/rand"
+	"fmt"
+	"net/mail"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/k3a/html2text"
+)
+
+const (
+	PasswordDummy = "•"
+)
+
+var (
+	regexpNonAlNum  = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]+`)
+	regexpSpaces    = regexp.MustCompile(`[\s]+`)
+	uuidV4Regex     = regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`)
+	regexpRefNumber = regexp.MustCompile(`#(\d+)`)
+	regexpConvUUID  = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
+)
+
+// HTML2Text converts HTML to text.
+func HTML2Text(html string) string {
+	return strings.TrimSpace(html2text.HTML2Text(html))
+}
+
+// SanitizeFilename sanitizes the provided filename.
+func SanitizeFilename(fName string) string {
+	// Trim whitespace.
+	name := strings.TrimSpace(fName)
+
+	// Replace whitespace and "/" with "-"
+	name = regexpSpaces.ReplaceAllString(name, "-")
+
+	// Remove or replace any non-alphanumeric characters
+	name = regexpNonAlNum.ReplaceAllString(name, "")
+
+	// Convert to lowercase
+	name = strings.ToLower(name)
+	return filepath.Base(name)
+}
+
+// RandomAlphanumeric generates a random alphanumeric string of length n.
+func RandomAlphanumeric(n int) (string, error) {
+	const dictionary = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	bytes := make([]byte, n)
+
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+
+	for k, v := range bytes {
+		bytes[k] = dictionary[v%byte(len(dictionary))]
+	}
+
+	return string(bytes), nil
+}
+
+// RandomNumeric generates a random numeric string of length n.
+func RandomNumeric(n int) (string, error) {
+	const dictionary = "0123456789"
+
+	bytes := make([]byte, n)
+
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+
+	for k, v := range bytes {
+		bytes[k] = dictionary[v%byte(len(dictionary))]
+	}
+
+	return string(bytes), nil
+}
+
+// RemoveEmpty removes empty strings from a slice of strings.
+func RemoveEmpty(s []string) []string {
+	var r []string
+	for _, str := range s {
+		if str != "" {
+			r = append(r, str)
+		}
+	}
+	return r
+}
+
+// GenerateEmailMessageID generates an RFC-compliant Message-ID for an email without angle brackets.
+func GenerateEmailMessageID(uuid string, fromAddress string) (string, error) {
+	if uuid == "" {
+		return "", fmt.Errorf("uuid cannot be empty")
+	}
+
+	// Parse from address
+	addr, err := mail.ParseAddress(fromAddress)
+	if err != nil {
+		return "", fmt.Errorf("invalid from address: %w", err)
+	}
+
+	// Extract domain with validation
+	parts := strings.Split(addr.Address, "@")
+	if len(parts) != 2 || parts[1] == "" {
+		return "", fmt.Errorf("invalid domain in from address")
+	}
+	domain := parts[1]
+
+	// Random component
+	randomStr, err := RandomAlphanumeric(11)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random string: %w", err)
+	}
+
+	return fmt.Sprintf("%s-%d-%s@%s",
+		uuid,
+		time.Now().UnixNano(),
+		randomStr,
+		domain,
+	), nil
+}
+
+// RemoveItemByValue removes all instances of a value from a slice of strings.
+func RemoveItemByValue(slice []string, value string) []string {
+	result := []string{}
+	for _, v := range slice {
+		if v != value {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// FormatDuration formats a duration as a string.
+func FormatDuration(d time.Duration, includeSeconds bool) string {
+	d = d.Round(time.Second)
+	h := int64(d.Hours())
+	d -= time.Duration(h) * time.Hour
+	m := int64(d.Minutes())
+	d -= time.Duration(m) * time.Minute
+	s := int64(d.Seconds())
+
+	var parts []string
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%d hours", h))
+	}
+	if m >= 0 {
+		parts = append(parts, fmt.Sprintf("%d minutes", m))
+	}
+	if s > 0 && includeSeconds {
+		parts = append(parts, fmt.Sprintf("%d seconds", s))
+	}
+	return strings.Join(parts, " ")
+}
+
+// ValidEmail returns true if it's a valid email else return false.
+func ValidEmail(email string) bool {
+	addr, err := mail.ParseAddress(email)
+	if err != nil {
+		return false
+	}
+	return addr.Name == "" && addr.Address == email
+}
+
+// ExtractEmail extracts the email address from a string.
+// E.g. "Name <john@example.com>" -> "john@example.com", "john@example.com" -> "john@example.com".
+func ExtractEmail(s string) (string, error) {
+	addr, err := mail.ParseAddress(s)
+	if err != nil {
+		return "", err
+	}
+	return addr.Address, nil
+}
+
+// DedupAndExcludeString returns a deduplicated []string excluding empty and a specific value.
+func DedupAndExcludeString(list []string, exclude string) []string {
+	seen := make(map[string]struct{}, len(list))
+	cleaned := make([]string, 0, len(list))
+	for _, s := range list {
+		if s == "" || s == exclude {
+			continue
+		}
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			cleaned = append(cleaned, s)
+		}
+	}
+	return cleaned
+}
+
+// StripConvUUID removes +conv-{uuid-v4} from an email address if present.
+// Only matches strict UUID v4 format (36 chars).
+// e.g., support+conv-13216cf7-6626-4b0d-a938-46ce65a20701@domain.com -> support@domain.com
+func StripConvUUID(email string) string {
+	return regexpConvUUID.ReplaceAllString(email, "@")
+}
+
+// ExtractConvUUID extracts the conversation UUID from a plus-addressed email.
+// e.g., support+conv-abc12345-1234-4123-1234-123456789abc@domain.com -> abc12345-1234-4123-1234-123456789abc
+// Returns empty string if no valid UUIDv4 found.
+func ExtractConvUUID(email string) string {
+	match := regexpConvUUID.FindString(email)
+	if match == "" {
+		return ""
+	}
+	// match is "+conv-{uuid}@", extract just the UUID (skip "+conv-" prefix and "@" suffix)
+	return match[6 : len(match)-1]
+}
+
+// DedupAndExcludePlusVariants deduplicates and excludes any of the given inbox addresses and their plus-addressed variants.
+func DedupAndExcludePlusVariants(list []string, excludeAddresses ...string) []string {
+	exclude := make(map[string]struct{}, len(excludeAddresses))
+	for _, addr := range excludeAddresses {
+		if addr != "" {
+			exclude[strings.ToLower(addr)] = struct{}{}
+		}
+	}
+	seen := make(map[string]struct{}, len(list))
+	cleaned := make([]string, 0, len(list))
+	for _, s := range list {
+		if s == "" {
+			continue
+		}
+		if _, skip := exclude[strings.ToLower(StripConvUUID(s))]; skip {
+			continue
+		}
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			cleaned = append(cleaned, s)
+		}
+	}
+	return cleaned
+}
+
+// ComputeRecipients computes new recipients using last message's recipients and direction.
+func ComputeRecipients(
+	from, to, cc, bcc []string,
+	contactEmail, inboxEmail, inboxReplyTo string,
+	lastMessageIncoming bool,
+) (finalTo, finalCC, finalBCC []string) {
+	if lastMessageIncoming {
+		if len(from) > 0 {
+			finalTo = from
+		} else if contactEmail != "" {
+			finalTo = []string{contactEmail}
+		}
+	} else {
+		if len(to) > 0 {
+			finalTo = to
+		} else if contactEmail != "" {
+			finalTo = []string{contactEmail}
+		}
+	}
+
+	finalCC = append([]string{}, cc...)
+
+	if lastMessageIncoming {
+		if len(to) > 0 {
+			finalCC = append(finalCC, to...)
+		}
+		if contactEmail != "" && !slices.Contains(finalTo, contactEmail) && !slices.Contains(finalCC, contactEmail) {
+			finalCC = append(finalCC, contactEmail)
+		}
+	}
+
+	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail, inboxReplyTo)
+	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail, inboxReplyTo)
+	// BCC is one-time only, user is supposed to add it manually.
+	finalBCC = []string{}
+
+	return
+}
+
+// ExtractUUID finds and returns the first valid UUID v4 in the given text.
+// Returns empty string if no valid UUID is found.
+func ExtractUUID(text string) string {
+	return uuidV4Regex.FindString(text)
+}
+
+// ExtractReferenceNumber extracts the last reference number from a subject line.
+// For example, "RE: Test - #392" returns "392".
+// If multiple numbers exist (e.g., "Order #123 - #392"), returns the last one ("392").
+func ExtractReferenceNumber(subject string) string {
+	matches := regexpRefNumber.FindAllStringSubmatch(subject, -1)
+	if len(matches) > 0 {
+		// Return the last match's captured group.
+		lastMatch := matches[len(matches)-1]
+		if len(lastMatch) >= 2 {
+			return lastMatch[1]
+		}
+	}
+	return ""
+}

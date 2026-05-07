@@ -1,0 +1,348 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-size: 16px;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    min-height: 100%;
+    overflow: hidden;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-background text-foreground;
+  }
+
+  ::selection {
+    background: hsl(var(--foreground) / 0.15);
+    color: hsl(var(--foreground));
+  }
+
+  .bg-primary ::selection,
+  .bg-primary::selection {
+    background: hsl(var(--primary-foreground) / 0.25);
+    color: hsl(var(--primary-foreground));
+  }
+
+  .bg-secondary ::selection,
+  .bg-secondary::selection {
+    background: hsl(var(--secondary-foreground) / 0.25);
+    color: hsl(var(--secondary-foreground));
+  }
+
+  @media (max-width: 768px) {
+    html,
+    body {
+      overflow-x: auto;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  .native-html {
+    p {
+      margin-bottom: 0.5rem;
+    }
+
+    ul {
+      list-style-type: disc;
+      margin-left: 1.5rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    ol {
+      list-style-type: decimal;
+      margin-left: 1.5rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    li {
+      padding-left: 0.25rem;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    a {
+      color: #0066cc;
+      cursor: pointer;
+
+      &:hover {
+        color: #004d99;
+      }
+    }
+
+    // Mention styling — vue-letter scopes classes as msg_XXX_ld-mention
+    [class$="_ld-mention"],
+    .ld-mention {
+      background-color: hsl(var(--primary) / 0.1);
+      border-radius: 0.25rem;
+      padding: 0 0.25rem;
+      color: hsl(var(--primary));
+      font-weight: 500;
+    }
+  }
+  :root {
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.9% 10%;
+    --sidebar-primary: 240 5.9% 30%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5% 88%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --sidebar-background: 240 5% 7%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 235 86% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 5% 14%;
+    --sidebar-ring: 235 86% 65%;
+  }
+
+  :root {
+    --vis-tooltip-background-color: none !important;
+    --vis-tooltip-border-color: none !important;
+    --vis-tooltip-text-color: none !important;
+    --vis-tooltip-shadow-color: none !important;
+    --vis-tooltip-backdrop-filter: none !important;
+    --vis-tooltip-padding: none !important;
+    --vis-primary-color: var(--primary);
+    --vis-secondary-color: 160 81% 40%;
+    --vis-text-color: var(--muted-foreground);
+  }
+
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+    --private: 35 90% 94%;
+    --canvas: 240 5% 90%;
+  }
+
+  .dark {
+    --background: 240 7% 11%;
+    --foreground: 240 4% 94%;
+
+    --card: 240 5% 13%;
+    --card-foreground: 240 4% 94%;
+
+    --popover: 240 5% 15%;
+    --popover-foreground: 240 4% 94%;
+
+    --primary: 240 4% 94%;
+    --primary-foreground: 240 7% 11%;
+
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 240 4% 94%;
+
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 4% 60%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 1 100% 69%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 5% 18%;
+    --input: 240 5% 16%;
+    --ring: 240 4.9% 83.9%;
+    --private: 30 35% 18%;
+    --canvas: 240 7% 15%;
+  }
+}
+
+.message-bubble {
+  @apply flex flex-col px-4 pt-2 pb-3 w-fit min-w-[30%] max-w-full border overflow-x-auto rounded shadow-sm;
+  overflow-wrap: break-all;
+
+  * {
+    max-width: 100%;
+  }
+
+  // Force pre blocks to wrap
+  pre,
+  code {
+    white-space: pre-wrap;
+  }
+
+  table {
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+}
+
+.overlay {
+  background: hsl(var(--foreground) / 0.5);
+}
+
+.text-sm-muted {
+  @apply text-muted-foreground text-sm;
+}
+
+.sidebar-label {
+  @apply text-sm text-muted-foreground;
+}
+
+.sidebar-value {
+  @apply text-sm text-foreground;
+}
+
+.box {
+  @apply border shadow rounded;
+}
+
+.loading-fade {
+  @apply opacity-50 transition-opacity duration-300;
+}
+
+// Scrollbar start
+* {
+  scrollbar-width: auto;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.dark * {
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: initial;
+    scrollbar-color: initial;
+  }
+
+  .dark * {
+    scrollbar-color: initial;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  .dark *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+  }
+
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+// Scrollbar end
+
+.show-quoted-text {
+  blockquote {
+    @apply block;
+  }
+}
+
+.hide-quoted-text {
+  blockquote {
+    @apply hidden;
+  }
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+// Emoji picker theme
+.v3-emoji-picker {
+  --v3-picker-bg: hsl(var(--popover)) !important;
+  --v3-picker-fg: hsl(var(--popover-foreground)) !important;
+  --v3-picker-border: hsl(var(--border)) !important;
+  --v3-picker-input-bg: hsl(var(--input)) !important;
+  --v3-picker-input-border: hsl(var(--border)) !important;
+  --v3-picker-input-focus-border: hsl(var(--ring)) !important;
+  --v3-picker-emoji-hover: hsl(var(--muted)) !important;
+}
+
+.dark .v3-emoji-picker {
+  --v3-group-image-filter: invert(1) !important;
+}
+
+// Hide number input spinners.
+.hide-number-spinners {
+  -moz-appearance: textfield;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+// Components
+@layer components {
+  .link-style {
+    color: #0066cc;
+    @apply hover:underline;
+  }
+}
+
+/* Fix collapsed sidebar visibility in padding gap.
+ * The sidebar is position:fixed and slides to left:-14rem when collapsed,
+ * but ml-[3.2rem] offset causes part to remain visible in the app's padding gap.
+ * Push it further left to fully hide it.
+ */
+[data-state="collapsed"][data-collapsible="offcanvas"] .sidebar-secondary {
+  left: calc((var(--sidebar-width) + 3.5rem) * -1.4) !important;
+}
