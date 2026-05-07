@@ -3,77 +3,63 @@
     <ContextMenuTrigger asChild>
       <router-link
         :to="conversationRoute"
-        class="group relative block px-3 py-3 transition-all duration-200 ease-in-out cursor-pointer hover:bg-accent/20 dark:hover:bg-accent/60"
+        class="group relative block px-4 py-3 transition-colors duration-150 cursor-pointer hover:bg-sidebar-accent/60"
         :class="{
-          'bg-accent/60': conversation.uuid === currentConversation?.uuid
+          'bg-sidebar-accent': conversation.uuid === currentConversation?.uuid
         }"
       >
-        <div class="flex items-start gap-2">
+        <div class="flex items-start gap-3">
           <!-- Avatar with channel indicator -->
           <div class="relative flex-shrink-0">
-            <Avatar class="w-10 h-10 rounded-full">
+            <Avatar class="w-7 h-7 rounded-full">
               <AvatarImage
                 :src="conversation.contact.avatar_url || ''"
                 class="object-cover"
               />
-              <AvatarFallback>
+              <AvatarFallback class="text-[10px]">
                 {{ conversation.contact.first_name.substring(0, 2).toUpperCase() }}
               </AvatarFallback>
             </Avatar>
-            <span class="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-background border border-border">
-              <component :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail" class="w-2.5 h-2.5 text-muted-foreground" />
+            <span class="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-background border border-border">
+              <component :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail" class="w-2 h-2 text-muted-foreground" />
             </span>
           </div>
 
           <!-- Content container -->
-          <div class="flex-1 min-w-0 space-y-2">
-            <!-- Name + Subject group -->
-            <div>
-              <!-- Contact name + inbox + time -->
-              <div class="flex items-baseline justify-between gap-2">
-                <div class="flex items-baseline gap-1.5 min-w-0">
-                  <h3 class="text-sm font-semibold truncate text-foreground">
-                    {{ contactFullName }}
-                  </h3>
-                  <span class="text-xs text-muted-foreground truncate">
-                    {{ conversation.inbox_name }}
-                  </span>
-                </div>
-                <span
-                  class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 tabular-nums"
-                  v-if="conversation.last_message_at"
-                >
-                  {{ relativeLastMessageTime }}
-                </span>
-              </div>
-
-              <!-- Subject -->
-              <p
-                v-if="conversation.subject"
-                class="text-xs text-muted-foreground truncate"
+          <div class="flex-1 min-w-0 space-y-1">
+            <!-- Contact name + time -->
+            <div class="flex items-baseline justify-between gap-2">
+              <h3 class="text-sm font-semibold truncate text-foreground">
+                {{ contactFullName }}
+              </h3>
+              <span
+                class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 tabular-nums"
+                v-if="conversation.last_message_at"
               >
-                {{ conversation.subject }}
-              </p>
+                {{ relativeLastMessageTime }}
+              </span>
             </div>
 
             <!-- Message preview + unread count -->
             <div class="flex items-center justify-between gap-2">
-              <p class="text-sm flex-1 min-w-0 truncate text-muted-foreground">
+              <p class="text-xs flex-1 min-w-0 truncate text-muted-foreground">
                 <template v-if="hasDraftForConversation">
-                  <span class="font-medium text-primary">{{ $t('globals.terms.draft') }}:</span>
-                  {{ draftPreview }}
+                  <FilePen
+                    class="text-primary inline-block align-text-bottom mr-1"
+                    :size="12"
+                  /><span class="italic mr-1">{{ $t('globals.terms.draft') }}</span>{{ draftPreview }}
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-green-600 inline-block align-text-bottom mr-0.5"
-                    :size="14"
+                    class="text-muted-foreground inline-block align-text-bottom mr-0.5"
+                    :size="12"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}
                 </template>
               </p>
               <div
                 v-if="conversation.unread_message_count > 0"
-                class="flex items-center justify-center w-5 h-5 bg-green-600 text-white text-xs font-medium rounded-full flex-shrink-0"
+                class="flex items-center justify-center min-w-5 h-5 px-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-full flex-shrink-0"
               >
                 {{ conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count }}
               </div>
@@ -126,7 +112,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, MessageSquare, Reply, MailOpen } from 'lucide-vue-next'
+import { Mail, MessageSquare, Reply, MailOpen, FilePen } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,

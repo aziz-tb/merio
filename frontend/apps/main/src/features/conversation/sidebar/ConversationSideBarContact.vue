@@ -1,32 +1,5 @@
 <template>
   <div class="space-y-2">
-    <div class="flex justify-between items-start">
-      <div class="relative">
-        <Avatar class="size-20">
-          <AvatarImage
-            :src="conversation?.contact?.avatar_url || ''"
-          />
-          <AvatarFallback>
-            {{ conversation?.contact?.first_name?.toUpperCase().substring(0, 2) }}
-          </AvatarFallback>
-        </Avatar>
-        <StatusDot
-          v-if="isLivechat"
-          :status="contactStatus"
-          size="lg"
-          class="absolute bottom-1 right-1 border-2 border-background"
-        />
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-7 w-7"
-        @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
-      >
-        <ViewVerticalIcon />
-      </Button>
-    </div>
-
     <div class="h-6 flex items-center gap-2">
       <span v-if="conversationStore.conversation.loading">
         <Skeleton class="w-24 h-4" />
@@ -121,10 +94,6 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { ViewVerticalIcon } from '@radix-icons/vue'
-import { Button } from '@shared-ui/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
-import StatusDot from '@shared-ui/components/StatusDot.vue'
 import {
   Mail,
   Phone,
@@ -138,15 +107,12 @@ import {
 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import countries from '@/constants/countries.js'
-import { useEmitter } from '@/composables/useEmitter'
-import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api'
 const conversationStore = useConversationStore()
-const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -170,7 +136,6 @@ const countryName = computed(() => {
 })
 
 const isLivechat = computed(() => conversation.value?.inbox_channel === 'livechat')
-const contactStatus = computed(() => conversation.value?.contact?.availability_status)
 const isVerified = computed(
   () => isLivechat.value && conversation.value?.contact?.type !== 'visitor'
 )

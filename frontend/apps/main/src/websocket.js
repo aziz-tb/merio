@@ -85,6 +85,9 @@ export class WebSocketClient {
         [WS_EVENT.CONVERSATION_UPDATE]: () => this.convStore.mergeConversationUpdate(data.data),
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.CONVERSATION_SUBSCRIBED]: () => { },
+        [WS_EVENT.CONVERSATION_VIEWERS]: () => {
+          this.convStore.setViewers(data.data.conversation_uuid, data.data.user_ids || [])
+        },
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },

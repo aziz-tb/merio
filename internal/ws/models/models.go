@@ -10,6 +10,7 @@ const (
 	MessageTypeError                  = "error"
 	MessageTypeConversationSubscribe  = "conversation_subscribe"
 	MessageTypeConversationSubscribed = "conversation_subscribed"
+	MessageTypeConversationViewers    = "conversation_viewers"
 	MessageTypeTyping                 = "typing"
 )
 

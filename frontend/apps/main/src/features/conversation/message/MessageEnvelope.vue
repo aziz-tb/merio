@@ -1,11 +1,17 @@
 <template>
   <div class="mb-1 text-xs space-y-1">
-    <p v-if="message.meta.subject" class="text-foreground">
-      {{ message.meta.subject }}
-    </p>
     <div class="space-y-0.5">
       <p v-if="message.meta.from?.length">
-        <span class="text-muted-foreground">From:</span> {{ message.meta.from.join(', ') }}
+        <span class="text-muted-foreground">From:</span>
+        <template v-for="(addr, i) in message.meta.from" :key="addr">
+          <router-link
+            v-if="contactId && userStore.can('contacts:read')"
+            :to="{ name: 'contact-detail', params: { id: contactId } }"
+            class="hover:underline"
+          >{{ addr }}</router-link>
+          <span v-else>{{ addr }}</span>
+          <span v-if="i < message.meta.from.length - 1">, </span>
+        </template>
       </p>
       <p v-if="message.meta.to?.length">
         <span class="text-muted-foreground">To:</span> {{ message.meta.to.join(', ') }}
@@ -21,10 +27,18 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useConversationStore } from '@main/stores/conversation'
+import { useUserStore } from '@main/stores/user'
+
 defineProps({
   message: {
     type: Object,
     required: true
   }
 })
+
+const conversationStore = useConversationStore()
+const userStore = useUserStore()
+const contactId = computed(() => conversationStore.current?.contact_id)
 </script>

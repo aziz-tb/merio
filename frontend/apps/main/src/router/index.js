@@ -130,8 +130,8 @@ const routes = [
             meta: {
               titleKey: 'globals.terms.inbox',
               typeKey: (route) => {
-                if (route.params.type === 'assigned') return 'conversation.myInbox'
-                if (route.params.type === 'mentioned') return 'conversation.mentions'
+                if (route.params.type === 'assigned') return 'globals.terms.myInbox'
+                if (route.params.type === 'mentioned') return 'globals.terms.mention'
                 if (route.params.type === 'unassigned') return 'globals.terms.unassigned'
                 if (route.params.type === 'all') return 'globals.messages.all'
                 return ''
@@ -146,8 +146,8 @@ const routes = [
                 meta: {
                   titleKey: 'globals.terms.inbox',
                   typeKey: (route) => {
-                    if (route.params.type === 'assigned') return 'conversation.myInbox'
-                    if (route.params.type === 'mentioned') return 'conversation.mentions'
+                    if (route.params.type === 'assigned') return 'globals.terms.myInbox'
+                    if (route.params.type === 'mentioned') return 'globals.terms.mention'
                     if (route.params.type === 'unassigned') return 'globals.terms.unassigned'
                     if (route.params.type === 'all') return 'globals.messages.all'
                     return ''

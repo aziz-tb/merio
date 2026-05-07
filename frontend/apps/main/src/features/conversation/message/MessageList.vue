@@ -22,15 +22,15 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div" class="space-y-4">
+        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div">
           <div
             v-for="(message, index) in conversationStore.conversationMessages"
             :key="message.uuid"
             :data-message-uuid="message.uuid"
-            :class="{
-              'my-2': message.type === 'activity',
-              'pt-4': index === 0
-            }"
+            :class="[
+              message.type === 'activity' ? 'my-2' : '',
+              showRowBorder(index) ? 'border-t border-border' : ''
+            ]"
           >
             <div v-if="!message.private && message.type !== 'activity'">
               <MessageBubble :message="message" :direction="message.type" />
@@ -218,6 +218,21 @@ watch(
 
 const isPrivateNote = (message) => {
   return message.type === 'outgoing' && message.private
+}
+
+// Show a top border on a row only when the row is a regular message AND there
+// is at least one earlier regular message. Activity rows ("System set priority …")
+// never get a border, and there's no border above the first regular message —
+// so single-message threads stay borderless and stacks of activities don't
+// pick up dividers either.
+const showRowBorder = (idx) => {
+  const messages = conversationStore.conversationMessages
+  const cur = messages[idx]
+  if (!cur || cur.type === 'activity') return false
+  for (let i = idx - 1; i >= 0; i--) {
+    if (messages[i] && messages[i].type !== 'activity') return true
+  }
+  return false
 }
 </script>
 

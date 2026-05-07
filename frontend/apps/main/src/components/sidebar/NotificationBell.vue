@@ -1,7 +1,10 @@
 <template>
   <Popover v-model:open="isOpen">
     <PopoverTrigger as-child>
-      <SidebarMenuButton size="md" class="relative">
+      <button
+        type="button"
+        class="relative inline-flex items-center justify-center size-9 rounded-md hover:bg-accent hover:text-foreground"
+      >
         <Bell class="h-5 w-5" />
         <span
           v-if="notificationStore.unreadCount > 0"
@@ -9,7 +12,7 @@
         >
           {{ notificationStore.unreadCount > 99 ? '99' : notificationStore.unreadCount }}
         </span>
-      </SidebarMenuButton>
+      </button>
     </PopoverTrigger>
     <PopoverContent side="right" :side-offset="8" align="end" class="w-96 p-0">
       <NotificationPanel @close="isOpen = false" />
@@ -21,7 +24,6 @@
 import { ref, watch, onMounted } from 'vue'
 import { Bell } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
-import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { useNotificationStore } from '@main/stores/notification'
 import NotificationPanel from './NotificationPanel.vue'
 

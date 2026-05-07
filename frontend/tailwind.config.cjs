@@ -74,7 +74,9 @@ module.exports = {
           foreground: 'hsl(var(--card-foreground))'
         },
         private: 'hsl(var(--private))',
-        canvas: 'hsl(var(--canvas))'
+        canvas: 'hsl(var(--canvas))',
+        'bubble-incoming': 'hsl(var(--bubble-incoming))',
+        'bubble-outgoing': 'hsl(var(--bubble-outgoing))'
       },
       borderRadius: {
         xl: 'calc(var(--radius) + 4px)',

@@ -233,6 +233,9 @@ func main() {
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 
+	// Periodic re-broadcast of conversation viewer presence (option-a reconciliation).
+	wsHub.StartViewerReconciler(ctx)
+
 	// Start inboxes.
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL)
 

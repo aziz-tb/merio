@@ -1,22 +1,27 @@
 <template>
-  <div class="h-screen flex flex-col">
+  <div class="h-full flex flex-col">
     <!-- Header -->
-    <div class="flex items-center space-x-4 px-2 h-12 border-b shrink-0">
-      <SidebarTrigger class="cursor-pointer" />
-      <span class="text-xl font-semibold">{{ title }}</span>
+    <div class="flex items-center gap-2 px-3 h-14 border-b border-border shrink-0">
+      <button
+        type="button"
+        class="cursor-pointer inline-flex items-center justify-center size-8 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
+        @click="toggleSidebar"
+      >
+        <PanelLeft class="size-4" />
+        <span class="sr-only">Toggle sidebar</span>
+      </button>
+      <span class="text-base font-semibold truncate">{{ title }}</span>
     </div>
 
     <!-- Filters -->
-    <div class="p-2 flex justify-between items-center">
+    <div class="px-3 h-10 flex justify-between items-center shrink-0">
       <!-- Status dropdown-menu, hidden when a view is selected as views are pre-filtered -->
       <DropdownMenu v-if="!route.params.viewID">
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" class="w-30">
-            <div>
-              <span class="mr-1">{{ conversationStore.conversations.total }}</span>
-              <span>{{ conversationStore.getListStatus }}</span>
-            </div>
-            <ChevronDown class="w-4 h-4 ml-2 opacity-50" />
+          <Button variant="ghost" size="sm" class="px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
+            <span>{{ conversationStore.conversations.total }}</span>
+            <span>{{ conversationStore.getListStatus }}</span>
+            <ChevronDown class="size-3 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
@@ -30,7 +35,7 @@
         </DropdownMenuContent>
       </DropdownMenu>
       <div v-else>
-        <Button variant="ghost" class="w-30">
+        <Button variant="ghost" size="sm" class="px-2 text-xs text-muted-foreground">
           <span>{{ conversationStore.conversations.total }}</span>
         </Button>
       </div>
@@ -38,9 +43,9 @@
       <!-- Sort dropdown-menu -->
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" class="w-30">
+          <Button variant="ghost" size="sm" class="px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
             {{ conversationStore.getListSortField }}
-            <ChevronDown class="w-4 h-4 ml-2 opacity-50" />
+            <ChevronDown class="size-3 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
@@ -151,7 +156,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useConversationStore } from '../../../stores/conversation'
-import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
+import { MessageCircleQuestion, MessageCircleWarning, ChevronDown, Loader2, PanelLeft } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -159,7 +164,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
-import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
+import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
 import EmptyList from '@/features/conversation/list/ConversationEmptyList.vue'
 import ConversationListItem from '@/features/conversation/list/ConversationListItem.vue'
 import { useRoute } from 'vue-router'
@@ -169,6 +174,7 @@ import ConversationListItemSkeleton from '@/features/conversation/list/Conversat
 const conversationStore = useConversationStore()
 const route = useRoute()
 const { t } = useI18n()
+const { toggle: toggleSidebar } = useLayoutSidebar()
 
 const title = computed(() => {
   const typeKey = route.meta?.typeKey?.(route)

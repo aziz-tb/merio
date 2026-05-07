@@ -25,6 +25,15 @@ export const useConversationStore = defineStore('conversation', () => {
   const macros = ref({})
   const drafts = ref(new Map())
 
+  // Per-conversation viewers (other agents currently subscribed via WebSocket).
+  // Keyed by conversation UUID → array of user IDs (deduped server-side).
+  // Each `conversation_viewers` broadcast is authoritative; setViewers replaces the entry verbatim.
+  const viewers = ref({})
+  const setViewers = (conversationUUID, userIds) => {
+    if (!conversationUUID) return
+    viewers.value[conversationUUID] = Array.isArray(userIds) ? userIds : []
+  }
+
   // Options for select fields
   const priorityOptions = computed(() => {
     return priorities.value.map(p => ({ label: p.name, value: p.id }))
@@ -978,6 +987,8 @@ export const useConversationStore = defineStore('conversation', () => {
     hasDraft,
     addPendingMessage,
     replacePendingMessage,
-    removePendingMessage
+    removePendingMessage,
+    viewers,
+    setViewers
   }
 })

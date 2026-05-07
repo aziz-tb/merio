@@ -1,15 +1,38 @@
 <template>
-  <div>
-    <ConversationSideBarContact class="p-4" />
-    <Accordion type="multiple" collapsible v-model="accordionState">
-      <AccordionItem value="actions" class="accordion-item">
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('globals.terms.action', 2) }}
-        </AccordionTrigger>
+  <div class="flex flex-col h-full">
+    <Tabs default-value="details" class="flex flex-col h-full">
+      <!-- Tab bar -->
+      <div class="flex items-center px-4 border-b border-border h-12 shrink-0">
+        <TabsList class="bg-transparent h-12 rounded-none p-0 gap-5">
+          <TabsTrigger
+            value="details"
+            class="bg-transparent rounded-none px-0 h-12 shadow-none border-b-2 border-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-amber-500 data-[state=active]:text-foreground text-muted-foreground"
+          >
+            Details
+          </TabsTrigger>
+          <TabsTrigger
+            value="copilot"
+            disabled
+            title="Coming soon"
+            class="bg-transparent rounded-none px-0 h-12 shadow-none border-b-2 border-transparent text-muted-foreground/60"
+          >
+            Copilot
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
-        <!-- Agent, team, priority, and tags assignment -->
-        <AccordionContent class="accordion-content--actions">
-          <div>
+      <!-- Details tab -->
+      <TabsContent value="details" class="flex-1 overflow-y-auto m-0 p-4 space-y-3">
+        <!-- Contact mini-card -->
+        <ConversationSideBarContact class="pb-2" />
+
+        <!-- Actions: agent, team, priority, tags -->
+        <Collapsible defaultOpen class="group/section border-t border-border pt-3">
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span>{{ t('globals.terms.action', 2) }}</span>
+            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3 space-y-3">
             <SelectComboBox
               v-model="conversationStore.current.assigned_user_id"
               :items="[{ value: 'none', label: t('globals.terms.none') }, ...usersStore.options]"
@@ -17,9 +40,6 @@
               @select="selectAgent"
               type="user"
             />
-          </div>
-
-          <div>
             <SelectComboBox
               v-model="conversationStore.current.assigned_team_id"
               :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamsStore.options]"
@@ -27,9 +47,6 @@
               @select="selectTeam"
               type="team"
             />
-          </div>
-
-          <div>
             <SelectComboBox
               v-model="conversationStore.current.priority_id"
               :items="priorityOptions"
@@ -37,72 +54,77 @@
               @select="selectPriority"
               type="priority"
             />
-          </div>
-
-          <div>
             <SelectTag
               v-if="conversationStore.current"
               v-model="conversationStore.current.tags"
               :items="tags.map((tag) => ({ label: tag, value: tag }))"
               :placeholder="t('placeholders.selectTags')"
             />
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+          </CollapsibleContent>
+        </Collapsible>
 
-      <!-- Information -->
-      <AccordionItem value="information" class="accordion-item">
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.information') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <ConversationInfo />
-        </AccordionContent>
-      </AccordionItem>
+        <!-- Information -->
+        <Collapsible defaultOpen class="group/section border-t border-border pt-3">
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span>{{ t('conversation.sidebar.information') }}</span>
+            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3">
+            <ConversationInfo />
+          </CollapsibleContent>
+        </Collapsible>
 
-      <!-- Contact attributes -->
-      <AccordionItem
-        value="contact_attributes"
-        class="accordion-item"
-        v-if="customAttributeStore.contactAttributeOptions.length > 0"
-      >
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.contactAttributes') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <CustomAttributes
-            :loading="conversationStore.current.loading"
-            :attributes="customAttributeStore.contactAttributeOptions"
-            :customAttributes="conversationStore.current?.contact?.custom_attributes || {}"
-            @update:setattributes="updateContactCustomAttributes"
-          />
-        </AccordionContent>
-      </AccordionItem>
+        <!-- Contact attributes -->
+        <Collapsible
+          v-if="customAttributeStore.contactAttributeOptions.length > 0"
+          defaultOpen
+          class="group/section border-t border-border pt-3"
+        >
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span>{{ t('conversation.sidebar.contactAttributes') }}</span>
+            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3">
+            <CustomAttributes
+              :loading="conversationStore.current.loading"
+              :attributes="customAttributeStore.contactAttributeOptions"
+              :customAttributes="conversationStore.current?.contact?.custom_attributes || {}"
+              @update:setattributes="updateContactCustomAttributes"
+            />
+          </CollapsibleContent>
+        </Collapsible>
 
-      <!-- Page visits (livechat only) -->
-      <AccordionItem
-        value="page_visits"
-        class="accordion-item"
-        v-if="conversationStore.current?.inbox_channel === 'livechat'"
-      >
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.lastVisitedPages') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <ConversationSideBarPageVisits />
-        </AccordionContent>
-      </AccordionItem>
+        <!-- Page visits (livechat only) -->
+        <Collapsible
+          v-if="conversationStore.current?.inbox_channel === 'livechat'"
+          class="group/section border-t border-border pt-3"
+        >
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span>{{ t('conversation.sidebar.lastVisitedPages') }}</span>
+            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3">
+            <ConversationSideBarPageVisits />
+          </CollapsibleContent>
+        </Collapsible>
 
-      <!-- Previous conversations -->
-      <AccordionItem value="previous_conversations" class="accordion-item">
-        <AccordionTrigger class="accordion-trigger">
-          {{ $t('conversation.sidebar.previousConvo') }}
-        </AccordionTrigger>
-        <AccordionContent class="accordion-content">
-          <PreviousConversations />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+        <!-- Previous conversations -->
+        <Collapsible class="group/section border-t border-border pt-3">
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span>{{ t('conversation.sidebar.previousConvo') }}</span>
+            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3">
+            <PreviousConversations />
+          </CollapsibleContent>
+        </Collapsible>
+      </TabsContent>
+
+      <!-- Copilot tab (placeholder) -->
+      <TabsContent value="copilot" class="flex-1 overflow-y-auto m-0 p-4 text-center text-sm text-muted-foreground">
+        Coming soon
+      </TabsContent>
+    </Tabs>
   </div>
 </template>
 
@@ -112,12 +134,9 @@ import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from '@shared-ui/components/ui/accordion'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@shared-ui/components/ui/collapsible'
+import { ChevronDown } from 'lucide-vue-next'
 import ConversationInfo from './ConversationInfo.vue'
 import ConversationSideBarContact from '@/features/conversation/sidebar/ConversationSideBarContact.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
@@ -125,7 +144,6 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { useI18n } from 'vue-i18n'
-import { useStorage } from '@vueuse/core'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
@@ -140,8 +158,6 @@ const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
 const tags = ref([])
-// Save the accordion state in local storage
-const accordionState = useStorage('conversation-sidebar-accordion', [])
 const { t } = useI18n()
 let isConversationChange = false
 customAttributeStore.fetchCustomAttributes()
@@ -256,21 +272,3 @@ const updateContactCustomAttributes = async (attributes) => {
   }
 }
 </script>
-
-<style scoped>
-:deep(.accordion-item) {
-  @apply border-0 mb-2;
-}
-
-:deep(.accordion-trigger) {
-  @apply bg-muted p-2 text-sm font-medium rounded mx-2;
-}
-
-:deep(.accordion-content) {
-  @apply p-4;
-}
-
-:deep(.accordion-content--actions) {
-  @apply space-y-3 p-4;
-}
-</style>

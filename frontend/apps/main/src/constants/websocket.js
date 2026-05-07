@@ -5,6 +5,7 @@ export const WS_EVENT = {
     CONTACT_UPDATE: 'contact_update',
     CONVERSATION_SUBSCRIBE: 'conversation_subscribe',
     CONVERSATION_SUBSCRIBED: 'conversation_subscribed',
+    CONVERSATION_VIEWERS: 'conversation_viewers',
     TYPING: 'typing',
     NEW_NOTIFICATION: 'new_notification',
 }

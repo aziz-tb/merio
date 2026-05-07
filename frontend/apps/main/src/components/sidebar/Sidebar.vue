@@ -1,3 +1,4 @@
+<!-- frontend/apps/main/src/components/sidebar/Sidebar.vue -->
 <script setup>
 import {
   adminNavItems,
@@ -8,28 +9,23 @@ import {
 import { useRoute, useRouter } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import {
-  Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarHeader,
-  SidebarInset,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarProvider
+  SidebarMenuSubItem
 } from '@shared-ui/components/ui/sidebar'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 import {
   ChevronRight,
   EllipsisVertical,
-  User,
   Search,
   Plus,
   CircleDashed,
-  List,
   AtSign,
   Settings,
   Clock,
@@ -85,6 +81,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
+import { Button } from '@shared-ui/components/ui/button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,6 +99,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
+import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -221,8 +219,10 @@ watch(
   { immediate: true }
 )
 
-// Sidebar open state in local storage
-const sidebarOpen = useStorage('mainSidebarOpen', true)
+// Open/closed state for the whole secondary sidebar (drives the slide-out animation).
+const { open: sidebarOpen } = useLayoutSidebar()
+
+// Per-section collapse state for the inbox mode's nested groups.
 const teamInboxOpen = useStorage('teamInboxOpen', true)
 const viewInboxOpen = useStorage('viewInboxOpen', true)
 const sharedViewInboxOpen = useStorage('sharedViewInboxOpen', true)
@@ -236,21 +236,25 @@ const viewToDelete = ref(null)
 </script>
 
 <template>
-  <SidebarProvider
-    style="--sidebar-width: 14rem"
-    :default-open="sidebarOpen"
-    v-on:update:open="sidebarOpen = $event"
+  <aside
+    :class="[
+      'fixed z-10 top-[var(--page-space)] bottom-[var(--page-space)] start-[var(--ld-sidebar-collapsed-width)] flex flex-col w-[var(--ld-sidebar-width)] bg-sidebar shadow-sm overflow-hidden transition-transform duration-200 ease-out',
+      isInboxRoute(route.path)
+        ? 'border-y border-l border-input rounded-l-xl'
+        : 'border border-input rounded-xl',
+      sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
+    ]"
   >
     <!-- Contacts sidebar -->
     <template
       v-if="route.matched.some((record) => record.name && record.name.startsWith('contact'))"
     >
-      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
+      <div class="flex flex-col h-full">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
               <div class="px-1">
-                <span class="font-semibold text-xl">
+                <span class="text-xs font-normal text-muted-foreground uppercase tracking-wider px-2">
                   {{ t('globals.terms.contact', 2) }}
                 </span>
               </div>
@@ -271,7 +275,7 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-      </Sidebar>
+      </div>
     </template>
 
     <!-- Reports sidebar -->
@@ -281,12 +285,12 @@ const viewToDelete = ref(null)
         route.matched.some((record) => record.name && record.name.startsWith('reports'))
       "
     >
-      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
+      <div class="flex flex-col h-full">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
               <div class="px-1">
-                <span class="font-semibold text-xl">
+                <span class="text-xs font-normal text-muted-foreground uppercase tracking-wider px-2">
                   {{ t('globals.terms.report', 2) }}
                 </span>
               </div>
@@ -307,17 +311,17 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-      </Sidebar>
+      </div>
     </template>
 
     <!-- Admin Sidebar -->
     <template v-if="route.matched.some((record) => record.name && record.name.startsWith('admin'))">
-      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
+      <div class="flex flex-col h-full">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
               <div class="flex flex-col items-start justify-between w-full px-1">
-                <span class="font-semibold text-xl">
+                <span class="text-xs font-normal text-muted-foreground uppercase tracking-wider px-2">
                   {{ t('globals.terms.admin') }}
                 </span>
                 <!-- App version -->
@@ -373,17 +377,17 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-      </Sidebar>
+      </div>
     </template>
 
     <!-- Account sidebar -->
     <template v-if="isActiveParent('/account')">
-      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
+      <div class="flex flex-col h-full">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
               <div class="px-1">
-                <span class="font-semibold text-xl">
+                <span class="text-xs font-normal text-muted-foreground uppercase tracking-wider px-2">
                   {{ t('globals.terms.account') }}
                 </span>
               </div>
@@ -407,23 +411,32 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-      </Sidebar>
+      </div>
     </template>
 
     <!-- Inbox sidebar -->
     <template v-if="route.path && isInboxRoute(route.path)">
-      <Sidebar collapsible="offcanvas" class="sidebar-secondary">
+      <div class="flex flex-col h-full">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <div class="flex items-center justify-between w-full px-1">
-                <div class="font-semibold text-xl">
-                  <span>{{ t('globals.terms.inbox') }}</span>
-                </div>
-                <div class="mr-1 mt-1 transition-colors">
-                  <router-link :to="{ name: 'search' }">
-                    <Search size="18" stroke-width="2.5" class="text-muted-foreground hover:text-foreground" />
-                  </router-link>
+              <div class="flex items-center justify-between w-full px-2">
+                <span class="text-base font-semibold text-foreground">{{ t('globals.terms.inbox') }}</span>
+                <div class="flex items-center gap-1">
+                  <Button asChild variant="ghost" size="icon" class="size-7 text-muted-foreground hover:text-foreground">
+                    <router-link :to="{ name: 'search' }" :title="t('globals.terms.search')">
+                      <Search class="size-4" />
+                    </router-link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="size-7 text-muted-foreground hover:text-foreground"
+                    :title="t('globals.messages.new', { name: t('globals.terms.conversation') })"
+                    @click="emit('createConversation')"
+                  >
+                    <Plus class="size-4" />
+                  </Button>
                 </div>
               </div>
             </SidebarMenuItem>
@@ -434,14 +447,8 @@ const viewToDelete = ref(null)
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton @click="emit('createConversation')">
-                    <Plus />
-                    <span>{{ t('conversation.newConversation') }}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/assigned')" @click="navigateToInbox('assigned')">
-                    <User />
+                    <InboxIcon />
                     <span>{{ t('globals.terms.myInbox') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -466,7 +473,7 @@ const viewToDelete = ref(null)
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
-                    <List />
+                    <UsersRound />
                     <span>
                       {{ t('globals.messages.all') }}
                     </span>
@@ -610,14 +617,9 @@ const viewToDelete = ref(null)
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
-      </Sidebar>
+      </div>
     </template>
-
-    <!-- Main Content Area -->
-    <SidebarInset class="bg-canvas !min-h-0 !h-full">
-      <slot></slot>
-    </SidebarInset>
-  </SidebarProvider>
+  </aside>
 
   <!-- View Delete Confirmation Dialog -->
   <AlertDialog v-model:open="isDeleteOpen">
@@ -638,18 +640,3 @@ const viewToDelete = ref(null)
   </AlertDialog>
 </template>
 
-<style scoped>
-:deep(.sidebar-secondary) {
-  @apply border ml-[3.2rem] rounded-lg overflow-hidden;
-  top: 0.40rem !important;
-  bottom: 0.35rem !important;
-  height: auto !important;
-}
-
-/* Override SidebarProvider height */
-:deep(.group\/sidebar-wrapper) {
-  min-height: auto !important;
-  height: 100%;
-}
-
-</style>

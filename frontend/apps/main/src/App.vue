@@ -1,123 +1,52 @@
+<!-- frontend/apps/main/src/App.vue -->
 <template>
   <SmallScreenOverlay v-if="showSmallScreenOverlay" @dismiss="dismissSmallScreen" />
 
-  <div class="flex w-full h-screen text-foreground bg-canvas p-1.5">
-    <!-- Icon sidebar always visible -->
-    <SidebarProvider style="--sidebar-width: 3rem" class="w-auto z-50">
-      <ShadcnSidebar collapsible="none" class="border rounded-lg overflow-hidden">
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/inboxes')">
-                        <router-link :to="lastInboxPath || { name: 'inboxes' }">
-                          <Inbox />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.inbox', 2) }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-                <SidebarMenuItem v-if="userStore.can('contacts:read_all')">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/contacts')">
-                        <router-link :to="{ name: 'contacts' }">
-                          <BookUser />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.contact', 2) }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-                <SidebarMenuItem v-if="userStore.hasReportTabPermissions">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/reports')">
-                        <router-link :to="{ name: 'reports' }">
-                          <FileLineChart />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.report', 2) }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-                <SidebarMenuItem v-if="userStore.hasAdminTabPermissions">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <SidebarMenuButton asChild :isActive="route.path.startsWith('/admin')">
-                        <router-link
-                          :to="{
-                            name: userStore.can('general_settings:manage') ? 'general' : 'admin'
-                          }"
-                        >
-                          <Shield />
-                        </router-link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{{ t('globals.terms.admin') }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <NotificationBell />
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>{{ t('globals.terms.notification', 2) }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarNavUser />
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      </ShadcnSidebar>
-    </SidebarProvider>
+  <SidebarProvider class="contents">
+  <div class="bg-canvas h-screen text-foreground">
+    <!-- Icon rail (extracted to its own component for clarity) -->
+    <IconRail />
 
-    <!-- Main sidebar that collapses -->
-    <div class="flex-1 min-w-0">
-      <Sidebar
-        :userTeams="userStore.teams"
-        :userViews="userViews"
-        :sharedViews="sharedViewStore.sharedViewList"
-        @create-view="openCreateViewForm = true"
-        @edit-view="editView"
-        @delete-view="deleteView"
-        @create-conversation="() => (openCreateConversationDialog = true)"
+    <!-- Secondary sidebar (5 modes, fixed-positioned internally) -->
+    <Sidebar
+      :userTeams="userStore.teams"
+      :userViews="userViews"
+      :sharedViews="sharedViewStore.sharedViewList"
+      @create-view="openCreateViewForm = true"
+      @edit-view="editView"
+      @delete-view="deleteView"
+      @create-conversation="() => (openCreateConversationDialog = true)"
+    />
+
+    <!-- Main content area, offset by both fixed columns. Margin shrinks when the secondary sidebar slides out.
+         The start-padding is dropped only when on an inbox route AND the sidebar is open — that's the only
+         case where we want the conversation list to sit flush against the sidebar with no canvas gap. In every
+         other case (non-inbox route, or sidebar collapsed) we add ps so panels read as standalone rounded cards. -->
+    <div
+      :class="[
+        'h-screen py-[var(--page-space)] pe-[var(--page-space)] overflow-hidden transition-[margin-inline-start] duration-200 ease-out',
+        (isInboxRoute && sidebarOpen) ? '' : 'ps-[var(--page-space)]',
+        sidebarOpen
+          ? 'ms-[calc(var(--ld-sidebar-collapsed-width)+var(--ld-sidebar-width))]'
+          : 'ms-[var(--ld-sidebar-collapsed-width)]'
+      ]"
+    >
+      <div
+        :class="[
+          'flex flex-col h-full overflow-hidden',
+          isInboxRoute
+            ? ''
+            : 'rounded-xl bg-background border border-input shadow-sm'
+        ]"
       >
-        <div class="flex flex-col h-full rounded-lg overflow-hidden bg-background">
-          <!-- Show admin banner only in admin routes -->
-          <AdminBanner v-if="route.path.startsWith('/admin')" />
-
-          <!-- Common header for all pages -->
-          <PageHeader />
-
-          <!-- Main content -->
-          <RouterView class="flex-grow" />
-        </div>
-        <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
-      </Sidebar>
+        <AdminBanner v-if="route.path.startsWith('/admin')" />
+        <PageHeader v-if="!isInboxRoute" />
+        <RouterView class="flex-grow" />
+      </div>
+      <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
     </div>
   </div>
+  </SidebarProvider>
 
   <!-- Command box -->
   <Command />
@@ -127,7 +56,8 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
 import { useStorage } from '@vueuse/core'
 import { RouterView } from 'vue-router'
 import { useUserStore } from './stores/user'
@@ -153,26 +83,13 @@ import ViewForm from '@/features/view/ViewForm.vue'
 import AdminBanner from '@/components/banner/AdminBanner.vue'
 import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
+import IconRail from '@main/components/sidebar/IconRail.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
-import { Inbox, Shield, FileLineChart, BookUser } from 'lucide-vue-next'
 import SmallScreenOverlay from '@/components/SmallScreenOverlay.vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import {
-  Sidebar as ShadcnSidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarMenu,
-  SidebarGroupContent,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider
-} from '@shared-ui/components/ui/sidebar'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
-import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
+import { SidebarProvider } from '@shared-ui/components/ui/sidebar'
 import api from '@main/api'
 
 const route = useRoute()
@@ -184,6 +101,14 @@ function dismissSmallScreen() {
   sessionStorage.setItem('smallScreenDismissed', '1')
   showSmallScreenOverlay.value = false
 }
+
+// True for any /inboxes/* route. Used to drop the outer card on inbox routes
+// where InboxLayout's two ResizablePanels supply their own card frames.
+const isInboxRoute = computed(() => route.path.startsWith('/inboxes'))
+
+// Open/closed state for the secondary sidebar — shared with Sidebar.vue and PageHeader.vue.
+// When closed, the sidebar slides off-canvas and main content reclaims the 240px.
+const { open: sidebarOpen } = useLayoutSidebar()
 
 // Remember last inbox path so navigating back from admin/contacts/reports restores it
 const lastInboxPath = useStorage('lastInboxPath', '')
@@ -322,9 +247,3 @@ const refreshViews = async (data) => {
 }
 </script>
 
-<style scoped>
-:deep(.group\/sidebar-wrapper) {
-  min-height: auto !important;
-  height: 100%;
-}
-</style>

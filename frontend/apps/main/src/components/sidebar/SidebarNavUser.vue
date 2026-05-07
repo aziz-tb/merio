@@ -1,9 +1,9 @@
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
-      <SidebarMenuButton
-        size="md"
-        class="p-0"
+      <button
+        type="button"
+        class="inline-flex items-center justify-center size-9 rounded-md hover:bg-accent"
       >
         <div class="relative">
           <Avatar class="h-8 w-8 rounded">
@@ -18,12 +18,7 @@
             class="absolute bottom-0 right-0 border border-background"
           />
         </div>
-        <div class="grid flex-1 text-left text-sm leading-tight">
-          <span class="truncate font-semibold">{{ userStore.getFullName }}</span>
-          <span class="truncate text-xs">{{ userStore.email }}</span>
-        </div>
-        <ChevronsUpDown class="ml-auto size-4" />
-      </SidebarMenuButton>
+      </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent
       class="min-w-56"
@@ -113,11 +108,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
-import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
-import { ChevronsUpDown, CircleUserRound, LogOut } from 'lucide-vue-next'
+import { CircleUserRound, LogOut } from 'lucide-vue-next'
 import { useUserStore } from '../../stores/user'
 import { useRouter } from 'vue-router'
 

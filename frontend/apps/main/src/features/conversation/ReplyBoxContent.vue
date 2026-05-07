@@ -1,31 +1,28 @@
 <template>
   <!-- Set fixed width only when not in fullscreen. -->
   <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen }">
-    <!-- Message type toggle -->
+    <!-- Top action bar — labelled private-note toggle + fullscreen.
+         The previous tab strip has been replaced by a single labelled button: clicking toggles
+         `messageType` between 'reply' and 'private_note'. Active (private-note) state gets an
+         amber-50 fill + amber-700 text + amber-200 border so the control itself signals the mode,
+         alongside the editor-wide `!bg-private` tint that already exists in ReplyBox.vue. -->
     <div
       class="flex justify-between items-center"
-      :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
+      :class="{ 'mb-2': !isFullscreen, 'border-b border-border pb-2': isFullscreen }"
     >
-      <Tabs v-model="messageType" class="rounded border">
-        <TabsList class="bg-muted p-1 rounded">
-          <TabsTrigger
-            value="reply"
-            class="px-3 py-1 rounded transition-colors duration-200"
-            :class="{ 'bg-background text-foreground': messageType === 'reply' }"
-          >
-            {{ $t('globals.terms.reply') }}
-          </TabsTrigger>
-          <TabsTrigger
-            value="private_note"
-            class="px-3 py-1 rounded transition-colors duration-200"
-            :class="{ 'bg-background text-foreground': messageType === 'private_note' }"
-          >
-            {{ $t('globals.terms.privateNote') }}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <Button class="text-muted-foreground" variant="ghost" @click="toggleFullscreen">
-        <component :is="isFullscreen ? Minimize2 : Maximize2" />
+      <Button
+        variant="ghost"
+        size="sm"
+        :class="messageType === 'private_note'
+          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-700 border border-amber-200'
+          : 'text-muted-foreground hover:text-foreground'"
+        @click="messageType = messageType === 'private_note' ? 'reply' : 'private_note'"
+      >
+        <StickyNote class="size-4 mr-1.5" />
+        {{ $t('globals.terms.privateNote') }}
+      </Button>
+      <Button class="text-muted-foreground" variant="ghost" size="icon" @click="toggleFullscreen">
+        <component :is="isFullscreen ? Minimize2 : Maximize2" class="size-4" />
       </Button>
     </div>
 
@@ -137,12 +134,11 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+import { Maximize2, Minimize2, StickyNote } from 'lucide-vue-next'
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useEmitter } from '@main/composables/useEmitter'
 import AttachmentsPreview from '@/features/conversation/message/attachment/AttachmentsPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'

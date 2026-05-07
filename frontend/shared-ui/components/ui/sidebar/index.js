@@ -31,12 +31,13 @@ export const sidebarMenuButtonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        default:
+          'h-8 px-2 text-[13px] font-normal text-foreground mx-2 rounded-md hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[active=true]:bg-background dark:data-[active=true]:bg-zinc-900 data-[active=true]:text-primary [&[data-active=true]_svg]:opacity-100',
         outline:
           'bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]',
       },
       size: {
-        default: 'h-8 text-sm',
+        default: 'h-8',
         sm: 'h-7 text-xs',
         lg: 'h-12 text-sm group-data-[collapsible=icon]:!p-0',
       },

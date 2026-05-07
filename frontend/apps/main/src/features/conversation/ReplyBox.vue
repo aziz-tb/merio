@@ -113,7 +113,7 @@
 
     <!-- Main Editor non-fullscreen -->
     <div
-      class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col"
+      class="bg-background text-card-foreground border border-border rounded-2xl shadow-sm overflow-hidden mx-4 mb-4 mt-2 px-2 pt-2 flex flex-col"
       :class="{ '!bg-private': messageType === 'private_note' }"
       v-if="!isEditorFullscreen"
     >
