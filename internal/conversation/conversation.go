@@ -35,6 +35,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	wlmodels "github.com/abhinavxd/libredesk/internal/worklog/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
@@ -70,6 +71,7 @@ type Manager struct {
 	settingsStore              settingsStore
 	csatStore                  csatStore
 	webhookStore               webhookStore
+	worklogStore               worklogStore
 	dispatcher                 *notifier.Dispatcher
 	lo                         *logf.Logger
 	db                         *sqlx.DB
@@ -165,6 +167,15 @@ type webhookStore interface {
 	TriggerEvent(event wmodels.WebhookEvent, data any)
 }
 
+// worklogStore is the B1 instrumentation surface. Errors from these methods
+// must never propagate to action callers — instrumentation does not change
+// action semantics. Implementations are expected to log + return.
+type worklogStore interface {
+	StartWorklog(ctx context.Context, convID int64, userID *int64, actionType string, contextPayload json.RawMessage) (int64, error)
+	StartWorklogByUUID(ctx context.Context, convUUID string, userID *int64, actionType string, contextPayload json.RawMessage) (int64, error)
+	EndWorklog(ctx context.Context, worklogID int64, extra json.RawMessage) error
+}
+
 // ContinuityConfig holds configuration for conversation continuity emails
 type ContinuityConfig struct {
 	BatchCheckInterval time.Duration
@@ -196,6 +207,7 @@ func New(
 	automation *automation.Engine,
 	template *template.Manager,
 	webhook webhookStore,
+	worklog worklogStore,
 	dispatcher *notifier.Dispatcher,
 	opts Opts) (*Manager, error) {
 
@@ -235,6 +247,7 @@ func New(
 		settingsStore:              settingsStore,
 		csatStore:                  csatStore,
 		webhookStore:               webhook,
+		worklogStore:               worklog,
 		slaStore:                   slaStore,
 		statusStore:                statusStore,
 		priorityStore:              priorityStore,
@@ -821,7 +834,8 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 }
 
 // UpdateConversationStatus updates the status of a conversation.
-func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, snoozeDur string, actor umodels.User) error {
+// Named return so the deferred worklog hook can observe the final error.
+func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, snoozeDur string, actor umodels.User) (err error) {
 	// Fetch the status name if status ID is provided.
 	if statusID > 0 {
 		s, err := c.statusStore.Get(statusID)
@@ -859,6 +873,20 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		return nil
 	}
 
+	// B1 worklog: an action is taking place. Captures duration via the
+	// deferred end. The closure sees the named-return `err`, which Go sets
+	// from explicit return values on every error path below.
+	var snoozeUntilStr string
+	if !snoozeUntil.IsZero() {
+		snoozeUntilStr = snoozeUntil.UTC().Format(time.RFC3339)
+	}
+	wlID := c.startWorklog(conversationBeforeChange.ID, actor.ID, wlmodels.ActionTypeStatus, map[string]any{
+		"previous_status": oldStatus,
+		"new_status":      status,
+		"snooze_until":    snoozeUntilStr,
+	})
+	defer func() { c.endWorklog(wlID, err) }()
+
 	// Update the conversation status.
 	if _, err := c.q.UpdateConversationStatus.Exec(uuid, status, snoozeUntil); err != nil {
 		c.lo.Error("error updating conversation status", "error", err)
@@ -871,11 +899,8 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		c.lo.Error("error fetching conversation after status change", "uuid", uuid, "error", err)
 	}
 
-	// Trigger webhook for conversation status change
-	var snoozeUntilStr string
-	if !snoozeUntil.IsZero() {
-		snoozeUntilStr = snoozeUntil.UTC().Format(time.RFC3339)
-	}
+	// Trigger webhook for conversation status change. snoozeUntilStr is
+	// already populated above (worklog hook).
 	c.webhookStore.TriggerEvent(wmodels.EventConversationStatusChanged, map[string]any{
 		"conversation_uuid": uuid,
 		"previous_status":   oldStatus,

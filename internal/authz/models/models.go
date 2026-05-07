@@ -92,6 +92,11 @@ const (
 
 	// Activity log
 	PermActivityLogsManage = "activity_logs:manage"
+
+	// Worklog (B1)
+	PermWorklogViewOwn  = "worklog:view_own"
+	PermWorklogViewTeam = "worklog:view_team"
+	PermWorklogViewAll  = "worklog:view_all"
 )
 
 var validPermissions = map[string]struct{}{
@@ -139,6 +144,9 @@ var validPermissions = map[string]struct{}{
 	PermActivityLogsManage:              {},
 	PermWebhooksManage:                  {},
 	PermContextLinksManage:              {},
+	PermWorklogViewOwn:                  {},
+	PermWorklogViewTeam:                 {},
+	PermWorklogViewAll:                  {},
 }
 
 // PermissionExists returns true if the permission exists else false

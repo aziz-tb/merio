@@ -48,6 +48,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/webhook"
+	"github.com/abhinavxd/libredesk/internal/worklog"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -93,6 +94,7 @@ type App struct {
 	inbox            *inbox.Manager
 	tmpl             *template.Manager
 	macro            *macro.Manager
+	worklog          *worklog.Manager
 	conversation     *conversation.Manager
 	automation       *automation.Engine
 	businessHours    *businesshours.Manager
@@ -225,7 +227,8 @@ func main() {
 		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
 		automation                  = initAutomationEngine(db, i18n)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
-		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
+		worklogMgr                  = initWorklog(db, i18n)
+		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher)
 		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
 	)
@@ -272,6 +275,7 @@ func main() {
 		tmpl:             template,
 		notifier:         notifier,
 		consts:           atomic.Value{},
+		worklog:          worklogMgr,
 		conversation:     conversation,
 		automation:       automation,
 		businessHours:    businessHours,

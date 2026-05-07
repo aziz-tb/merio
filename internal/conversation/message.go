@@ -24,6 +24,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	wlmodels "github.com/abhinavxd/libredesk/internal/worklog/models"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
@@ -389,13 +390,21 @@ func (m *Manager) MarkMessageAsPending(uuid string) error {
 }
 
 // SendPrivateNote inserts a private message in a conversation.
-func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
+// Named returns so the deferred B1 worklog hook can observe the final error.
+func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (message models.Message, err error) {
+	// B1 worklog: note action. UUID-based start (conv int ID isn't in scope).
+	wlID := m.startWorklogByUUID(conversationUUID, senderID, wlmodels.ActionTypeNote, map[string]any{
+		"mentions_count":  len(mentions),
+		"has_attachments": len(media) > 0,
+	})
+	defer func() { m.endWorklog(wlID, err) }()
+
 	// Best-effort render template variables before saving.
 	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
 		content = m.template.RenderString(data, content)
 	}
 
-	message := models.Message{
+	message = models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
 		Type:             models.MessageOutgoing,
@@ -406,7 +415,7 @@ func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversat
 		Private:          true,
 		Media:            media,
 	}
-	if err := m.InsertMessage(&message); err != nil {
+	if err = m.InsertMessage(&message); err != nil {
 		return models.Message{}, err
 	}
 
@@ -447,10 +456,19 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 }
 
 // QueueReply queues a reply message in a conversation.
-func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}) (models.Message, error) {
-	var (
-		message = models.Message{}
-	)
+// Named returns so the deferred B1 worklog hook can observe the final error.
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}) (message models.Message, err error) {
+	// B1 worklog. UUID-based start because the int conversation_id is not in
+	// scope here; the SQL resolves it inline. Errors are swallowed inside
+	// the helper — instrumentation must never alter action flow.
+	wlID := m.startWorklogByUUID(conversationUUID, senderID, wlmodels.ActionTypeWrite, map[string]any{
+		"inbox_id":        inboxID,
+		"to_count":        len(to),
+		"cc_count":        len(cc),
+		"bcc_count":       len(bcc),
+		"has_attachments": len(media) > 0,
+	})
+	defer func() { m.endWorklog(wlID, err) }()
 
 	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
 	if err != nil {

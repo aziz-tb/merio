@@ -51,6 +51,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/abhinavxd/libredesk/internal/webhook"
+	"github.com/abhinavxd/libredesk/internal/worklog"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -278,6 +279,19 @@ func initUser(i18n *i18n.I18n, DB *sqlx.DB) *user.Manager {
 	return mgr
 }
 
+// initWorklog inits the B1 worklog manager.
+func initWorklog(db *sqlx.DB, i18n *i18n.I18n) *worklog.Manager {
+	wl, err := worklog.New(worklog.Opts{
+		DB:   db,
+		Lo:   initLogger("worklog_manager"),
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing worklog manager: %v", err)
+	}
+	return wl
+}
+
 // initConversations inits conversation manager.
 func initConversations(
 	i18n *i18n.I18n,
@@ -295,6 +309,7 @@ func initConversations(
 	automationEngine *automation.Engine,
 	template *tmpl.Manager,
 	webhook *webhook.Manager,
+	worklog *worklog.Manager,
 	dispatcher *notifier.Dispatcher,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
@@ -302,7 +317,7 @@ func initConversations(
 		continuityConfig.BatchCheckInterval = ko.MustDuration("conversation.continuity_scan_interval")
 	}
 
-	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, dispatcher, conversation.Opts{
+	c, err := conversation.New(hub, i18n, sla, status, priority, inboxStore, userStore, teamStore, mediaStore, settings, csat, automationEngine, template, webhook, worklog, dispatcher, conversation.Opts{
 		DB:                       db,
 		Lo:                       initLogger("conversation_manager"),
 		OutgoingMessageQueueSize: ko.MustInt("message.outgoing_queue_size"),
