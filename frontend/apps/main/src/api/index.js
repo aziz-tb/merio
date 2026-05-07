@@ -321,6 +321,10 @@ const getConversationMessage = (cuuid, uuid) =>
   http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
 const retryMessage = (cuuid, uuid) =>
   http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
+const forwardMessage = (cuuid, uuid, data) =>
+  http.post(`/api/v1/conversations/${cuuid}/messages/${uuid}/forward`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
 const getConversationMessages = (uuid, params) =>
   http.get(`/api/v1/conversations/${uuid}/messages`, { params })
 const sendMessage = (uuid, data) =>
@@ -594,6 +598,7 @@ export default {
   createConversation,
   sendMessage,
   retryMessage,
+  forwardMessage,
   createUser,
   createInbox,
   updateInbox,

@@ -716,6 +716,8 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s set %s SLA policy", actorName, newValue)
 	case models.ActivityParticipantAdded:
 		content = fmt.Sprintf("%s joined the conversation", newValue)
+	case models.ActivityMessageForward:
+		content = fmt.Sprintf("%s forwarded a message to %s", actorName, newValue)
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}

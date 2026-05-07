@@ -224,6 +224,80 @@ func (m *Manager) Attach(id int, model string, modelID int) error {
 	return nil
 }
 
+// Clone duplicates an existing media file (storage blob + DB row) and attaches the new copy to
+// (modelType, modelID). Used for forwarding a message: the forwarded message gets its own
+// independent media rows so deleting the original doesn't break the forward (the underlying
+// `media.model_id` column is single-owner — re-attaching would steal the row from the original).
+//
+// `ContentID` is preserved verbatim so cid:... references in the cloned HTML body still resolve
+// at send time via the existing CID-rewrite path in the conversation send flow.
+//
+// Pass modelID = 0 with a non-empty modelType to leave the row temporarily unattached (the caller
+// can call `Attach` afterwards once the new owner's ID is known); pass a real modelID to attach
+// immediately. Use `ModelID: null.IntFromPtr(nil)` semantics via 0 = unattached.
+func (m *Manager) Clone(srcID int, modelType string, modelID int) (models.Media, error) {
+	src, err := m.Get(srcID, "")
+	if err != nil {
+		return models.Media{}, err
+	}
+
+	// Read the underlying blob from the source store.
+	blob, err := m.store.GetBlob(src.UUID)
+	if err != nil {
+		m.lo.Error("error reading source media blob for clone", "src_uuid", src.UUID, "error", err)
+		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	// Upload to a fresh UUID. Use a bytes.Reader-equivalent so we can seek; strings.NewReader works
+	// for []byte via a small wrapper.
+	newUUID := uuid.New().String()
+	if _, err := m.store.Put(newUUID, src.ContentType, &readSeekerBytes{b: blob}); err != nil {
+		m.lo.Error("error writing cloned media blob", "new_uuid", newUUID, "error", err)
+		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUploadingFile"), nil)
+	}
+
+	// Insert a new row with the same metadata; preserve ContentID for CID rewriting.
+	var (
+		nullModelType = null.NewString(modelType, modelType != "")
+		nullModelID   = null.NewInt(modelID, modelID > 0)
+	)
+	cloned, err := m.Insert(src.Disposition, src.Filename, src.ContentType, src.ContentID, nullModelType, newUUID, nullModelID, src.Size, src.Meta)
+	if err != nil {
+		// Best-effort cleanup of the orphan blob if the DB insert failed.
+		m.store.Delete(newUUID)
+		return models.Media{}, err
+	}
+	return cloned, nil
+}
+
+// readSeekerBytes is a tiny adapter that turns a []byte into an io.ReadSeeker, used by Clone
+// to feed an in-memory blob into the upload pipeline (which requires Seek for content-type detection).
+type readSeekerBytes struct {
+	b   []byte
+	pos int64
+}
+
+func (r *readSeekerBytes) Read(p []byte) (int, error) {
+	if r.pos >= int64(len(r.b)) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.b[r.pos:])
+	r.pos += int64(n)
+	return n, nil
+}
+
+func (r *readSeekerBytes) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		r.pos = offset
+	case io.SeekCurrent:
+		r.pos += offset
+	case io.SeekEnd:
+		r.pos = int64(len(r.b)) + offset
+	}
+	return r.pos, nil
+}
+
 // GetByModel retrieves all media files attached to a specific model.
 func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) {
 	var media = make([]models.Media, 0)
