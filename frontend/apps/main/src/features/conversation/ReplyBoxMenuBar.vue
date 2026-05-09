@@ -39,17 +39,20 @@
       </Toggle>
     </div>
     <Button class="h-8 w-6 px-8" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
-      {{ $t('globals.messages.send') }}
+      {{ sendLabel }}
     </Button>
   </div>
 </template>
 
 <script setup>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
 import { Paperclip, Smile } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([
@@ -66,7 +69,7 @@ const emojiPickerRef = ref(null)
 const emit = defineEmits(['emojiSelect'])
 
 // Using defineProps for props that don't need two-way binding
-defineProps({
+const props = defineProps({
   isFullscreen: Boolean,
   isSending: Boolean,
   enableSend: Boolean,
@@ -76,7 +79,19 @@ defineProps({
     default: true
   },
   handleFileUpload: Function,
-  handleInlineImageUpload: Function
+  handleInlineImageUpload: Function,
+  messageType: {
+    type: String,
+    default: 'reply'
+  }
+})
+
+// Send-button label tracks the active mode: Send / Forward / Add note. Borrowed from
+// Help Scout — eliminates the "did I just send a private note publicly?" failure mode.
+const sendLabel = computed(() => {
+  if (props.messageType === 'forward') return t('globals.terms.forward')
+  if (props.messageType === 'private_note') return t('globals.terms.addNote')
+  return t('globals.messages.send')
 })
 
 onClickOutside(emojiPickerRef, () => {

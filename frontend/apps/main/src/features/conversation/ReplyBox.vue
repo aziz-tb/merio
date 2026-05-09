@@ -99,7 +99,9 @@
           v-model:bcc="bcc"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
+          v-model:showCc="showCc"
           v-model:showBcc="showBcc"
+          v-model:forwardedSources="forwardedSources"
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
@@ -113,7 +115,7 @@
 
     <!-- Main Editor non-fullscreen -->
     <div
-      class="bg-background text-card-foreground border border-border rounded-2xl shadow-sm overflow-hidden mx-4 mb-4 mt-2 px-2 pt-2 flex flex-col"
+      class="bg-background text-card-foreground border border-border rounded-lg shadow-sm overflow-hidden mx-4 mb-4 mt-2 px-2 pt-2 flex flex-col"
       :class="{ '!bg-private': messageType === 'private_note' }"
       v-if="!isEditorFullscreen"
     >
@@ -132,7 +134,9 @@
         v-model:bcc="bcc"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
+        v-model:showCc="showCc"
         v-model:showBcc="showBcc"
+        v-model:forwardedSources="forwardedSources"
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
@@ -179,6 +183,7 @@ import { Input } from '@shared-ui/components/ui/input'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
+import { buildForwardSourceHTML } from '@/features/conversation/forwardBody.js'
 import { UserTypeAgent } from '@/constants/user'
 import {
   Form,
@@ -232,10 +237,15 @@ const isOpenAIKeyUpdating = ref(false)
 const isEditorFullscreen = ref(false)
 const isSending = ref(false)
 const messageType = useStorage('replyBoxMessageType', 'reply')
+// Forward state isn't persisted across reloads (an empty editor in forward mode would be a bad
+// UX). Reset to reply if a previous session left forward mode in localStorage.
+if (messageType.value === 'forward') messageType.value = 'reply'
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
+const showCc = ref(false)
 const showBcc = ref(false)
+const forwardedSources = ref([])
 const emailErrors = ref([])
 const aiPrompts = ref([])
 const replyBoxContentRef = ref(null)
@@ -315,9 +325,86 @@ const hasTextContent = computed(() => {
 })
 
 /**
+ * Processes a Forward send. The editor only holds the agent's note. Forwarded sources live
+ * in `forwardedSources` (state) and are rendered via `buildForwardSourceHTML` at send time —
+ * keeping email HTML out of Tiptap so ProseMirror can't strip it during parse.
+ */
+const processForward = async () => {
+  const convUUID = conversationStore.current.uuid
+
+  if (!to.value.trim()) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: t('replyBox.toRequired')
+    })
+    return
+  }
+
+  if (forwardedSources.value.length === 0) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: t('replyBox.noMessageToForward')
+    })
+    return
+  }
+
+  const parseList = (s) =>
+    s
+      ? s
+          .split(',')
+          .map((e) => e.trim())
+          .filter(Boolean)
+      : []
+
+  const note = htmlContent.value || ''
+  const blocks = forwardedSources.value.map(buildForwardSourceHTML).join('')
+  const body = note + blocks
+  const messageUUIDs = forwardedSources.value.map((s) => s.uuid)
+
+  isSending.value = true
+  try {
+    await api.forwardMessage(convUUID, messageUUIDs[0], {
+      to: parseList(to.value),
+      cc: parseList(cc.value),
+      bcc: parseList(bcc.value),
+      message_uuids: messageUUIDs,
+      body,
+      skip_quote: true
+    })
+    // Reset state: editor body, recipients, draft, then flip back to reply mode.
+    htmlContent.value = ''
+    to.value = ''
+    cc.value = ''
+    bcc.value = ''
+    showCc.value = false
+    showBcc.value = false
+    forwardedSources.value = []
+    emailErrors.value = []
+    clearDraft(currentDraftKey.value)
+    clearMediaFiles()
+    messageType.value = 'reply'
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isSending.value = false
+  }
+}
+
+/**
  * Processes the send action.
  */
 const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false) => {
+  // Forward mode has its own send path: a separate endpoint, no optimistic pending message,
+  // attachments cloned server-side from the listed source UUIDs.
+  if (messageType.value === 'forward') {
+    isEditorFullscreen.value = false
+    await processForward()
+    return
+  }
+
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
@@ -520,7 +607,12 @@ watch(
 watch(
   () => conversationStore.currentCC,
   (newVal) => {
-    cc.value = newVal?.join(', ') || ''
+    const newCc = newVal?.join(', ') || ''
+    cc.value = newCc
+    // Auto-show the CC field when there's existing CC content (e.g. inherited from the conversation).
+    if (newCc.length > 0) {
+      showCc.value = true
+    }
   },
   { deep: true, immediate: true }
 )
@@ -552,6 +644,18 @@ watch(
   () => {
     clearMediaFiles()
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+    // Forward state is conversation-scoped: dropping it on switch avoids stale quoted blocks
+    // from conversation A leaking into conversation B's composer.
+    if (messageType.value === 'forward') {
+      messageType.value = 'reply'
+      htmlContent.value = ''
+      to.value = ''
+      cc.value = ''
+      bcc.value = ''
+      showCc.value = false
+      showBcc.value = false
+      forwardedSources.value = []
+    }
     // Focus editor on conversation change
     setTimeout(() => {
       replyBoxContentRef.value?.focus()

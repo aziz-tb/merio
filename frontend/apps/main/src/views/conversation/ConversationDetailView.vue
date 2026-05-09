@@ -10,7 +10,7 @@
       <ResizablePanel :default-size="sidebarOpen ? panelSizes[0] : 100" :min-size="50">
         <div
           :class="[
-            'h-full bg-sidebar border border-input rounded-xl shadow-sm overflow-hidden',
+            'h-full bg-sidebar border border-input rounded-lg shadow-sm overflow-hidden',
             sidebarOpen ? 'mr-0.5' : ''
           ]"
         >
@@ -32,7 +32,7 @@
         @collapse="onSidebarCollapse"
         @expand="onSidebarExpand"
       >
-        <div class="h-full bg-background border border-input rounded-xl shadow-sm overflow-hidden ml-0.5">
+        <div class="h-full bg-background border border-input rounded-lg shadow-sm overflow-hidden ml-0.5">
           <div class="h-full overflow-y-auto overflow-x-hidden">
             <ConversationSideBar />
           </div>

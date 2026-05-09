@@ -25,10 +25,13 @@ import (
 var fwdSubjectPrefix = regexp.MustCompile(`(?i)^\s*(fwd?|fw):\s*`)
 
 type forwardReq struct {
-	To      []string `json:"to"`
-	CC      []string `json:"cc"`
-	BCC     []string `json:"bcc"`
-	Comment string   `json:"comment"`
+	To           []string `json:"to"`
+	CC           []string `json:"cc"`
+	BCC          []string `json:"bcc"`
+	MessageUUIDs []string `json:"message_uuids"`
+	Body         string   `json:"body"`
+	SkipQuote    bool     `json:"skip_quote"`
+	Comment      string   `json:"comment"`
 }
 
 type messageReq struct {
@@ -288,11 +291,18 @@ func handleSendMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(message)
 }
 
-// handleForwardMessage forwards an existing message to one or more new recipients within the same
-// conversation. v1 is email-only (the inbox channel must be ChannelEmail). The original message's
-// attachments are CLONED (new media rows + duplicated blob), not reattached, so the original keeps
-// its attachments and the cloned media's ContentID is preserved verbatim — the existing CID
-// rewrite at send time resolves cid:... refs in the quoted body to the cloned media's URLs.
+// handleForwardMessage forwards one or more existing messages to new recipients within the same
+// conversation. v1 is email-only (the inbox channel must be ChannelEmail). Each source message's
+// attachments are CLONED (new media rows + duplicated blob), not reattached, so the originals keep
+// their attachments and each cloned media's ContentID is preserved verbatim — the CID rewrite at
+// send time resolves cid:... refs in the body to the cloned media's URLs.
+//
+// Two modes:
+//   - New (preferred): caller sends `message_uuids[]` + `body` (full HTML built client-side) +
+//     `skip_quote: true`. Server clones attachments from each source, submits Body verbatim.
+//   - Legacy: caller sends `comment` only with the URL-path source UUID. Server builds the quoted
+//     body via buildForwardedBody and appends the original content. Kept for back-compat; remove
+//     once all callers migrate.
 func handleForwardMessage(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -333,69 +343,94 @@ func handleForwardMessage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Forwarding is only supported on email conversations.", nil, envelope.InputError)
 	}
 
-	// Load the original message.
-	orig, err := app.conversation.GetMessage(muuid)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
+	// Resolve source UUIDs: prefer body field, fall back to URL path for legacy single-source callers.
+	sourceUUIDs := req.MessageUUIDs
+	if len(sourceUUIDs) == 0 && muuid != "" {
+		sourceUUIDs = []string{muuid}
+	}
+	if len(sourceUUIDs) == 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`message_uuids`"), nil, envelope.InputError)
 	}
 
-	// B1 worklog: forward action. Started here, after access checks succeed
-	// and the original message is loaded — the soonest the action is
-	// committed-to-attempt. Ended at function exit; the captured `err` from
-	// the trailing `r.SendEnvelope(newMsg)` is fine because the named-return
-	// idiom is not in play here, so we explicitly close on the success path.
+	// Load all source messages up-front so we can fail early on missing/inaccessible UUIDs and
+	// gather the primary (oldest) for subject derivation.
+	sources := make([]cmodels.Message, 0, len(sourceUUIDs))
+	for _, uuid := range sourceUUIDs {
+		m, err := app.conversation.GetMessage(uuid)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		sources = append(sources, m)
+	}
+	primary := sources[0]
+
+	// B1 worklog: forward action. Started after access checks succeed and sources are loaded —
+	// the soonest the action is committed-to-attempt.
 	var fwdUserID *int64
 	if user.ID > 0 {
 		v := int64(user.ID)
 		fwdUserID = &v
 	}
 	fwdCtxJSON, _ := json.Marshal(map[string]any{
-		"original_message_uuid": orig.UUID,
-		"to_count":              len(req.To),
-		"cc_count":              len(req.CC),
-		"bcc_count":             len(req.BCC),
-		"has_comment":           strings.TrimSpace(req.Comment) != "",
+		"primary_message_uuid": primary.UUID,
+		"source_count":         len(sources),
+		"to_count":             len(req.To),
+		"cc_count":             len(req.CC),
+		"bcc_count":            len(req.BCC),
+		"skip_quote":           req.SkipQuote,
 	})
 	wlID, _ := app.worklog.StartWorklog(context.Background(), int64(conv.ID), fwdUserID, wlmodels.ActionTypeForward, fwdCtxJSON)
 	defer app.worklog.EndWorklog(context.Background(), wlID, nil)
 
-	// Decode original meta to extract from/to/subject for the forwarded body header.
-	var origMeta map[string]any
-	if len(orig.Meta) > 0 {
-		_ = json.Unmarshal(orig.Meta, &origMeta)
+	// Subject: derive from the primary source, stripping any existing Fwd: prefix so the chain doesn't stack.
+	var primaryMeta map[string]any
+	if len(primary.Meta) > 0 {
+		_ = json.Unmarshal(primary.Meta, &primaryMeta)
 	}
-	origFrom, _ := origMeta["from"].([]any)
-	origTo, _ := origMeta["to"].([]any)
-	origSubject, _ := origMeta["subject"].(string)
+	primarySubject, _ := primaryMeta["subject"].(string)
+	cleanedSubject := "Fwd: " + fwdSubjectPrefix.ReplaceAllString(primarySubject, "")
 
-	// Strip any leading Fwd:/FW:/FWD: (case-insensitive) so the prefix doesn't stack across forwards.
-	cleanedSubject := "Fwd: " + fwdSubjectPrefix.ReplaceAllString(origSubject, "")
+	// Build body. New path: client supplied full HTML in Body; submit verbatim.
+	// Legacy path: server-build a single quoted block from the primary source's content.
+	var body string
+	if req.SkipQuote && strings.TrimSpace(req.Body) != "" {
+		body = req.Body
+	} else {
+		primaryFrom, _ := primaryMeta["from"].([]any)
+		primaryTo, _ := primaryMeta["to"].([]any)
+		body = buildForwardedBody(req.Comment, primaryFrom, primaryTo, primarySubject, primary.CreatedAt.Format("Mon, 2 Jan 2006 15:04:05 -0700"), primary.Content)
+	}
 
-	// Build the forwarded HTML body. The original content is wrapped verbatim so cid: refs survive.
-	body := buildForwardedBody(req.Comment, origFrom, origTo, origSubject, orig.CreatedAt.Format("Mon, 2 Jan 2006 15:04:05 -0700"), orig.Content)
-
-	// Clone the original's attachments so the new message has independent media rows.
+	// Clone every source's attachments into a single attachment list for the new forward message.
 	// Attachments expose UUID (not the numeric media.id), so look up each via Get(0, uuid) first.
 	// Pass modelID=0 — InsertMessage downstream calls mediaStore.Attach for each media in the
 	// message, pointing the cloned rows at the new message's ID.
-	clonedMedia := make([]mmodels.Media, 0, len(orig.Attachments))
-	for _, att := range orig.Attachments {
-		src, err := app.media.Get(0, att.UUID)
-		if err != nil {
-			app.lo.Error("error fetching source media for forward clone", "src_uuid", att.UUID, "error", err)
-			return sendErrorEnvelope(r, err)
+	clonedMedia := make([]mmodels.Media, 0)
+	for _, src := range sources {
+		for _, att := range src.Attachments {
+			srcMedia, err := app.media.Get(0, att.UUID)
+			if err != nil {
+				app.lo.Error("error fetching source media for forward clone", "src_uuid", att.UUID, "error", err)
+				return sendErrorEnvelope(r, err)
+			}
+			cm, err := app.media.Clone(srcMedia.ID, mmodels.ModelMessages, 0)
+			if err != nil {
+				app.lo.Error("error cloning media for forward", "src_id", srcMedia.ID, "error", err)
+				return sendErrorEnvelope(r, err)
+			}
+			clonedMedia = append(clonedMedia, cm)
 		}
-		cm, err := app.media.Clone(src.ID, mmodels.ModelMessages, 0)
-		if err != nil {
-			app.lo.Error("error cloning media for forward", "src_id", src.ID, "error", err)
-			return sendErrorEnvelope(r, err)
-		}
-		clonedMedia = append(clonedMedia, cm)
 	}
 
+	// Collect source UUIDs for meta. Multi-source: include both primary (legacy readers) and full list.
+	forwardedUUIDs := make([]string, 0, len(sources))
+	for _, s := range sources {
+		forwardedUUIDs = append(forwardedUUIDs, s.UUID)
+	}
 	meta := map[string]any{
-		"subject":        cleanedSubject,
-		"forwarded_from": orig.UUID,
+		"subject":             cleanedSubject,
+		"forwarded_from":      primary.UUID,
+		"forwarded_from_list": forwardedUUIDs,
 	}
 
 	newMsg, err := app.conversation.QueueReply(clonedMedia, conv.InboxID, user.ID, conv.ContactID, cuuid, body, req.To, req.CC, req.BCC, meta)
@@ -422,14 +457,13 @@ func buildForwardedBody(comment string, origFrom, origTo []any, origSubject, ori
 		sb.WriteString(html.EscapeString(comment))
 		sb.WriteString("</p>")
 	}
-	sb.WriteString(`<p>---------- Forwarded message ----------</p>`)
+	sb.WriteString(`<blockquote style="border-left:2px solid #e5e7eb;padding-left:1em;color:#374151;">`)
 	sb.WriteString("<p>")
 	sb.WriteString(fmt.Sprintf("<b>From:</b> %s<br/>", html.EscapeString(joinAny(origFrom))))
 	sb.WriteString(fmt.Sprintf("<b>Date:</b> %s<br/>", html.EscapeString(origDate)))
 	sb.WriteString(fmt.Sprintf("<b>Subject:</b> %s<br/>", html.EscapeString(origSubject)))
 	sb.WriteString(fmt.Sprintf("<b>To:</b> %s", html.EscapeString(joinAny(origTo))))
 	sb.WriteString("</p>")
-	sb.WriteString(`<blockquote style="border-left:2px solid #e5e7eb;padding-left:1em;color:#374151;">`)
 	// Original content is rendered verbatim (already HTML); do not escape — that would break formatting + cid: refs.
 	sb.WriteString(origContent)
 	sb.WriteString(`</blockquote>`)

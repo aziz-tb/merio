@@ -17,7 +17,7 @@
       <div
         :class="[
           'h-full bg-sidebar border border-input shadow-sm overflow-hidden mr-0.5',
-          sidebarOpen ? 'rounded-r-xl' : 'rounded-xl'
+          sidebarOpen ? 'rounded-r-lg' : 'rounded-lg'
         ]"
       >
         <ConversationList />

@@ -27,23 +27,6 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <p class="text-xs text-muted-foreground tabular-nums cursor-default">{{ formatMessageTimestamp(message.created_at) }}</p>
-          <DropdownMenu v-if="canForward">
-            <DropdownMenuTrigger as-child>
-              <button
-                type="button"
-                class="opacity-0 group-hover:opacity-100 focus:opacity-100 inline-flex items-center justify-center size-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-opacity"
-                :title="t('globals.messages.more', 1) || 'More'"
-              >
-                <MoreHorizontal class="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="forwardOpen = true">
-                <Forward class="size-4 mr-2" />
-                {{ t('conversation.forwardMessage') || 'Forward' }}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -61,8 +44,27 @@
           :html="sanitizedContent"
           :allowedSchemas="['cid', 'https', 'http', 'mailto']"
           class="native-html whitespace-pre-wrap break-words"
-          :class="{ 'mb-3': message.attachments.length > 0, 'show-quoted-text': showQuotedText, 'hide-quoted-text': !showQuotedText }"
+          :class="{
+            'mb-3': message.attachments.length > 0,
+            'show-quoted-text': showQuotedText,
+            'hide-quoted-text': !showQuotedText,
+            'show-forwarded-text': showForwardedText,
+            'hide-forwarded-text': !showForwardedText
+          }"
         />
+
+        <!-- Forwarded Text Toggle: Gmail-style [...] indicator that expands/collapses
+             every <div data-source-uuid="..."> wrapper inserted by the forward composer.
+             Default collapsed so the agent's note stays prominent and the bulk thread is one tap away. -->
+        <button
+          v-if="hasForwardedContent"
+          type="button"
+          @click="toggleForwarded"
+          :title="showForwardedText ? t('conversation.hideForwardedMessages') : t('conversation.showForwardedMessages')"
+          class="inline-flex items-center justify-center mt-2 px-2 py-0.5 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200"
+        >
+          <MoreHorizontal class="size-4" />
+        </button>
 
         <!-- Quoted Text Toggle (incoming only) -->
         <div
@@ -105,7 +107,6 @@
     </div>
   </div>
 
-  <ForwardMessageDialog v-if="canForward" v-model:open="forwardOpen" :message="message" />
 </template>
 
 <script setup>
@@ -113,17 +114,15 @@ import { computed, ref } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, MoreHorizontal, Forward } from 'lucide-vue-next'
+import { Lock, Mail, RotateCcw, Check, MoreHorizontal } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
-import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
+import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@shared-ui/components/ui/dropdown-menu'
 import { Letter } from 'vue-letter'
 import MessageAttachmentPreview from '@main/features/conversation/message/attachment/MessageAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
-import ForwardMessageDialog from '@/features/conversation/ForwardMessageDialog.vue'
 import api from '@main/api'
 
 const props = defineProps({
@@ -184,6 +183,16 @@ const toggleQuote = () => {
   showQuotedText.value = !showQuotedText.value
 }
 
+// Forwarded-block toggle: collapses/expands every <div data-source-uuid="..."> in the
+// rendered message. Default collapsed so the agent's note is the focus.
+const showForwardedText = ref(false)
+const hasForwardedContent = computed(
+  () => sanitizedContent.value.includes('data-source-uuid')
+)
+const toggleForwarded = () => {
+  showForwardedText.value = !showForwardedText.value
+}
+
 // Envelope visibility (both directions)
 const showEnvelope = computed(() => {
   return (
@@ -195,13 +204,4 @@ const showEnvelope = computed(() => {
   )
 })
 
-// Forward menu — email-only in v1, hidden on private notes (no point forwarding an internal note),
-// hidden on pending/failed messages (nothing to forward yet).
-const forwardOpen = ref(false)
-const canForward = computed(() =>
-  convStore.current?.inbox_channel === 'email' &&
-  !isPrivateMessage.value &&
-  props.message.status !== 'pending' &&
-  props.message.status !== 'failed'
-)
 </script>

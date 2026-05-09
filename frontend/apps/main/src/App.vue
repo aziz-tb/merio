@@ -36,10 +36,9 @@
           'flex flex-col h-full overflow-hidden',
           isInboxRoute
             ? ''
-            : 'rounded-xl bg-background border border-input shadow-sm'
+            : 'rounded-lg bg-background border border-input shadow-sm'
         ]"
       >
-        <AdminBanner v-if="route.path.startsWith('/admin')" />
         <PageHeader v-if="!isInboxRoute" />
         <RouterView class="flex-grow" />
       </div>
