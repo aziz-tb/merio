@@ -32,6 +32,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/knowledge"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
@@ -369,6 +370,20 @@ func initMacro(db *sqlx.DB, i18n *i18n.I18n) *macro.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing macro manager: %v", err)
+	}
+	return m
+}
+
+// initKnowledge inits knowledge base manager.
+func initKnowledge(db *sqlx.DB, i18n *i18n.I18n) *knowledge.Manager {
+	var lo = initLogger("knowledge")
+	m, err := knowledge.New(knowledge.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing knowledge manager: %v", err)
 	}
 	return m
 }

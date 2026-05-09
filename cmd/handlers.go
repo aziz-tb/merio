@@ -122,6 +122,22 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.DELETE("/api/v1/macros/{id}", perm(handleDeleteMacro, "macros:manage"))
 	g.POST("/api/v1/conversations/{uuid}/macros/{id}/apply", auth(handleApplyMacro))
 
+	// Knowledge base.
+	g.GET("/api/v1/knowledge/folders", perm(handleListKnowledgeFolders, "knowledge:read"))
+	g.GET("/api/v1/knowledge/folders/{id}", perm(handleGetKnowledgeFolder, "knowledge:read"))
+	g.POST("/api/v1/knowledge/folders", perm(handleCreateKnowledgeFolder, "knowledge:write"))
+	g.PUT("/api/v1/knowledge/folders/{id}", perm(handleUpdateKnowledgeFolder, "knowledge:write"))
+	g.POST("/api/v1/knowledge/folders/{id}/move", perm(handleMoveKnowledgeFolder, "knowledge:write"))
+	g.DELETE("/api/v1/knowledge/folders/{id}", perm(handleDeleteKnowledgeFolder, "knowledge:delete"))
+	g.GET("/api/v1/knowledge/articles", perm(handleListKnowledgeArticles, "knowledge:read"))
+	g.GET("/api/v1/knowledge/articles/{id}", perm(handleGetKnowledgeArticle, "knowledge:read"))
+	g.POST("/api/v1/knowledge/articles", perm(handleCreateKnowledgeArticle, "knowledge:write"))
+	g.PUT("/api/v1/knowledge/articles/{id}", perm(handleUpdateKnowledgeArticle, "knowledge:write"))
+	g.POST("/api/v1/knowledge/articles/{id}/publish", perm(handlePublishKnowledgeArticle, "knowledge:publish"))
+	g.POST("/api/v1/knowledge/articles/{id}/unpublish", perm(handleUnpublishKnowledgeArticle, "knowledge:publish"))
+	g.POST("/api/v1/knowledge/articles/{id}/move", perm(handleMoveKnowledgeArticle, "knowledge:write"))
+	g.DELETE("/api/v1/knowledge/articles/{id}", perm(handleDeleteKnowledgeArticle, "knowledge:delete"))
+
 	// Agents.
 	g.GET("/api/v1/agents/me", auth(handleGetCurrentAgent))
 	g.PUT("/api/v1/agents/me", auth(handleUpdateCurrentAgent))

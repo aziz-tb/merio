@@ -97,6 +97,12 @@ const (
 	PermWorklogViewOwn  = "worklog:view_own"
 	PermWorklogViewTeam = "worklog:view_team"
 	PermWorklogViewAll  = "worklog:view_all"
+
+	// Knowledge (B3)
+	PermKnowledgeRead    = "knowledge:read"
+	PermKnowledgeWrite   = "knowledge:write"
+	PermKnowledgePublish = "knowledge:publish"
+	PermKnowledgeDelete  = "knowledge:delete"
 )
 
 var validPermissions = map[string]struct{}{
@@ -147,6 +153,10 @@ var validPermissions = map[string]struct{}{
 	PermWorklogViewOwn:                  {},
 	PermWorklogViewTeam:                 {},
 	PermWorklogViewAll:                  {},
+	PermKnowledgeRead:                   {},
+	PermKnowledgeWrite:                  {},
+	PermKnowledgePublish:                {},
+	PermKnowledgeDelete:                 {},
 }
 
 // PermissionExists returns true if the permission exists else false

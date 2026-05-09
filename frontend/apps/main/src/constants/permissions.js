@@ -45,5 +45,9 @@ export const permissions = {
   CONTEXT_LINKS_MANAGE: 'context_links:manage',
   WORKLOG_VIEW_OWN: 'worklog:view_own',
   WORKLOG_VIEW_TEAM: 'worklog:view_team',
-  WORKLOG_VIEW_ALL: 'worklog:view_all'
+  WORKLOG_VIEW_ALL: 'worklog:view_all',
+  KNOWLEDGE_READ: 'knowledge:read',
+  KNOWLEDGE_WRITE: 'knowledge:write',
+  KNOWLEDGE_PUBLISH: 'knowledge:publish',
+  KNOWLEDGE_DELETE: 'knowledge:delete'
 }

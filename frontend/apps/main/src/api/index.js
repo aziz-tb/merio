@@ -508,6 +508,22 @@ const initiateOAuthFlow = (provider, data) =>
     }
   })
 
+// Knowledge base.
+const getKnowledgeFolders = () => http.get('/api/v1/knowledge/folders')
+const getKnowledgeFolder = (id) => http.get(`/api/v1/knowledge/folders/${id}`)
+const createKnowledgeFolder = (data) => http.post('/api/v1/knowledge/folders', data)
+const updateKnowledgeFolder = (id, data) => http.put(`/api/v1/knowledge/folders/${id}`, data)
+const moveKnowledgeFolder = (id, data) => http.post(`/api/v1/knowledge/folders/${id}/move`, data)
+const deleteKnowledgeFolder = (id) => http.delete(`/api/v1/knowledge/folders/${id}`)
+const getKnowledgeArticles = (params) => http.get('/api/v1/knowledge/articles', { params, paramsSerializer: (p) => qs.stringify(p, { arrayFormat: 'repeat' }) })
+const getKnowledgeArticle = (id) => http.get(`/api/v1/knowledge/articles/${id}`)
+const createKnowledgeArticle = (data) => http.post('/api/v1/knowledge/articles', data)
+const updateKnowledgeArticle = (id, data) => http.put(`/api/v1/knowledge/articles/${id}`, data)
+const publishKnowledgeArticle = (id) => http.post(`/api/v1/knowledge/articles/${id}/publish`)
+const unpublishKnowledgeArticle = (id) => http.post(`/api/v1/knowledge/articles/${id}/unpublish`)
+const moveKnowledgeArticle = (id, data) => http.post(`/api/v1/knowledge/articles/${id}/move`, data)
+const deleteKnowledgeArticle = (id) => http.delete(`/api/v1/knowledge/articles/${id}`)
+
 // User notifications (in-app)
 const getNotifications = (params) => http.get('/api/v1/notifications', { params })
 const getNotificationStats = () => http.get('/api/v1/notifications/stats')
@@ -576,6 +592,20 @@ export default {
   updateMacro,
   deleteMacro,
   applyMacro,
+  getKnowledgeFolders,
+  getKnowledgeFolder,
+  createKnowledgeFolder,
+  updateKnowledgeFolder,
+  moveKnowledgeFolder,
+  deleteKnowledgeFolder,
+  getKnowledgeArticles,
+  getKnowledgeArticle,
+  createKnowledgeArticle,
+  updateKnowledgeArticle,
+  publishKnowledgeArticle,
+  unpublishKnowledgeArticle,
+  moveKnowledgeArticle,
+  deleteKnowledgeArticle,
   updateCurrentUser,
   updateAssignee,
   updateConversationStatus,

@@ -38,6 +38,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/knowledge"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
@@ -94,6 +95,7 @@ type App struct {
 	inbox            *inbox.Manager
 	tmpl             *template.Manager
 	macro            *macro.Manager
+	knowledge        *knowledge.Manager
 	worklog          *worklog.Manager
 	conversation     *conversation.Manager
 	automation       *automation.Engine
@@ -288,6 +290,7 @@ func main() {
 		role:             initRole(db, i18n),
 		tag:              initTag(db, i18n),
 		macro:            initMacro(db, i18n),
+		knowledge:        initKnowledge(db, i18n),
 		ai:               initAI(db, i18n),
 		importer:         initImporter(i18n),
 		webhook:          webhook,

@@ -42,6 +42,23 @@
           <TooltipContent side="right"><p>{{ t('globals.terms.contact', 2) }}</p></TooltipContent>
         </Tooltip>
 
+        <Tooltip v-if="userStore.can('knowledge:read')">
+          <TooltipTrigger as-child>
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              :data-state="route.path.startsWith('/knowledge') ? 'open' : undefined"
+              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+            >
+              <router-link :to="{ name: 'knowledge-list' }">
+                <BookOpen class="!size-[18px]" />
+              </router-link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right"><p>{{ t('globals.terms.knowledgeBase', 2) }}</p></TooltipContent>
+        </Tooltip>
+
         <Tooltip v-if="userStore.hasReportTabPermissions">
           <TooltipTrigger as-child>
             <Button
@@ -102,7 +119,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Inbox, Shield, FileLineChart, BookUser } from 'lucide-vue-next'
+import { Inbox, Shield, FileLineChart, BookUser, BookOpen } from 'lucide-vue-next'
 import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
 import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
 

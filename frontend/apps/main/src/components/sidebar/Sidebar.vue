@@ -48,7 +48,8 @@ import {
   Link,
   BarChart3,
   CircleUser,
-  Contact
+  Contact,
+  BookOpen
 } from 'lucide-vue-next'
 
 const navIconMap = {
@@ -73,7 +74,8 @@ const navIconMap = {
   Link,
   BarChart3,
   CircleUser,
-  Contact
+  Contact,
+  BookOpen
 }
 import {
   DropdownMenu,
@@ -100,6 +102,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
 import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
+import KnowledgeSidebar from '@main/components/sidebar/KnowledgeSidebar.vue'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -238,10 +241,10 @@ const viewToDelete = ref(null)
 <template>
   <aside
     :class="[
-      'fixed z-10 top-[var(--page-space)] bottom-[var(--page-space)] start-[var(--ld-sidebar-collapsed-width)] flex flex-col w-[var(--ld-sidebar-width)] bg-sidebar shadow-sm overflow-hidden transition-transform duration-200 ease-out',
+      'fixed z-10 top-[var(--page-space)] bottom-[var(--page-space)] start-[var(--ld-sidebar-collapsed-width)] flex flex-col w-[var(--ld-sidebar-width)] bg-sidebar overflow-hidden transition-transform duration-200 ease-out',
       isInboxRoute(route.path)
-        ? 'border-y border-l border-input rounded-l-xl'
-        : 'border border-input rounded-xl',
+        ? 'border-y border-l border-input rounded-l-lg'
+        : 'border border-input rounded-lg',
       sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
     ]"
   >
@@ -312,6 +315,11 @@ const viewToDelete = ref(null)
           </SidebarGroup>
         </SidebarContent>
       </div>
+    </template>
+
+    <!-- Knowledge sidebar -->
+    <template v-if="route.path && route.path.startsWith('/knowledge')">
+      <KnowledgeSidebar />
     </template>
 
     <!-- Admin Sidebar -->

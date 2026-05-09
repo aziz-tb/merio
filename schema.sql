@@ -723,6 +723,52 @@ CREATE INDEX index_worklogs_on_user_id ON worklogs (user_id);
 CREATE INDEX index_worklogs_on_started_at ON worklogs (started_at);
 CREATE INDEX index_worklogs_on_action_type ON worklogs (action_type);
 
+DROP TABLE IF EXISTS kb_articles CASCADE;
+DROP TABLE IF EXISTS kb_folders CASCADE;
+CREATE TABLE kb_folders (
+	id BIGSERIAL PRIMARY KEY,
+	parent_id BIGINT NULL REFERENCES kb_folders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+	name VARCHAR(255) NOT NULL,
+	slug VARCHAR(255) NOT NULL,
+	sort_order INT NOT NULL DEFAULT 0,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX kb_folders_parent_slug_uniq
+	ON kb_folders (parent_id, slug)
+	WHERE parent_id IS NOT NULL;
+CREATE UNIQUE INDEX kb_folders_root_slug_uniq
+	ON kb_folders (slug)
+	WHERE parent_id IS NULL;
+
+CREATE TABLE kb_articles (
+	id BIGSERIAL PRIMARY KEY,
+	folder_id BIGINT NOT NULL REFERENCES kb_folders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+	slug VARCHAR(255) NOT NULL,
+	title VARCHAR(500) NOT NULL,
+	locale VARCHAR(8) NOT NULL DEFAULT 'en',
+	classification VARCHAR(32) NOT NULL,
+	status VARCHAR(32) NOT NULL DEFAULT 'draft',
+	is_ai_groundable BOOLEAN NOT NULL DEFAULT FALSE,
+	body_html TEXT NOT NULL DEFAULT '',
+	body_tiptap_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+	body_markdown TEXT NOT NULL DEFAULT '',
+	author_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	published_at TIMESTAMPTZ NULL,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	CONSTRAINT constraint_kb_articles_on_classification
+		CHECK (classification IN ('faq', 'how_to', 'policy', 'news', 'other')),
+	CONSTRAINT constraint_kb_articles_on_status
+		CHECK (status IN ('draft', 'published')),
+	CONSTRAINT kb_articles_folder_slug_locale_uniq
+		UNIQUE (folder_id, slug, locale)
+);
+CREATE INDEX index_kb_articles_on_status_classification_locale
+	ON kb_articles (status, classification, locale);
+CREATE INDEX index_kb_articles_on_author_user_id
+	ON kb_articles (author_user_id);
+
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
 VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
@@ -783,7 +829,7 @@ VALUES
 	(
 		'Agent',
 		'Role for all agents with limited access to conversations.',
-		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,worklog:view_own}'
+		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,worklog:view_own,knowledge:read}'
 	);
 
 INSERT INTO
@@ -792,7 +838,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,worklog:view_own,worklog:view_team,worklog:view_all}'
+		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,worklog:view_own,worklog:view_team,worklog:view_all,knowledge:read,knowledge:write,knowledge:publish,knowledge:delete}'
 	);
 
 

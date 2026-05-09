@@ -43,6 +43,40 @@ const routes = [
         meta: { titleKey: 'contact.allContacts' }
       },
       {
+        path: '/knowledge',
+        name: 'knowledge',
+        component: () => import('@main/views/knowledge/Knowledge.vue'),
+        redirect: { name: 'knowledge-list' },
+        meta: { titleKey: 'globals.terms.knowledgeBase' },
+        children: [
+          {
+            path: '',
+            name: 'knowledge-list',
+            component: () => import('@main/views/knowledge/KnowledgeList.vue')
+          },
+          {
+            path: 'new',
+            name: 'new-article',
+            component: () => import('@main/views/knowledge/CreateArticle.vue'),
+            meta: { titleKey: 'admin.knowledge.actions.newArticle' }
+          },
+          {
+            path: ':id/edit',
+            name: 'edit-article',
+            props: true,
+            component: () => import('@main/views/knowledge/EditArticle.vue'),
+            meta: { titleKey: 'admin.knowledge.actions.editArticle' }
+          }
+        ]
+      },
+      // Bookmark redirects: keep teammate links to the old /admin/knowledge paths working.
+      { path: '/admin/knowledge', redirect: { name: 'knowledge-list' } },
+      { path: '/admin/knowledge/articles/new', redirect: { name: 'new-article' } },
+      {
+        path: '/admin/knowledge/articles/:id/edit',
+        redirect: (to) => ({ name: 'edit-article', params: { id: to.params.id } })
+      },
+      {
         path: 'contacts/:id',
         name: 'contact-detail',
         component: () => import('@main/views/contact/ContactDetailView.vue'),
