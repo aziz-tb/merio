@@ -5,7 +5,7 @@ Public surface:
 
     Data (read-only):
         sdk.input              — dict of LLM-provided arguments
-        sdk.ticket_data        — dict | None
+        sdk.conversation_data        — dict | None
         sdk.contract_data      — dict | None
         sdk.customer_data      — dict | None
 
@@ -39,7 +39,7 @@ See README.md (alongside this module) for examples.
 from __future__ import annotations
 
 # Data — module-level globals populated at import time
-from ._data import contract_data, customer_data, input, ticket_data
+from ._data import contract_data, conversation_data, customer_data, input
 
 # Errors
 from ._errors import (
@@ -63,7 +63,7 @@ from . import _tools as tools
 __all__ = [
     # Data
     "input",
-    "ticket_data",
+    "conversation_data",
     "contract_data",
     "customer_data",
     # Outputs

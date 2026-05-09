@@ -14,11 +14,11 @@ if contract_id is None:
     raise SystemExit
 
 # Read context (already pre-fetched by the platform)
-if sdk.ticket_data is None:
+if sdk.conversation_data is None:
     sdk.error("no ticket attached")
     raise SystemExit
 
-ticket_id = sdk.ticket_data["id"]
+ticket_id = sdk.conversation_data["id"]
 
 # Call the platform
 try:
@@ -42,7 +42,7 @@ else:
 
 ```python
 sdk.input          # dict of LLM-provided tool arguments (always a dict, never None)
-sdk.ticket_data    # dict of the current ticket, or None if not in a ticket context
+sdk.conversation_data    # dict of the current ticket, or None if not in a ticket context
 sdk.contract_data  # dict of the resolved contract, or None
 sdk.customer_data  # dict of the resolved customer, or None
 ```

@@ -103,6 +103,14 @@ const (
 	PermKnowledgeWrite   = "knowledge:write"
 	PermKnowledgePublish = "knowledge:publish"
 	PermKnowledgeDelete  = "knowledge:delete"
+
+	// Tools (script execution — B5/exec-runner)
+	PermToolsCall = "tools:call"
+
+	// AI agents and tools (F9 — configuration data model)
+	PermAIAgentsManage = "ai_agents:manage"
+	PermAIToolsManage  = "ai_tools:manage"
+	PermAIToolsInvoke  = "ai_tools:invoke"
 )
 
 var validPermissions = map[string]struct{}{
@@ -157,6 +165,10 @@ var validPermissions = map[string]struct{}{
 	PermKnowledgeWrite:                  {},
 	PermKnowledgePublish:                {},
 	PermKnowledgeDelete:                 {},
+	PermToolsCall:                       {},
+	PermAIAgentsManage:                  {},
+	PermAIToolsManage:                   {},
+	PermAIToolsInvoke:                   {},
 }
 
 // PermissionExists returns true if the permission exists else false

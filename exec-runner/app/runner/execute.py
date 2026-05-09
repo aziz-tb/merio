@@ -118,8 +118,8 @@ def _build_env(req: ExecuteRequest) -> dict[str, str]:
     """
     return {
         "_INPUT_DATA": json.dumps(req.input, default=str),
-        "_TICKET_DATA": json.dumps(req.ticket_data, default=str)
-        if req.ticket_data is not None
+        "_CONVERSATION_DATA": json.dumps(req.conversation_data, default=str)
+        if req.conversation_data is not None
         else "null",
         "_CONTRACT_DATA": json.dumps(req.contract_data, default=str)
         if req.contract_data is not None

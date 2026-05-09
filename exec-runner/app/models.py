@@ -17,9 +17,16 @@ class ExecuteRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=1_048_576)  # 1MB cap matches sandbox
     language: Literal["python", "javascript"] = "python"
 
-    # Data passed to scripts via env vars
+    # Data passed to scripts via env vars.
+    #
+    # `conversation_data` carries the platform's full Conversation JSON
+    # when the script runs in a conversation context. None otherwise
+    # (e.g., scheduled jobs).
+    #
+    # `contract_data` and `customer_data` are reserved for future
+    # per-org executor outputs. v1 always sends them as None.
     input: dict[str, Any] = Field(default_factory=dict)
-    ticket_data: dict[str, Any] | None = None
+    conversation_data: dict[str, Any] | None = None
     contract_data: dict[str, Any] | None = None
     customer_data: dict[str, Any] | None = None
 

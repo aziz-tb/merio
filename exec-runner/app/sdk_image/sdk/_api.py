@@ -2,16 +2,20 @@
 Platform API client used inside scripts.
 
 Scripts call:
-    sdk.api.get(path, params=None)
-    sdk.api.post(path, body=None)
-    sdk.api.patch(path, body=None)
-    sdk.api.delete(path)
+    sdk.api.get(path, params=None, system=False)
+    sdk.api.post(path, body=None, system=False)
+    sdk.api.patch(path, body=None, system=False)
+    sdk.api.delete(path, system=False)
+
+By default the call acts as the script's *invoker* — the agent or
+API-key user that triggered the execution. Pass `system=True` to act as
+the System user instead, for actions that should not be attributed to
+the human caller (auto-generated notes, system-side updates, etc.).
 
 Idempotency on writes is automatic and internal — scripts NEVER pass an
 idempotency_key argument. The SDK derives one from:
     SHA256(_EXECUTION_ID : path : body_json)[:32]
 and includes it in the `Idempotency-Key` header on POST/PATCH/DELETE.
-The Go side dedupes against a 1-hour Redis cache.
 
 Reads have no idempotency header (naturally idempotent).
 
@@ -32,6 +36,12 @@ every call is fast.
 
 Scripts that need `requests` for their own external API calls can still
 install it via the `packages` parameter — they just pay the cold-restore cost.
+
+Auth shape: Libredesk's existing `Authorization` parser accepts
+`Token <key>:<secret>`. Script tokens use the same shape — both halves
+of the tuple carry the same `sx_<value>` string. The "secret" half is
+meaningless for these short-lived tokens; we just match the parser's
+expected format so we don't have to invent a new auth scheme.
 """
 from __future__ import annotations
 
@@ -59,15 +69,28 @@ _TIMEOUT_SECONDS = 30
 # ─── Header construction ───────────────────────────────────────────────────
 
 
-def _read_headers() -> dict[str, str]:
-    """Headers for GET requests — auth only, no idempotency."""
-    return {"Authorization": f"Bearer {_TOKEN}"}
+def _auth_value() -> str:
+    """
+    Builds the `Authorization` header value. Libredesk's parser expects
+    `Token <key>:<secret>` — we send the same token in both halves; the
+    server-side resolver only reads the key (the secret half is ignored
+    for sx_-prefixed tokens).
+    """
+    return f"Token {_TOKEN}:{_TOKEN}"
 
 
-def _write_headers(path: str, body: Any | None) -> dict[str, str]:
+def _read_headers(system: bool) -> dict[str, str]:
+    """Headers for GET requests — auth + optional actor switch."""
+    h = {"Authorization": _auth_value()}
+    if system:
+        h["X-Script-System"] = "true"
+    return h
+
+
+def _write_headers(path: str, body: Any | None, system: bool) -> dict[str, str]:
     """
     Headers for POST/PATCH/DELETE — adds Idempotency-Key derived from
-    (execution_id, path, body).
+    (execution_id, path, body) plus the optional actor switch.
     """
     body_str = (
         json.dumps(body, sort_keys=True, default=str, ensure_ascii=False)
@@ -76,11 +99,14 @@ def _write_headers(path: str, body: Any | None) -> dict[str, str]:
     )
     key_input = f"{_EXECUTION_ID}:{path}:{body_str}"
     idem_key = hashlib.sha256(key_input.encode("utf-8")).hexdigest()[:32]
-    return {
-        "Authorization": f"Bearer {_TOKEN}",
+    h = {
+        "Authorization": _auth_value(),
         "Content-Type": "application/json",
         "Idempotency-Key": idem_key,
     }
+    if system:
+        h["X-Script-System"] = "true"
+    return h
 
 
 # ─── Internal HTTP helpers ─────────────────────────────────────────────────
@@ -111,7 +137,7 @@ def _parse_success_body(resp: Any) -> Any:
             raise _errors.PlatformError(
                 f"platform returned {status} but JSON was malformed: {e}"
             ) from e
-    # Non-JSON 2xx — return raw text. Rare for our /sdk/* endpoints.
+    # Non-JSON 2xx — return raw text. Rare for /api/v1 endpoints.
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
@@ -164,25 +190,55 @@ def _request(method: str, url: str, headers: dict[str, str], body_bytes: bytes |
 # ─── Public methods ────────────────────────────────────────────────────────
 
 
-def get(path: str, params: dict[str, Any] | None = None) -> Any:
+def get(
+    path: str,
+    params: dict[str, Any] | None = None,
+    *,
+    system: bool = False,
+) -> Any:
     """
     GET the platform at `path` (relative to _CALLBACK_BASE_URL).
 
+    Args:
+        path: Server path, e.g. "/api/v1/conversations/123".
+        params: Optional query params.
+        system: When True, the request acts as the System user instead
+            of the script's invoker. Used for reads that should not be
+            attributed to the human triggerer (rare; most reads are fine
+            as the invoker).
+
     Example:
-        ticket = sdk.api.get("/sdk/tickets/123")
-        results = sdk.api.get("/sdk/kb/search", params={"q": "refund"})
+        conv = sdk.api.get("/api/v1/conversations/abc-123")
+        results = sdk.api.get("/api/v1/macros", params={"team_id": 5})
     """
     if not _BASE:
         raise _errors.PlatformError("SDK not initialized: _CALLBACK_BASE_URL is empty")
-    return _request("GET", _build_url(path, params), _read_headers(), None)
+    return _request("GET", _build_url(path, params), _read_headers(system), None)
 
 
-def post(path: str, body: dict[str, Any] | None = None) -> Any:
+def post(
+    path: str,
+    body: dict[str, Any] | None = None,
+    *,
+    system: bool = False,
+) -> Any:
     """
     POST to the platform. Idempotent under retry (per execution).
 
+    Args:
+        path: Server path.
+        body: JSON body.
+        system: When True, the request acts as the System user. Use this
+            for actions the script takes on the platform's behalf
+            ("auto-tagged based on rule X") rather than on the agent's
+            behalf ("Alice replied with...").
+
     Example:
-        sdk.api.post("/sdk/tickets/123/tags", {"tag": "vip"})
+        sdk.api.post(
+            "/api/v1/conversations/abc-123/tags",
+            {"tag": "vip"},
+            system=True,
+        )
     """
     if not _BASE:
         raise _errors.PlatformError("SDK not initialized: _CALLBACK_BASE_URL is empty")
@@ -191,11 +247,16 @@ def post(path: str, body: dict[str, Any] | None = None) -> Any:
         if body is not None
         else None
     )
-    return _request("POST", _build_url(path), _write_headers(path, body), body_bytes)
+    return _request("POST", _build_url(path), _write_headers(path, body, system), body_bytes)
 
 
-def patch(path: str, body: dict[str, Any] | None = None) -> Any:
-    """PATCH the platform. Idempotent under retry."""
+def patch(
+    path: str,
+    body: dict[str, Any] | None = None,
+    *,
+    system: bool = False,
+) -> Any:
+    """PATCH the platform. Idempotent under retry. See post() for `system`."""
     if not _BASE:
         raise _errors.PlatformError("SDK not initialized: _CALLBACK_BASE_URL is empty")
     body_bytes = (
@@ -203,11 +264,11 @@ def patch(path: str, body: dict[str, Any] | None = None) -> Any:
         if body is not None
         else None
     )
-    return _request("PATCH", _build_url(path), _write_headers(path, body), body_bytes)
+    return _request("PATCH", _build_url(path), _write_headers(path, body, system), body_bytes)
 
 
-def delete(path: str) -> Any:
-    """DELETE on the platform. Idempotent under retry."""
+def delete(path: str, *, system: bool = False) -> Any:
+    """DELETE on the platform. Idempotent under retry. See post() for `system`."""
     if not _BASE:
         raise _errors.PlatformError("SDK not initialized: _CALLBACK_BASE_URL is empty")
-    return _request("DELETE", _build_url(path), _write_headers(path, None), None)
+    return _request("DELETE", _build_url(path), _write_headers(path, None, system), None)
