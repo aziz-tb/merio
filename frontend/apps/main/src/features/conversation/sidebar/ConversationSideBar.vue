@@ -121,6 +121,20 @@
           </CollapsibleContent>
         </Collapsible>
 
+        <!-- Contact notes -->
+        <Collapsible
+          v-if="conversationStore.current?.contact?.id && userStore.can('contact_notes:read')"
+          class="group/section border-t border-border pt-3"
+        >
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span>{{ t('globals.terms.note', 2) }}</span>
+            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3">
+            <ContactNotes :contact-id="conversationStore.current.contact.id" compact />
+          </CollapsibleContent>
+        </Collapsible>
+
         <!-- Previous conversations -->
         <Collapsible class="group/section border-t border-border pt-3">
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
@@ -150,6 +164,7 @@ import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
+import { useUserStore } from '@/stores/user'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@shared-ui/components/ui/collapsible'
 import { ChevronDown, RefreshCw } from 'lucide-vue-next'
@@ -163,6 +178,7 @@ import { useEmitter } from '../../../composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
+import ContactNotes from '@/features/contact/ContactNotes.vue'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
 import ComposerTab from '@/features/conversation/sidebar/ComposerTab.vue'
@@ -175,6 +191,7 @@ const conversationStore = useConversationStore()
 const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
+const userStore = useUserStore()
 const tags = ref([])
 const reloadingUUID = ref('')
 const { t } = useI18n()
