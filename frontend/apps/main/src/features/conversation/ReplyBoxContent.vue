@@ -126,6 +126,7 @@
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
+        @files-dropped="handleFilesDropped"
       />
     </div>
 
@@ -307,7 +308,8 @@ const emit = defineEmits([
   'fileUpload',
   'inlineImageUpload',
   'fileDelete',
-  'aiPromptSelected'
+  'aiPromptSelected',
+  'filesDropped'
 ])
 
 const conversationStore = useConversationStore()
@@ -474,6 +476,10 @@ const handleSend = async () => {
 
 const handleFileUpload = (event) => {
   emit('fileUpload', event)
+}
+
+const handleFilesDropped = (files) => {
+  emit('filesDropped', files)
 }
 
 const handleOnFileDelete = (uuid) => {
