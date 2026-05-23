@@ -87,6 +87,17 @@ func handleUpdateTeam(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+
+	// Invalidate cached agents for this team's members so membership changes reflect
+	// immediately in assignment dropdowns instead of waiting for a restart.
+	members, membersErr := app.team.GetMembers(id)
+	if membersErr != nil {
+		app.lo.Error("error fetching team members for cache invalidation", "team_id", id, "error", membersErr)
+	} else {
+		for _, m := range members {
+			app.user.InvalidateAgentCache(m.ID)
+		}
+	}
 	return r.SendEnvelope(updatedTeam)
 }
 
@@ -99,9 +110,18 @@ func handleDeleteTeam(r *fastglue.Request) error {
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
+	// Capture members before deletion (Delete removes team_members rows) so we can
+	// invalidate their agent cache afterward.
+	members, membersErr := app.team.GetMembers(id)
+	if membersErr != nil {
+		app.lo.Error("error fetching team members for cache invalidation", "team_id", id, "error", membersErr)
+	}
 	err = app.team.Delete(id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	for _, m := range members {
+		app.user.InvalidateAgentCache(m.ID)
 	}
 	return r.SendEnvelope(true)
 }

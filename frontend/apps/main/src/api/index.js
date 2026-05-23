@@ -18,6 +18,13 @@ function getCSRFToken () {
   return ''
 }
 
+// Route-scoped abort, opt-in via { abortOnRoute: true }. Default no-abort protects in-flight saves.
+let routeAbort = new AbortController()
+export function abortRouteScope () {
+  routeAbort.abort()
+  routeAbort = new AbortController()
+}
+
 // Request interceptor.
 http.interceptors.request.use((request) => {
   const token = getCSRFToken()
@@ -29,11 +36,15 @@ http.interceptors.request.use((request) => {
   if ((request.method === 'post' || request.method === 'put') && !request.headers['Content-Type']) {
     request.headers['Content-Type'] = 'application/json'
   }
-  
+
   if (request.headers['Content-Type'] === 'application/x-www-form-urlencoded') {
     request.data = qs.stringify(request.data)
   }
-  
+
+  if (request.abortOnRoute && request.signal === undefined) {
+    request.signal = routeAbort.signal
+  }
+
   return request
 })
 
@@ -431,15 +442,14 @@ const forwardMessage = (cuuid, uuid, data) =>
     headers: { 'Content-Type': 'application/json' }
   })
 const getConversationMessages = (uuid, params) =>
-  http.get(`/api/v1/conversations/${uuid}/messages`, { params })
+  http.get(`/api/v1/conversations/${uuid}/messages`, { params, abortOnRoute: true })
 const sendMessage = (uuid, data) =>
   http.post(`/api/v1/conversations/${uuid}/messages`, data, {
     headers: {
       'Content-Type': 'application/json'
     }
   })
-const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`)
-const getConversationParticipants = (uuid) => http.get(`/api/v1/conversations/${uuid}/participants`)
+const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`)
 const getAllMacros = () => http.get('/api/v1/macros')
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
@@ -463,15 +473,15 @@ const applyMacro = (uuid, id, data) =>
     }
   })
 const getTeamUnassignedConversations = (teamID, params) =>
-  http.get(`/api/v1/teams/${teamID}/conversations/unassigned`, { params })
-const getAssignedConversations = (params) => http.get('/api/v1/conversations/assigned', { params })
+  http.get(`/api/v1/teams/${teamID}/conversations/unassigned`, { params, abortOnRoute: true })
+const getAssignedConversations = (params) => http.get('/api/v1/conversations/assigned', { params, abortOnRoute: true })
 const getUnassignedConversations = (params) =>
-  http.get('/api/v1/conversations/unassigned', { params })
-const getAllConversations = (params) => http.get('/api/v1/conversations/all', { params })
+  http.get('/api/v1/conversations/unassigned', { params, abortOnRoute: true })
+const getAllConversations = (params) => http.get('/api/v1/conversations/all', { params, abortOnRoute: true })
 const getMentionedConversations = (params) =>
-  http.get('/api/v1/conversations/mentioned', { params })
+  http.get('/api/v1/conversations/mentioned', { params, abortOnRoute: true })
 const getViewConversations = (id, params) =>
-  http.get(`/api/v1/views/${id}/conversations`, { params })
+  http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute: true })
 const uploadMedia = (data) =>
   http.post('/api/v1/media', data, {
     headers: {
@@ -686,7 +696,6 @@ export default {
   getOverviewCSAT,
   getOverviewMessageVolume,
   getOverviewTagDistribution,
-  getConversationParticipants,
   getConversationVariables,
   evaluateDetection,
   getConversationMessage,

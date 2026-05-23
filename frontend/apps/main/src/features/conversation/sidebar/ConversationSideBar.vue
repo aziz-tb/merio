@@ -2,17 +2,17 @@
   <div class="flex flex-col h-full">
     <Tabs default-value="details" class="flex flex-col h-full">
       <!-- Tab bar -->
-      <div class="flex items-center px-4 border-b border-border h-12 shrink-0">
-        <TabsList class="bg-transparent h-12 rounded-none p-0 gap-5">
+      <div class="flex items-center px-8 border-b border-border h-14 shrink-0">
+        <TabsList class="bg-transparent h-14 rounded-none  p-0 gap-5">
           <TabsTrigger
             value="details"
-            class="bg-transparent rounded-none px-0 h-12 shadow-none border-b-2 border-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-amber-500 data-[state=active]:text-foreground text-muted-foreground"
+            class="bg-transparent rounded-none px-0 h-14 shadow-none border-b-2 border-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-amber-500 data-[state=active]:text-foreground text-muted-foreground"
           >
             Details
           </TabsTrigger>
           <TabsTrigger
             value="composer"
-            class="bg-transparent rounded-none px-0 h-12 shadow-none border-b-2 border-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-amber-500 data-[state=active]:text-foreground text-muted-foreground"
+            class="bg-transparent rounded-none px-0 h-14 shadow-none border-b-2 border-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-amber-500 data-[state=active]:text-foreground text-muted-foreground"
           >
             {{ $t('composer.tabTitle') }}
           </TabsTrigger>
