@@ -2,7 +2,6 @@ package ws
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -53,23 +52,21 @@ type Client struct {
 func (c *Client) Serve() {
 	var heartBeatTicker = time.NewTicker(2 * time.Second)
 	defer heartBeatTicker.Stop()
+	defer c.Conn.Close()
 
-Loop:
 	for {
 		select {
 		case <-heartBeatTicker.C:
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				fmt.Println("error writing message", err)
 				return
 			}
 		case msg, ok := <-c.Send:
 			if !ok {
-				break Loop
+				return
 			}
 			c.Conn.WriteMessage(msg.MessageType, msg.Data)
 		}
 	}
-	c.Conn.Close()
 }
 
 // Listen is a block method that listens for incoming messages from the client.
