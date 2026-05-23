@@ -9,7 +9,7 @@ DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "convers
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing', 'email_notification');
 -- Visitors are unauthenticated contacts.
 DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor');
-DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai');
+DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai', 'anthropic');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
 DROP TYPE IF EXISTS "view_visibility" CASCADE; CREATE TYPE "view_visibility" AS ENUM ('all', 'team', 'user');
@@ -429,8 +429,24 @@ CREATE TABLE tags (
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	"name" TEXT NOT NULL UNIQUE,
-	CONSTRAINT constraint_tags_on_name CHECK (length("name") <= 140)
+	parent_id INT NULL REFERENCES tags(id) ON DELETE SET NULL,
+	type TEXT NOT NULL DEFAULT 'skill',
+	color TEXT NOT NULL DEFAULT 'grey',
+	visibility TEXT NOT NULL DEFAULT 'public',
+	description TEXT NOT NULL DEFAULT '',
+	detection JSONB NOT NULL DEFAULT '{"mode":"manual_only"}'::jsonb,
+	sla_policy_id INT NULL REFERENCES sla_policies(id) ON DELETE SET NULL,
+	priority_id INT NULL REFERENCES conversation_priorities(id) ON DELETE SET NULL,
+	updated_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	CONSTRAINT constraint_tags_on_name CHECK (length("name") <= 140),
+	CONSTRAINT constraint_tags_on_type CHECK (type IN ('skill', 'topic', 'contact', 'other')),
+	CONSTRAINT constraint_tags_on_visibility CHECK (visibility IN ('public', 'private', 'disabled')),
+	CONSTRAINT constraint_tags_on_color CHECK (color IN ('grey', 'green', 'red', 'blue', 'yellow', 'purple', 'orange', 'teal'))
 );
+CREATE INDEX index_tags_on_parent_id ON tags(parent_id) WHERE parent_id IS NOT NULL;
+CREATE INDEX index_tags_on_visibility ON tags(visibility);
+CREATE INDEX index_tags_on_detection_mode ON tags((detection->>'mode'));
+CREATE INDEX index_tags_on_updated_by ON tags(updated_by) WHERE updated_by IS NOT NULL;
 
 DROP TABLE IF EXISTS team_members CASCADE;
 CREATE TABLE team_members (
@@ -465,14 +481,60 @@ WHERE (is_default = true);
 
 DROP TABLE IF EXISTS conversation_tags CASCADE;
 CREATE TABLE conversation_tags (
-	id BIGSERIAL PRIMARY KEY,
-	created_at TIMESTAMPTZ DEFAULT NOW(),
-	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	-- Cascade deletes when tag or conversation is deleted.
 	tag_id INT REFERENCES tags(id) ON DELETE CASCADE ON UPDATE CASCADE,
-	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE
+	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	applied_by TEXT NOT NULL DEFAULT 'manual',
+	-- ai_operation_id links an AI-applied tag back to the ai_operations
+	-- row that applied it (NULL for manual/rule tags). Provenance only —
+	-- nothing reads it for logic; the FK SET NULLs if the op is purged.
+	ai_operation_id BIGINT NULL,
+	-- Natural key is sufficient; the surrogate BIGSERIAL id was dropped
+	-- in Batch 9 (discovery confirmed nothing read it).
+	PRIMARY KEY (conversation_id, tag_id),
+	CONSTRAINT constraint_conversation_tags_on_applied_by CHECK (applied_by IN ('manual', 'ai', 'rule'))
 );
-CREATE UNIQUE INDEX index_conversation_tags_on_conversation_id_and_tag_id ON conversation_tags (conversation_id, tag_id);
+CREATE INDEX index_conversation_tags_on_applied_by ON conversation_tags(applied_by);
+
+-- ai_operations — unified per-logical-AI-operation outcome audit (Batch 9,
+-- replacing tag_classifications). Houses tag classification today and
+-- future AI feature outcomes (agent validation, OCR, summarization, etc.).
+-- Lightweight: operation-specific data lives in payload JSONB; the
+-- underlying LLM call(s) are joined from ai_usage via trace_id. Heavyweight
+-- agent runs stay in agent_executions and are UNIONed at query time.
+-- operation_type has no CHECK enum — values are managed in code
+-- (internal/ai/operations/models) so new ops need no migration.
+DROP TABLE IF EXISTS ai_operations CASCADE;
+CREATE TABLE ai_operations (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	operation_type TEXT NOT NULL,
+	-- Nullable: not every future op is conversation-scoped.
+	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE,
+	triggered_by TEXT NOT NULL,
+	triggered_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	-- Join key to ai_usage. NOT NULL even for skipped ops (callers use a
+	-- deterministic trace pattern, e.g. "tag-classify:<conv-uuid>").
+	trace_id TEXT NOT NULL,
+	status TEXT NOT NULL,
+	error_message TEXT,
+	-- Operation-specific outcome data; shape per operation_type documented
+	-- in internal/aioperations/payloads/. Empty/partial for failed/skipped.
+	payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+	CONSTRAINT check_ai_operations_triggered_by CHECK (triggered_by IN ('auto', 'manual')),
+	CONSTRAINT check_ai_operations_status CHECK (status IN ('success', 'failed', 'skipped'))
+);
+CREATE INDEX index_ai_operations_on_conversation
+	ON ai_operations(conversation_id, created_at DESC)
+	WHERE conversation_id IS NOT NULL;
+CREATE INDEX index_ai_operations_on_type_created
+	ON ai_operations(operation_type, created_at DESC);
+CREATE INDEX index_ai_operations_on_trace
+	ON ai_operations(trace_id);
+
+ALTER TABLE conversation_tags
+	ADD CONSTRAINT fk_conversation_tags_ai_operation_id
+	FOREIGN KEY (ai_operation_id) REFERENCES ai_operations(id) ON DELETE SET NULL;
 
 DROP TABLE IF EXISTS csat_responses CASCADE;
 CREATE TABLE csat_responses (
@@ -749,10 +811,29 @@ CREATE TABLE kb_articles (
 	locale VARCHAR(8) NOT NULL DEFAULT 'en',
 	classification VARCHAR(32) NOT NULL,
 	status VARCHAR(32) NOT NULL DEFAULT 'draft',
+	-- is_ai_groundable: legacy flag retained for data compatibility. New
+	-- indexing logic ignores it (F12 fork-5 resolution); agent kb_scope
+	-- is the authoritative gate for what each agent can see.
 	is_ai_groundable BOOLEAN NOT NULL DEFAULT FALSE,
 	body_html TEXT NOT NULL DEFAULT '',
 	body_tiptap_json JSONB NOT NULL DEFAULT '{}'::jsonb,
 	body_markdown TEXT NOT NULL DEFAULT '',
+	-- revision is bumped in Go on every UpdateArticle / PublishArticle.
+	-- Workflow IDs `embed-article:<id>:v<revision>` derive idempotency from this.
+	revision INT NOT NULL DEFAULT 1,
+	-- body_tsvector is a locale-aware generated column powering the
+	-- keyword half of hybrid search. Stemming dictionary is selected
+	-- per row based on the article's locale.
+	body_tsvector tsvector GENERATED ALWAYS AS (
+		CASE locale
+			WHEN 'de' THEN to_tsvector('german',
+				coalesce(title, '') || ' ' || coalesce(body_markdown, ''))
+			WHEN 'en' THEN to_tsvector('english',
+				coalesce(title, '') || ' ' || coalesce(body_markdown, ''))
+			ELSE to_tsvector('simple',
+				coalesce(title, '') || ' ' || coalesce(body_markdown, ''))
+		END
+	) STORED,
 	author_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
 	published_at TIMESTAMPTZ NULL,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -768,10 +849,328 @@ CREATE INDEX index_kb_articles_on_status_classification_locale
 	ON kb_articles (status, classification, locale);
 CREATE INDEX index_kb_articles_on_author_user_id
 	ON kb_articles (author_user_id);
+CREATE INDEX index_kb_articles_on_body_tsvector
+	ON kb_articles USING GIN (body_tsvector);
+
+-- F12 RAG foundation: pgvector extension + universal embeddings table +
+-- per-article active-version pointer.
+CREATE EXTENSION IF NOT EXISTS vector;
+
+DROP TABLE IF EXISTS articles_index_state CASCADE;
+DROP TABLE IF EXISTS embeddings CASCADE;
+
+CREATE TABLE embeddings (
+	id              BIGSERIAL PRIMARY KEY,
+	content_type    TEXT NOT NULL,
+	source_id       BIGINT NOT NULL,
+	source_version  INT NOT NULL DEFAULT 1,
+	chunk_index     INT NOT NULL DEFAULT 0,
+	chunk_text      TEXT NOT NULL,
+	content_hash    TEXT NOT NULL,
+	embedding_model TEXT NOT NULL,
+	embedding       halfvec(1024) NOT NULL,
+	source_path     TEXT NOT NULL DEFAULT '',
+	created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	CONSTRAINT constraint_embeddings_on_content_type
+		CHECK (content_type IN ('kb_chunk', 'ticket', 'customer_note')),
+	CONSTRAINT constraint_embeddings_on_source_version
+		CHECK (source_version > 0),
+	CONSTRAINT constraint_embeddings_on_chunk_index
+		CHECK (chunk_index >= 0)
+);
+CREATE UNIQUE INDEX index_embeddings_on_content_source_version_chunk_model
+	ON embeddings (content_type, source_id, source_version, chunk_index, embedding_model);
+CREATE INDEX index_embeddings_on_vector
+	ON embeddings USING hnsw (embedding halfvec_cosine_ops)
+	WITH (m = 16, ef_construction = 64);
+CREATE INDEX index_embeddings_on_content_source_version
+	ON embeddings (content_type, source_id, source_version);
+CREATE INDEX index_embeddings_on_model_created
+	ON embeddings (embedding_model, created_at DESC);
+
+CREATE TABLE articles_index_state (
+	article_id       BIGINT PRIMARY KEY
+		REFERENCES kb_articles(id) ON DELETE CASCADE,
+	active_version   INT NOT NULL DEFAULT 1,
+	active_model     TEXT NOT NULL,
+	last_indexed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	is_stale         BOOLEAN NOT NULL DEFAULT FALSE,
+	CONSTRAINT constraint_articles_index_state_on_active_version
+		CHECK (active_version > 0)
+);
+CREATE INDEX index_articles_index_state_on_stale
+	ON articles_index_state (is_stale, last_indexed_at)
+	WHERE is_stale = TRUE;
+
+DROP TABLE IF EXISTS ai_tools CASCADE;
+DROP TABLE IF EXISTS ai_agents CASCADE;
+CREATE TABLE ai_agents (
+	id                   SERIAL PRIMARY KEY,
+	created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	name                 TEXT NOT NULL,
+	slug                 TEXT NOT NULL,
+	description          TEXT NULL,
+	prompt               TEXT NOT NULL DEFAULT '',
+	detection            JSONB NOT NULL DEFAULT '{"mode":"manual_only","rules":{"op":"AND","children":[]},"ai":{"prompt":""}}'::jsonb,
+	tools                JSONB NOT NULL DEFAULT '[]'::jsonb,
+	kb_scope             JSONB NOT NULL DEFAULT '{"folder_ids":[],"article_ids":[]}'::jsonb,
+	preset_overrides     JSONB NOT NULL DEFAULT '{}'::jsonb,
+	confidence_threshold NUMERIC(4,3) NOT NULL DEFAULT 0.5,
+	max_iterations       INT NOT NULL DEFAULT 5,
+	extended_thinking_enabled BOOL NOT NULL DEFAULT TRUE,
+	min_legitimation     INT NOT NULL DEFAULT 0,
+	autonomy             JSONB NOT NULL DEFAULT '{}'::jsonb,
+	enabled              BOOL NOT NULL DEFAULT TRUE,
+	CONSTRAINT constraint_ai_agents_on_name              CHECK (length(name) <= 140),
+	CONSTRAINT constraint_ai_agents_on_slug              CHECK (length(slug) <= 140),
+	CONSTRAINT constraint_ai_agents_on_description       CHECK (description IS NULL OR length(description) <= 1000),
+	CONSTRAINT constraint_ai_agents_on_threshold         CHECK (confidence_threshold >= 0 AND confidence_threshold <= 1),
+	CONSTRAINT constraint_ai_agents_on_iterations        CHECK (max_iterations > 0 AND max_iterations <= 50),
+	CONSTRAINT constraint_ai_agents_on_min_legitimation  CHECK (min_legitimation >= 0),
+	CONSTRAINT constraint_ai_agents_on_name_unique       UNIQUE (name),
+	CONSTRAINT constraint_ai_agents_on_slug_unique       UNIQUE (slug)
+);
+CREATE INDEX index_ai_agents_on_enabled ON ai_agents(enabled) WHERE enabled = TRUE;
+
+CREATE TABLE ai_tools (
+	id                SERIAL PRIMARY KEY,
+	created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	name              TEXT NOT NULL,
+	slug              TEXT NOT NULL,
+	description       TEXT NULL,
+	input_parameters  JSONB NOT NULL DEFAULT '[]'::jsonb,
+	output_schema     JSONB NOT NULL DEFAULT '{}'::jsonb,
+	implementation    JSONB NOT NULL DEFAULT '{}'::jsonb,
+	category          TEXT NOT NULL DEFAULT 'write',
+	min_legitimation  INT NOT NULL DEFAULT 0,
+	timeout_ms        INT NOT NULL DEFAULT 30000,
+	async             BOOL NOT NULL DEFAULT FALSE,
+	enabled           BOOL NOT NULL DEFAULT TRUE,
+	CONSTRAINT constraint_ai_tools_on_name        CHECK (length(name) <= 140),
+	CONSTRAINT constraint_ai_tools_on_slug        CHECK (length(slug) <= 140),
+	CONSTRAINT constraint_ai_tools_on_description CHECK (description IS NULL OR length(description) <= 1000),
+	CONSTRAINT constraint_ai_tools_on_category    CHECK (category IN ('read', 'write')),
+	CONSTRAINT constraint_ai_tools_on_legit       CHECK (min_legitimation >= 0),
+	CONSTRAINT constraint_ai_tools_on_timeout     CHECK (timeout_ms > 0 AND timeout_ms <= 600000),
+	CONSTRAINT constraint_ai_tools_on_name_unique UNIQUE (name),
+	CONSTRAINT constraint_ai_tools_on_slug_unique UNIQUE (slug)
+);
+CREATE INDEX index_ai_tools_on_enabled ON ai_tools(enabled) WHERE enabled = TRUE;
+
+-- Seed data — one stub agent (disabled). The F9 kb_search_universal
+-- ai_tools row was removed in the F5 schema cleanup; kb_search now lives
+-- in code under internal/ai/tools/builtin/.
+INSERT INTO ai_agents (
+	name, slug, description, prompt, detection, tools, kb_scope,
+	preset_overrides, confidence_threshold, max_iterations, min_legitimation, autonomy, enabled
+) VALUES (
+	'Test Agent',
+	'test-agent',
+	'Stub agent — disabled. Edit prompt and enable when ready.',
+	'',
+	'{"mode":"manual_only","rules":{"op":"AND","children":[]},"ai":{"prompt":""}}'::jsonb,
+	'[]'::jsonb,
+	'{"folder_ids":[],"article_ids":[]}'::jsonb,
+	'{}'::jsonb,
+	0.5,
+	5,
+	0,
+	'{}'::jsonb,
+	FALSE
+) ON CONFLICT (slug) DO NOTHING;
+
+DROP TABLE IF EXISTS tool_executions CASCADE;
+CREATE TABLE tool_executions (
+	execution_id     TEXT PRIMARY KEY,
+	tool_name        TEXT,
+	invoker_user_id  BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+	conversation_id  BIGINT REFERENCES conversations(id) ON DELETE SET NULL,
+	tool_depth       INT NOT NULL DEFAULT 0,
+	language         TEXT NOT NULL,
+	started_at       TIMESTAMPTZ NOT NULL,
+	finished_at      TIMESTAMPTZ,
+	duration_ms      INT NOT NULL DEFAULT 0,
+	kind             TEXT NOT NULL CHECK (kind IN ('success','failure','error','noop')),
+	result_code      TEXT,
+	message          TEXT,
+	data             JSONB,
+	warm_pool_hit    BOOLEAN NOT NULL DEFAULT FALSE,
+	trace_id         TEXT,
+	created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_tool_executions_tool_name
+	ON tool_executions(tool_name) WHERE tool_name IS NOT NULL;
+CREATE INDEX idx_tool_executions_conversation_id
+	ON tool_executions(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX idx_tool_executions_started_at
+	ON tool_executions(started_at DESC);
+CREATE INDEX idx_tool_executions_invoker_user_id
+	ON tool_executions(invoker_user_id);
+
+-- agent_executions — immutable record of every agent run on a
+-- conversation. agent_execution_outcomes — at-most-one commitment per
+-- run (sent / drafted / escalated / discarded). See migration v2_7_6
+-- for the rationale.
+DROP TABLE IF EXISTS agent_execution_outcomes CASCADE;
+DROP TABLE IF EXISTS agent_executions CASCADE;
+CREATE TABLE agent_executions (
+	id                    BIGSERIAL PRIMARY KEY,
+	conversation_id       BIGINT NOT NULL
+	                      REFERENCES conversations(id) ON DELETE CASCADE,
+	agent_id              INT NOT NULL
+	                      REFERENCES ai_agents(id) ON DELETE RESTRICT,
+	source                TEXT NOT NULL,
+	resolution_attempt_id INT NULL,
+	trace_id              TEXT NOT NULL DEFAULT '',
+	format_version        TEXT NOT NULL DEFAULT '2',
+	status                TEXT NOT NULL,
+	draft                 TEXT,
+	trace                 JSONB NOT NULL DEFAULT '[]'::jsonb,
+	usage                 JSONB NOT NULL DEFAULT '{}'::jsonb,
+	duration_ms           INT NOT NULL DEFAULT 0,
+	run_by_user_id        BIGINT NULL
+	                      REFERENCES users(id) ON DELETE SET NULL,
+	run_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	agent_updated_at      TIMESTAMPTZ NOT NULL,
+	created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	CONSTRAINT constraint_agent_executions_on_source
+	    CHECK (source IN ('composer', 'pipeline'))
+);
+CREATE INDEX index_agent_executions_on_conv_agent_run_at
+	ON agent_executions (conversation_id, agent_id, run_at DESC);
+CREATE INDEX index_agent_executions_on_source_run_at
+	ON agent_executions (source, run_at DESC);
+
+CREATE TABLE agent_execution_outcomes (
+	id                   BIGSERIAL PRIMARY KEY,
+	agent_execution_id   BIGINT NOT NULL UNIQUE
+	                     REFERENCES agent_executions(id) ON DELETE CASCADE,
+	outcome              TEXT NOT NULL,
+	outcome_reason       TEXT NULL,
+	message_id           BIGINT NULL
+	                     REFERENCES conversation_messages(id) ON DELETE SET NULL,
+	committed_by_user_id BIGINT NULL
+	                     REFERENCES users(id) ON DELETE SET NULL,
+	committed_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	CONSTRAINT constraint_agent_execution_outcomes_on_outcome
+	    CHECK (outcome IN ('sent', 'drafted', 'escalated', 'discarded'))
+);
+CREATE INDEX index_agent_execution_outcomes_on_outcome_committed_at
+	ON agent_execution_outcomes (outcome, committed_at DESC);
+
+-- System (Internal) inbox — sentinel FK target for ai_usage rows that
+-- have no real inbox context (rewrite manager calls, AgentTestPanel
+-- synthetic runs, future internal jobs). Channel is 'email' because
+-- the enum has no 'system' value; enabled=false keeps it out of inbox
+-- pickers. The UUID is stable and resolved at app startup; see
+-- internal/migrations/v2_7_7.go::SystemInboxUUID.
+INSERT INTO inboxes (uuid, name, channel, enabled, config, "from")
+VALUES ('00000000-0000-0000-0000-000000000001', 'System (Internal)', 'email', FALSE, '{}'::jsonb, '')
+ON CONFLICT (uuid) DO NOTHING;
+
+-- ai_usage — one row per LLM provider call. Partitioned by month on
+-- created_at; the application's partition manager keeps the runway
+-- extended. Indexes declared on the parent; PG14+ propagates to every
+-- child partition automatically. See migration v2_7_7 for full
+-- rationale.
+DROP TABLE IF EXISTS ai_usage CASCADE;
+CREATE TABLE ai_usage (
+	id                      BIGSERIAL NOT NULL,
+	schema_version          SMALLINT NOT NULL DEFAULT 1,
+	created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	trace_id                TEXT NOT NULL,
+	call_sequence_in_trace  INT NOT NULL,
+	inbox_id                INT NOT NULL,
+	conversation_id         BIGINT NULL,
+	agent_id                INT NULL,
+	agent_execution_id      BIGINT NULL,
+	resolution_attempt_id   INT NULL,
+	user_id                 BIGINT NULL,
+	provider                TEXT NOT NULL,
+	model                   TEXT NOT NULL,
+	preset_slug             TEXT NOT NULL,
+	purpose                 TEXT NOT NULL,
+	stop_reason             TEXT NOT NULL DEFAULT '',
+	input_tokens            INT NOT NULL DEFAULT 0,
+	output_tokens           INT NOT NULL DEFAULT 0,
+	cached_input_tokens     INT NOT NULL DEFAULT 0,
+	cache_markers_used      INT NOT NULL DEFAULT 0,
+	input_cost_usd          NUMERIC(12, 8) NOT NULL DEFAULT 0,
+	output_cost_usd         NUMERIC(12, 8) NOT NULL DEFAULT 0,
+	cached_input_cost_usd   NUMERIC(12, 8) NOT NULL DEFAULT 0,
+	total_cost_usd          NUMERIC(12, 8) NOT NULL DEFAULT 0,
+	latency_ms              INT NOT NULL DEFAULT 0,
+	provider_latency_ms     INT NULL,
+	retry_count             INT NOT NULL DEFAULT 0,
+	outcome                 TEXT NOT NULL,
+	error_class             TEXT NULL,
+	error_message           TEXT NULL,
+	provider_request_id     TEXT NULL,
+	provider_metadata       JSONB NULL,
+	request_payload         JSONB NULL,
+	response_payload        JSONB NULL,
+	structured_output       JSONB NULL,
+	CONSTRAINT constraint_ai_usage_on_call_sequence CHECK (call_sequence_in_trace > 0),
+	CONSTRAINT constraint_ai_usage_on_input_tokens  CHECK (input_tokens >= 0),
+	CONSTRAINT constraint_ai_usage_on_output_tokens CHECK (output_tokens >= 0),
+	CONSTRAINT constraint_ai_usage_on_cached_tokens CHECK (cached_input_tokens >= 0),
+	CONSTRAINT constraint_ai_usage_on_latency_ms    CHECK (latency_ms >= 0),
+	CONSTRAINT constraint_ai_usage_on_retry_count   CHECK (retry_count >= 0),
+	CONSTRAINT constraint_ai_usage_on_total_cost    CHECK (total_cost_usd >= 0),
+	CONSTRAINT constraint_ai_usage_on_outcome CHECK (
+	    outcome IN ('success', 'timeout', 'auth_error', 'rate_limited',
+	                'circuit_open', 'invalid_request', 'other')
+	)
+) PARTITION BY RANGE (created_at);
+
+ALTER TABLE ai_usage ADD CONSTRAINT fk_ai_usage_on_inbox
+	FOREIGN KEY (inbox_id) REFERENCES inboxes(id) ON DELETE RESTRICT;
+ALTER TABLE ai_usage ADD CONSTRAINT fk_ai_usage_on_conversation
+	FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL;
+ALTER TABLE ai_usage ADD CONSTRAINT fk_ai_usage_on_agent
+	FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL;
+ALTER TABLE ai_usage ADD CONSTRAINT fk_ai_usage_on_agent_execution
+	FOREIGN KEY (agent_execution_id) REFERENCES agent_executions(id) ON DELETE SET NULL;
+ALTER TABLE ai_usage ADD CONSTRAINT fk_ai_usage_on_user
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX index_ai_usage_on_trace_seq
+	ON ai_usage (trace_id, call_sequence_in_trace, created_at);
+CREATE INDEX index_ai_usage_on_created_at
+	ON ai_usage (created_at DESC);
+CREATE INDEX index_ai_usage_on_inbox_created
+	ON ai_usage (inbox_id, created_at DESC);
+CREATE INDEX index_ai_usage_on_agent_created
+	ON ai_usage (agent_id, created_at DESC) WHERE agent_id IS NOT NULL;
+CREATE INDEX index_ai_usage_on_agent_execution
+	ON ai_usage (agent_execution_id) WHERE agent_execution_id IS NOT NULL;
+CREATE INDEX index_ai_usage_on_trace
+	ON ai_usage (trace_id);
+CREATE INDEX index_ai_usage_on_purpose_model_created
+	ON ai_usage (purpose, model, created_at DESC);
+CREATE INDEX index_ai_usage_on_errors
+	ON ai_usage (outcome, created_at DESC) WHERE outcome != 'success';
+CREATE INDEX index_ai_usage_on_provider_model
+	ON ai_usage (provider, model, created_at DESC);
+-- Cross-feature "all AI calls on conversation X" lookups (Batch 9).
+CREATE INDEX index_ai_usage_on_conversation_id_created_at
+	ON ai_usage (conversation_id, created_at DESC)
+	WHERE conversation_id IS NOT NULL;
 
 INSERT INTO ai_providers
 ("name", provider, config, is_default)
 VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
+
+-- Anthropic provider row for the F7 LLM abstraction. is_default=false
+-- so the existing OpenAI rewrite manager keeps using the OpenAI row.
+-- Admin sets the api_key via the AI providers settings UI.
+INSERT INTO ai_providers
+("name", provider, config, is_default)
+VALUES('anthropic', 'anthropic', '{"api_key": ""}'::jsonb, false);
 
 -- Default AI prompts
 INSERT INTO ai_prompts ("key", "content", title)
@@ -838,8 +1237,26 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,worklog:view_own,worklog:view_team,worklog:view_all,knowledge:read,knowledge:write,knowledge:publish,knowledge:delete}'
+		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,tags:view_private,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,worklog:view_own,worklog:view_team,worklog:view_all,knowledge:read,knowledge:write,knowledge:publish,knowledge:delete,tools:call,ai_agents:manage,ai_agents:run,ai_tools:manage,ai_tools:invoke}'
 	);
+
+
+-- System Agent user — script-execution callbacks act as this user when
+-- a script opts into system identity. Identified by stable reserved email.
+INSERT INTO users (type, enabled, email, first_name, last_name, password)
+SELECT 'agent', TRUE, 'system@libredesk.local', 'System Agent', '', NULL
+WHERE NOT EXISTS (
+	SELECT 1 FROM users
+	WHERE email = 'system@libredesk.local'
+	  AND type = 'agent' AND deleted_at IS NULL
+);
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id
+FROM   users u, roles r
+WHERE  u.email = 'system@libredesk.local'
+  AND  u.type = 'agent' AND u.deleted_at IS NULL
+  AND  r.name = 'Admin';
 
 
 -- Email notification templates
