@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"log"
 
@@ -43,6 +44,10 @@ var (
 	PasswordHint = fmt.Sprintf("Password must be %d-%d characters long should contain at least one uppercase letter, one lowercase letter, one number, and one special character.", minPassword, maxPassword)
 )
 
+// lastActiveFlushDebounce caps how often a single user's last_active_at is written to the DB,
+// reducing churn from frequent WS pings. Matches upstream's interval.
+const lastActiveFlushDebounce = 30 * time.Second
+
 // Manager handles user-related operations.
 type Manager struct {
 	lo           *logf.Logger
@@ -51,6 +56,11 @@ type Manager struct {
 	db           *sqlx.DB
 	agentCache   map[int]models.User
 	agentCacheMu sync.RWMutex
+
+	// lastActiveFlushAt tracks the last time each user's last_active_at was flushed to the DB,
+	// used by reserveFlush to debounce frequent ping-driven updates.
+	lastActiveFlushAt   map[int]time.Time
+	lastActiveFlushAtMu sync.Mutex
 }
 
 // Opts contains options for initializing the Manager.
@@ -111,11 +121,12 @@ func New(i18n *i18n.I18n, opts Opts) (*Manager, error) {
 		return nil, fmt.Errorf("error scanning SQL file: %w", err)
 	}
 	return &Manager{
-		q:          q,
-		lo:         opts.Lo,
-		i18n:       i18n,
-		db:         opts.DB,
-		agentCache: make(map[int]models.User),
+		q:                 q,
+		lo:                opts.Lo,
+		i18n:              i18n,
+		db:                opts.DB,
+		agentCache:        make(map[int]models.User),
+		lastActiveFlushAt: make(map[int]time.Time),
 	}, nil
 }
 
@@ -334,13 +345,37 @@ func (u *Manager) UpdateAvailability(id int, status string) error {
 	return nil
 }
 
-// UpdateLastActive updates the last active timestamp of an user.
-func (u *Manager) UpdateLastActive(id int) error {
-	if _, err := u.q.UpdateLastActiveAt.Exec(id); err != nil {
-		u.lo.Error("error updating user last active at", "error", err)
-		return fmt.Errorf("updating user last active at: %w", err)
+// UpdateLastActive updates last_active_at and returns true if the user flipped from offline to online.
+func (u *Manager) UpdateLastActive(id int) (wasOffline bool, err error) {
+	agent, cachedOK := u.GetAgentFromCache(id)
+	alreadyOnline := cachedOK && agent.AvailabilityStatus == models.Online
+
+	// Only debounce when the cache already says online; a cache miss (cold start, contacts/visitors,
+	// just-invalidated agent) bypasses the gate so the offline->online transition is never missed.
+	if alreadyOnline && !u.reserveFlush(id) {
+		return false, nil
 	}
-	return nil
+
+	if err := u.q.UpdateLastActiveAt.Get(&wasOffline, id); err != nil {
+		u.lo.Error("error updating user last active at", "error", err)
+		return false, fmt.Errorf("updating user last active at: %w", err)
+	}
+
+	if wasOffline {
+		u.InvalidateAgentCache(id)
+	}
+	return wasOffline, nil
+}
+
+// reserveFlush atomically claims the flush slot, returning false if still inside the debounce window.
+func (u *Manager) reserveFlush(id int) bool {
+	u.lastActiveFlushAtMu.Lock()
+	defer u.lastActiveFlushAtMu.Unlock()
+	if last, ok := u.lastActiveFlushAt[id]; ok && time.Since(last) < lastActiveFlushDebounce {
+		return false
+	}
+	u.lastActiveFlushAt[id] = time.Now()
+	return true
 }
 
 // IsOffline returns true if the user's availability status is offline.

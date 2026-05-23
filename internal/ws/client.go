@@ -93,7 +93,9 @@ func (c *Client) Listen() {
 func (c *Client) processIncomingMessage(data []byte) {
 	// Handle ping messages, and update last active time for user.
 	if string(data) == "ping" {
-		c.Hub.userStore.UpdateLastActive(c.ID)
+		if _, err := c.Hub.userStore.UpdateLastActive(c.ID); err != nil {
+			log.Printf("ws: UpdateLastActive failed for client %d: %v", c.ID, err)
+		}
 		c.SendMessage([]byte("pong"), websocket.TextMessage)
 		return
 	}

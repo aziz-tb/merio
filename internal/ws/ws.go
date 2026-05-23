@@ -31,7 +31,7 @@ type Hub struct {
 }
 
 type userStore interface {
-	UpdateLastActive(userID int) error
+	UpdateLastActive(userID int) (bool, error)
 }
 
 type conversationStore interface {

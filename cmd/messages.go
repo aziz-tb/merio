@@ -141,6 +141,12 @@ func handleGetMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	// Ensure the message belongs to the conversation in the route. Return 404
+	// (not 403) so we don't leak the existence of messages in other conversations.
+	if message.ConversationUUID != cuuid {
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.T("globals.messages.notFound"), nil, envelope.NotFoundError)
+	}
+
 	// Process CSAT status for the message (will only affect CSAT messages)
 	messages := []cmodels.Message{message}
 	app.conversation.ProcessCSATStatus(messages)
