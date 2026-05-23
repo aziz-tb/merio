@@ -79,10 +79,14 @@ type Article struct {
 	BodyHTML       string          `db:"body_html"        json:"body_html"`
 	BodyTiptapJSON json.RawMessage `db:"body_tiptap_json" json:"body_tiptap_json"`
 	BodyMarkdown   string          `db:"body_markdown"    json:"body_markdown"`
-	AuthorUserID   null.Int        `db:"author_user_id"   json:"author_user_id"`
-	PublishedAt    null.Time       `db:"published_at"     json:"published_at"`
-	CreatedAt      time.Time       `db:"created_at"       json:"created_at"`
-	UpdatedAt      time.Time       `db:"updated_at"       json:"updated_at"`
+	// Revision is bumped on every UpdateArticle / PublishArticle. The
+	// embed workflow ID `embed-article:<id>:v<revision>` derives its
+	// idempotency from this column.
+	Revision     int       `db:"revision"       json:"revision"`
+	AuthorUserID null.Int  `db:"author_user_id" json:"author_user_id"`
+	PublishedAt  null.Time `db:"published_at"   json:"published_at"`
+	CreatedAt    time.Time `db:"created_at"     json:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"     json:"updated_at"`
 }
 
 // CreateArticleParams is the payload for CreateArticle. AuthorUserID is set

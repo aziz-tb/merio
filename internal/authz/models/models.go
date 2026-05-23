@@ -26,7 +26,8 @@ const (
 	PermStatusManage = "status:manage"
 
 	// Tags
-	PermTagsManage = "tags:manage"
+	PermTagsManage      = "tags:manage"
+	PermTagsViewPrivate = "tags:view_private"
 
 	// Macros
 	PermMacrosManage = "macros:manage"
@@ -93,24 +94,26 @@ const (
 	// Activity log
 	PermActivityLogsManage = "activity_logs:manage"
 
-	// Worklog (B1)
+	// Worklog
 	PermWorklogViewOwn  = "worklog:view_own"
 	PermWorklogViewTeam = "worklog:view_team"
 	PermWorklogViewAll  = "worklog:view_all"
 
-	// Knowledge (B3)
+	// Knowledge
 	PermKnowledgeRead    = "knowledge:read"
 	PermKnowledgeWrite   = "knowledge:write"
 	PermKnowledgePublish = "knowledge:publish"
 	PermKnowledgeDelete  = "knowledge:delete"
 
-	// Tools (script execution — B5/exec-runner)
+	// Tools (script execution
 	PermToolsCall = "tools:call"
 
-	// AI agents and tools (F9 — configuration data model)
+	// AI agents and tools
 	PermAIAgentsManage = "ai_agents:manage"
-	PermAIToolsManage  = "ai_tools:manage"
-	PermAIToolsInvoke  = "ai_tools:invoke"
+	// PermAIAgentsRun gates the agent runner's manual-run endpoint
+	PermAIAgentsRun   = "ai_agents:run"
+	PermAIToolsManage = "ai_tools:manage"
+	PermAIToolsInvoke = "ai_tools:invoke"
 )
 
 var validPermissions = map[string]struct{}{
@@ -133,6 +136,7 @@ var validPermissions = map[string]struct{}{
 	PermSharedViewsManage:               {},
 	PermStatusManage:                    {},
 	PermTagsManage:                      {},
+	PermTagsViewPrivate:                 {},
 	PermMacrosManage:                    {},
 	PermUsersManage:                     {},
 	PermTeamsManage:                     {},
@@ -167,6 +171,7 @@ var validPermissions = map[string]struct{}{
 	PermKnowledgeDelete:                 {},
 	PermToolsCall:                       {},
 	PermAIAgentsManage:                  {},
+	PermAIAgentsRun:                     {},
 	PermAIToolsManage:                   {},
 	PermAIToolsInvoke:                   {},
 }

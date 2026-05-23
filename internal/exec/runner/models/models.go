@@ -83,7 +83,7 @@ type Request struct {
 // Kind enumerates the four possible script outcomes. These mirror the
 // SDK's sdk.success/sdk.failure/sdk.error/sdk.noop calls. Anything else
 // (uncaught exception, no result emitted at all) ends up as KindError
-// with a code identifying the underlying cause.
+// with a code identifying the underlying cause (see Code* below).
 type Kind string
 
 const (
@@ -93,26 +93,81 @@ const (
 	KindNoop    Kind = "noop"
 )
 
+// Result.Code values. Stable enum used by callers (cmd/ai_tools.go) to
+// pick HTTP status codes:
+//
+//	CodeExecutionSuccess   → script ran and called sdk.success / sdk.noop / sdk.failure
+//	CodeExecutionTimeout   → script ran past its declared timeout and got killed (408)
+//	CodeExecutionException → script raised an unhandled exception; stderr has the traceback (422)
+//	CodeExecutionFailed    → script crashed for some other reason, or exited cleanly without
+//	                         calling sdk.* (500-class — internal/operational)
+//
+// Distinction is made Go-side by inspecting exit_code, duration vs
+// declared timeout, and whether stderr looks like a Python traceback.
+// The Python sandbox doesn't currently surface these codes itself; if
+// it ever does, the codes here become the canonical names and the Go
+// runner just passes them through.
+const (
+	CodeExecutionSuccess   = "EXECUTION_SUCCESS"
+	CodeExecutionTimeout   = "EXECUTION_TIMEOUT"
+	CodeExecutionException = "EXECUTION_EXCEPTION"
+	CodeExecutionFailed    = "EXECUTION_FAILED"
+)
+
+// MaxStderrBytes caps Stderr bytes we propagate / persist. Long Python
+// tracebacks aren't useful past this; the Result envelope and the
+// tool_executions.data._stderr field both honor this cap and add a
+// trailing marker on truncation.
+const MaxStderrBytes = 8 * 1024
+
 // Result is what the runner returns to the caller after the script has
 // completed (or failed). It mirrors the structure of the sandbox's
 // ExecuteResponse but with named Go-side fields.
 type Result struct {
-	Kind       Kind           `json:"kind"`
-	Data       map[string]any `json:"data,omitempty"`
-	Message    string         `json:"message,omitempty"`
-	Code       string         `json:"code,omitempty"`
-	Retryable  bool           `json:"retryable,omitempty"`
+	Kind      Kind           `json:"kind"`
+	Data      map[string]any `json:"data,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Code      string         `json:"code,omitempty"`
+	Retryable bool           `json:"retryable,omitempty"`
+
+	// Stderr captures the script's stderr stream, regardless of outcome.
+	// Always present on returned Result (may be empty). Capped at
+	// MaxStderrBytes; if truncated, ends with a marker line.
+	//
+	// Tool authors get the traceback for Python exceptions here; for
+	// successful runs it usually carries logging output. This field is
+	// the primary debug surface when EXECUTION_EXCEPTION fires.
+	Stderr string `json:"stderr,omitempty"`
 
 	// Operational telemetry — exposed mostly for the AI pipeline to log,
 	// not for handlers.
-	ExecutionID  string        `json:"execution_id"`
-	DurationMs   int           `json:"duration_ms"`
-	WarmPoolHit  bool          `json:"warm_pool_hit"`
-	StartedAt    time.Time     `json:"started_at"`
+	ExecutionID string    `json:"execution_id"`
+	DurationMs  int       `json:"duration_ms"`
+	WarmPoolHit bool      `json:"warm_pool_hit"`
+	StartedAt   time.Time `json:"started_at"`
 }
 
 // IsSuccess is a small convenience for callers that only care whether the
 // script terminated cleanly.
 func (r *Result) IsSuccess() bool {
 	return r != nil && r.Kind == KindSuccess
+}
+
+// InternalAuditRow is the input shape for Manager.RecordInternalAudit.
+// Mirrors the columns of the tool_executions table that apply to
+// in-process Go capability invocations (no warm-pool, no result-code
+// from the sandbox, language is hardcoded to "internal" inside the
+// runner). Kept in this package so the dispatcher (which lives outside
+// the runner package) can construct rows without a circular import.
+type InternalAuditRow struct {
+	ExecutionID    string
+	ToolName       string
+	InvokerUserID  int
+	ConversationID int
+	StartedAt      time.Time
+	DurationMs     int
+	Kind           string          // "success" | "error"
+	Message        string          // populated on Kind="error"
+	Data           json.RawMessage // populated on Kind="success" with the marshalled capability output
+	TraceID        string
 }

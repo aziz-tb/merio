@@ -33,8 +33,11 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/template"
+	itemporal "github.com/abhinavxd/libredesk/internal/temporal"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	wfagentvalidation "github.com/abhinavxd/libredesk/internal/workflows/agentvalidation"
+	wftagclass "github.com/abhinavxd/libredesk/internal/workflows/tagclassification"
 	wlmodels "github.com/abhinavxd/libredesk/internal/worklog/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
@@ -43,6 +46,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
+	enumspb "go.temporal.io/api/enums/v1"
 )
 
 var (
@@ -79,6 +83,7 @@ type Manager struct {
 	automation                 *automation.Engine
 	wsHub                      *ws.Hub
 	template                   *template.Manager
+	temporalClient             *itemporal.Client
 	incomingMessageQueue       chan models.IncomingMessage
 	outgoingMessageQueue       chan models.Message
 	outgoingProcessingMessages sync.Map
@@ -189,6 +194,7 @@ type Opts struct {
 	IncomingMessageQueueSize int
 	ContinuityConfig         *ContinuityConfig
 	SubjectRefFormat         string
+	TemporalClient           *itemporal.Client
 }
 
 // New initializes a new conversation Manager.
@@ -253,6 +259,7 @@ func New(
 		priorityStore:              priorityStore,
 		automation:                 automation,
 		template:                   template,
+		temporalClient:             opts.TemporalClient,
 		db:                         opts.DB,
 		lo:                         opts.Lo,
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
@@ -821,7 +828,7 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 
 	// Evaluate automation rules for conversation priority change.
 	conversation, err := c.GetConversation(0, uuid, "")
-	if err == nil {
+	if err == nil && c.automation != nil {
 		c.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationPriorityChange)
 	}
 
@@ -1021,6 +1028,85 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	}
 
 	return nil
+}
+
+// ClassifyConversation starts the tag-classification workflow for a conversation.
+func (c *Manager) ClassifyConversation(conversationUUID, triggeredBy string, userID int64) (string, error) {
+	if c.temporalClient == nil {
+		c.lo.Debug("temporal not configured, skipping tag classification", "conversation_uuid", conversationUUID)
+		return "", nil
+	}
+
+	workflowID := fmt.Sprintf("tag-classify:%s", conversationUUID)
+	_, err := c.temporalClient.StartWorkflow(
+		context.Background(),
+		itemporal.StartOptions{
+			ID:        workflowID,
+			TaskQueue: itemporal.QueuePipeline,
+			SearchAttributes: map[string]any{
+				itemporal.SATraceID:      workflowID,
+				itemporal.SAWorkflowKind: "tag_classification",
+				itemporal.SAEntityType:   "conversation",
+				itemporal.SAEntityID:     conversationUUID,
+			},
+			ReusePolicy:             enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+			ErrorWhenAlreadyStarted: true,
+		},
+		wftagclass.TagClassificationWorkflow,
+		wftagclass.Input{
+			ConversationUUID:  conversationUUID,
+			TriggeredBy:       triggeredBy,
+			TriggeredByUserID: userID,
+		},
+	)
+	if err != nil {
+		if itemporal.IsAlreadyStarted(err) {
+			return "", itemporal.ErrAlreadyStarted
+		}
+		return "", err
+	}
+	return workflowID, nil
+}
+
+// ValidateConversationAgents starts the agent-validation workflow for a
+// conversation. Mirrors ClassifyConversation's deterministic workflow ID +
+// ALLOW_DUPLICATE pattern so completed validations can be rerun while a
+// currently-running validation still returns ErrAlreadyStarted.
+func (c *Manager) ValidateConversationAgents(ctx context.Context, conversationUUID, triggeredBy string, userID int64) (string, error) {
+	if c.temporalClient == nil {
+		c.lo.Debug("temporal not configured, skipping agent validation", "conversation_uuid", conversationUUID)
+		return "", nil
+	}
+
+	workflowID := fmt.Sprintf("agent-validate:%s", conversationUUID)
+	_, err := c.temporalClient.StartWorkflow(
+		ctx,
+		itemporal.StartOptions{
+			ID:        workflowID,
+			TaskQueue: itemporal.QueuePipeline,
+			SearchAttributes: map[string]any{
+				itemporal.SATraceID:      workflowID,
+				itemporal.SAWorkflowKind: "agent_validation",
+				itemporal.SAEntityType:   "conversation",
+				itemporal.SAEntityID:     conversationUUID,
+			},
+			ReusePolicy:             enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+			ErrorWhenAlreadyStarted: true,
+		},
+		wfagentvalidation.AgentValidationWorkflow,
+		wfagentvalidation.Input{
+			ConversationUUID:  conversationUUID,
+			TriggeredBy:       triggeredBy,
+			TriggeredByUserID: userID,
+		},
+	)
+	if err != nil {
+		if itemporal.IsAlreadyStarted(err) {
+			return "", itemporal.ErrAlreadyStarted
+		}
+		return "", err
+	}
+	return workflowID, nil
 }
 
 // GetMessageSourceIDs retrieves source IDs for messages in a conversation in descending order.

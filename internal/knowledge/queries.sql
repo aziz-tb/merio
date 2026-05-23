@@ -85,6 +85,8 @@ VALUES
 RETURNING *;
 
 -- name: update-article
+-- Bumps revision unconditionally so the embed workflow ID
+-- (embed-article:<id>:v<revision>) deduplicates by content state.
 UPDATE
     kb_articles
 SET
@@ -96,6 +98,7 @@ SET
     body_html = $7,
     body_tiptap_json = $8,
     body_markdown = $9,
+    revision = revision + 1,
     updated_at = NOW()
 WHERE
     id = $1
@@ -103,12 +106,15 @@ RETURNING *;
 
 -- name: publish-article
 -- Refuses to flip an already-published row by gating on the current status;
--- callers receive sql.ErrNoRows when the precondition fails.
+-- callers receive sql.ErrNoRows when the precondition fails. Bumps
+-- revision so the publish event has its own workflow ID distinct from
+-- the prior draft revision (in case a draft was embedded for previews).
 UPDATE
     kb_articles
 SET
     status = 'published',
     published_at = NOW(),
+    revision = revision + 1,
     updated_at = NOW()
 WHERE
     id = $1
@@ -116,7 +122,9 @@ WHERE
 RETURNING *;
 
 -- name: unpublish-article
--- Symmetric guard: fails when the row is already a draft.
+-- Symmetric guard: fails when the row is already a draft. Revision is
+-- NOT bumped on unpublish — the content didn't change, only its
+-- visibility. The trigger handler deletes active vectors instead.
 UPDATE
     kb_articles
 SET
@@ -127,6 +135,19 @@ WHERE
     id = $1
     AND status = 'published'
 RETURNING *;
+
+-- name: mark-index-stale
+-- Best-effort upsert on articles_index_state.is_stale = TRUE. Called
+-- as a fallback when workflow start fails so the catch-up sweep can
+-- eventually re-embed. Inserts a placeholder row if none exists yet
+-- (first-save case) so the stale flag has somewhere to live.
+INSERT INTO articles_index_state (article_id, active_version, active_model, is_stale)
+VALUES ($1, 1, '', TRUE)
+ON CONFLICT (article_id) DO UPDATE
+SET is_stale = TRUE;
+
+-- name: get-article-revision
+SELECT revision FROM kb_articles WHERE id = $1;
 
 -- name: move-article
 UPDATE

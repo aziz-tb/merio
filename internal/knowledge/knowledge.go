@@ -50,14 +50,16 @@ type queries struct {
 	GetFolderDescendants *sqlx.Stmt `query:"get-folder-descendants"`
 
 	// Articles
-	InsertArticle    *sqlx.Stmt `query:"insert-article"`
-	UpdateArticle    *sqlx.Stmt `query:"update-article"`
-	PublishArticle   *sqlx.Stmt `query:"publish-article"`
-	UnpublishArticle *sqlx.Stmt `query:"unpublish-article"`
-	MoveArticle      *sqlx.Stmt `query:"move-article"`
-	DeleteArticle    *sqlx.Stmt `query:"delete-article"`
-	GetArticle       *sqlx.Stmt `query:"get-article"`
-	ListArticles     *sqlx.Stmt `query:"list-articles"`
+	InsertArticle      *sqlx.Stmt `query:"insert-article"`
+	UpdateArticle      *sqlx.Stmt `query:"update-article"`
+	PublishArticle     *sqlx.Stmt `query:"publish-article"`
+	UnpublishArticle   *sqlx.Stmt `query:"unpublish-article"`
+	MoveArticle        *sqlx.Stmt `query:"move-article"`
+	DeleteArticle      *sqlx.Stmt `query:"delete-article"`
+	GetArticle         *sqlx.Stmt `query:"get-article"`
+	ListArticles       *sqlx.Stmt `query:"list-articles"`
+	MarkIndexStale     *sqlx.Stmt `query:"mark-index-stale"`
+	GetArticleRevision *sqlx.Stmt `query:"get-article-revision"`
 }
 
 // Opts contains the dependencies for the knowledge manager.
@@ -360,6 +362,28 @@ func (m *Manager) GetArticle(id int) (models.Article, error) {
 		return models.Article{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return article, nil
+}
+
+// MarkIndexStale is the fallback path when starting an embed workflow
+// fails. It flips articles_index_state.is_stale=TRUE for the article
+// (upserting a placeholder row if one doesn't exist yet) so the
+// catch-up sweep can eventually re-embed. Errors are logged but not
+// returned — best-effort by design.
+func (m *Manager) MarkIndexStale(articleID int) {
+	if _, err := m.q.MarkIndexStale.Exec(articleID); err != nil {
+		m.lo.Warn("knowledge: mark-index-stale failed", "article_id", articleID, "error", err)
+	}
+}
+
+// GetArticleRevision returns the current revision number. Used by the
+// save-handler integration to derive workflow IDs without fetching the
+// full row.
+func (m *Manager) GetArticleRevision(id int) (int, error) {
+	var rev int
+	if err := m.q.GetArticleRevision.Get(&rev, id); err != nil {
+		return 0, err
+	}
+	return rev, nil
 }
 
 // ListArticles paginates and filters. Search is ILIKE on title only — no

@@ -603,8 +603,11 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		*message = refetchedMessage
 	}
 
-	// Trigger webhook for new message created.
-	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
+	// Trigger webhook for new message created. Worker-only conversation
+	// managers can omit webhookStore when they only need DB-side methods.
+	if m.webhookStore != nil {
+		m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
+	}
 
 	return nil
 }
@@ -1233,6 +1236,9 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 		if err == nil {
 			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
 			m.automation.EvaluateNewConversationRules(conversation)
+			if _, err := m.ClassifyConversation(conversation.UUID, "auto", 0); err != nil {
+				m.lo.Warn("enqueue tag classification for new conversation failed", "conversation_uuid", conversation.UUID, "error", err)
+			}
 		}
 		return nil
 	}
@@ -1255,6 +1261,9 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	} else {
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming)
+		if _, err := m.ClassifyConversation(conversation.UUID, "auto", 0); err != nil {
+			m.lo.Warn("enqueue tag classification for incoming message failed", "conversation_uuid", conversation.UUID, "error", err)
+		}
 
 		if conversation.SLAPolicyID.Int == 0 {
 			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")

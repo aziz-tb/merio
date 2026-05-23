@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -253,7 +254,7 @@ func (m *Manager) Execute(ctx context.Context, req models.Request) (*models.Resu
 
 	m.breaker.recordSuccess()
 
-	result := toResult(resp, executionID, startedAt)
+	result := toResult(resp, executionID, startedAt, req.TimeoutSeconds)
 	m.recordAudit(ctx, executionID, req, startedAt, result, resp)
 
 	return result, nil
@@ -393,6 +394,12 @@ func (m *Manager) singleCall(
 }
 
 // recordAudit writes a successful execution row.
+//
+// On a failure result (result.Kind == KindError) we additionally fold
+// result.Stderr into the JSONB Data column under the underscore-prefixed
+// _stderr key, so tool authors can pull the traceback out via
+// `data->>'_stderr'` without an extra column. The underscore prefix
+// signals "operational metadata, distinct from script-emitted data."
 func (m *Manager) recordAudit(
 	ctx context.Context,
 	executionID string,
@@ -401,7 +408,16 @@ func (m *Manager) recordAudit(
 	result *models.Result,
 	resp *sandboxResponse,
 ) {
-	dataJSON, _ := json.Marshal(result.Data)
+	// Fold stderr into the JSONB blob on failure paths so the audit row
+	// carries the debug surface alongside the rest of the result data.
+	dataMap := map[string]any{}
+	for k, v := range result.Data {
+		dataMap[k] = v
+	}
+	if result.Stderr != "" && result.Kind == models.KindError {
+		dataMap["_stderr"] = result.Stderr
+	}
+	dataJSON, _ := json.Marshal(dataMap)
 	if err := m.queries.insertExecution(ctx, executionRow{
 		ExecutionID:    executionID,
 		ToolName:       nullableString(req.ToolName),
@@ -421,6 +437,44 @@ func (m *Manager) recordAudit(
 	}); err != nil {
 		m.opts.Logger.Error("runner: audit insert failed",
 			"execution_id", executionID, "error", err)
+	}
+}
+
+// RecordInternalAudit writes a tool_executions row for an
+// internal-capability invocation. Used by the unified dispatcher's
+// internal-kind path so audit rows for in-process Go calls share the
+// same table + column shape as Python sandbox runs. Language is fixed
+// to "internal" so ops can filter the two surfaces apart at query time.
+//
+// Best-effort: errors are logged, never propagated. Dispatch already
+// returned to the caller before this fires.
+func (m *Manager) RecordInternalAudit(ctx context.Context, row models.InternalAuditRow) {
+	if m == nil || m.queries == nil {
+		return
+	}
+	var convPtr *int
+	if row.ConversationID > 0 {
+		c := row.ConversationID
+		convPtr = &c
+	}
+	finishedAt := row.StartedAt.Add(time.Duration(row.DurationMs) * time.Millisecond)
+	if err := m.queries.insertExecution(ctx, executionRow{
+		ExecutionID:    row.ExecutionID,
+		ToolName:       nullableString(row.ToolName),
+		InvokerUserID:  row.InvokerUserID,
+		ConversationID: convPtr,
+		ToolDepth:      0,
+		Language:       "internal",
+		StartedAt:      row.StartedAt,
+		FinishedAt:     finishedAt,
+		DurationMs:     row.DurationMs,
+		Kind:           row.Kind,
+		Message:        nullableString(row.Message),
+		Data:           row.Data,
+		TraceID:        nullableString(row.TraceID),
+	}); err != nil {
+		m.opts.Logger.Error("runner: internal audit insert failed",
+			"execution_id", row.ExecutionID, "error", err)
 	}
 }
 
@@ -519,30 +573,131 @@ func buildSandboxPayload(
 
 // toResult converts a sandbox response to the public Result.
 //
-// If the script never emitted a result envelope (NO_RESULT_EMITTED case),
-// the sandbox fills in a synthetic envelope with kind="error" — we just
-// pass it through unchanged.
-func toResult(resp *sandboxResponse, executionID string, startedAt time.Time) *models.Result {
+// Result.Code is normalized to the EXECUTION_* enum so callers don't
+// have to switch on raw sandbox codes:
+//
+//	success path  → CodeExecutionSuccess
+//	failure/noop  → existing semantics (Code field carries the
+//	                script-emitted code if any; Kind disambiguates)
+//	error path    → distinguish by exit code + duration + stderr:
+//	                  - duration ≥ 95% of declared timeout → CodeExecutionTimeout
+//	                  - stderr starts/contains a Python traceback → CodeExecutionException
+//	                  - else → CodeExecutionFailed
+//
+// stderr is always propagated (possibly empty), capped at MaxStderrBytes.
+// requestedTimeoutSeconds is the timeout the caller asked for (passed
+// in from Execute); we use it for the 95%-of-timeout heuristic.
+func toResult(resp *sandboxResponse, executionID string, startedAt time.Time, requestedTimeoutSeconds int) *models.Result {
 	res := &models.Result{
 		ExecutionID: executionID,
 		DurationMs:  resp.DurationMs,
 		WarmPoolHit: resp.WarmPoolHit,
 		StartedAt:   startedAt,
+		Stderr:      capStderr(resp.Stderr),
 	}
+
+	// No result envelope at all → script crashed without calling sdk.*.
+	// Apply timeout/exception/failed heuristics.
 	if resp.Result == nil {
-		// No result at all — should not happen with the current sandbox
-		// (it always synthesizes one), but be defensive.
 		res.Kind = models.KindError
-		res.Code = "NO_RESULT"
-		res.Message = "sandbox returned no result envelope"
+		res.Code = classifyFailure(resp, requestedTimeoutSeconds)
+		res.Message = failureMessageFor(res.Code, resp)
 		return res
 	}
+
+	// Sandbox emitted a result envelope — pass through, normalizing Code.
 	res.Kind = models.Kind(resp.Result.Kind)
 	res.Data = resp.Result.Data
 	res.Message = resp.Result.Message
 	res.Code = resp.Result.Code
 	res.Retryable = resp.Result.Retryable
+
+	// Normalize the success-path code. The sandbox emits whatever the
+	// script set on sdk.success(code=...); when no code is provided we
+	// stamp the canonical EXECUTION_SUCCESS so callers can rely on it.
+	if res.Kind == models.KindSuccess && res.Code == "" {
+		res.Code = models.CodeExecutionSuccess
+	}
+
+	// Sandbox synthesizes its own NO_RESULT_EMITTED when exit_code=0
+	// but no __RESULT__ was found. Treat this as an operational failure
+	// (script-author bug — should have called sdk.success/etc.) and
+	// classify it the same way as a missing envelope.
+	if res.Kind == models.KindError && (res.Code == "NO_RESULT_EMITTED" || res.Code == "NO_RESULT") {
+		res.Code = classifyFailure(resp, requestedTimeoutSeconds)
+		res.Message = failureMessageFor(res.Code, resp)
+	}
+
 	return res
+}
+
+// classifyFailure picks one of CodeExecutionTimeout / CodeExecutionException
+// / CodeExecutionFailed based on signal-derived hints.
+//
+// Heuristics, in priority order:
+//  1. Duration ≥ 95% of declared timeout → TIMEOUT (the script almost
+//     certainly hit the kill signal; standard SIGKILL gives exit_code
+//     -1/137 but we don't trust that across platforms).
+//  2. Stderr contains "Traceback (most recent call last)" → EXCEPTION.
+//  3. Else → FAILED (catch-all: VM error after script started, or
+//     non-traceback crash like sys.exit(1) or hard signal).
+func classifyFailure(resp *sandboxResponse, requestedTimeoutSeconds int) string {
+	if requestedTimeoutSeconds > 0 {
+		// Use 95% threshold so we catch slightly-early kills too.
+		// (timeout * 1000 ms, then × 0.95).
+		threshold := (requestedTimeoutSeconds * 1000 * 95) / 100
+		if resp.DurationMs >= threshold {
+			return models.CodeExecutionTimeout
+		}
+	}
+	if strings.Contains(resp.Stderr, "Traceback (most recent call last)") {
+		return models.CodeExecutionException
+	}
+	return models.CodeExecutionFailed
+}
+
+// failureMessageFor returns a stable, user-facing failure message for
+// the EXECUTION_* codes. Tools surface this to authors verbatim so it
+// has to read cleanly without context.
+func failureMessageFor(code string, resp *sandboxResponse) string {
+	switch code {
+	case models.CodeExecutionTimeout:
+		return fmt.Sprintf("script exceeded its declared timeout (ran %dms before being killed)", resp.DurationMs)
+	case models.CodeExecutionException:
+		// First non-empty line of stderr is usually the most useful
+		// summary (e.g., "ValueError: boom"). Last line of a traceback
+		// is the exception message.
+		return summarizeTraceback(resp.Stderr)
+	default:
+		return "script terminated without emitting a result"
+	}
+}
+
+// summarizeTraceback extracts the most useful one-liner from a Python
+// traceback — typically the last non-empty line, which is the exception
+// type + message (e.g., "ValueError: boom").
+func summarizeTraceback(stderr string) string {
+	lines := strings.Split(strings.TrimRight(stderr, "\n"), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		s := strings.TrimSpace(lines[i])
+		if s != "" {
+			return "script raised: " + s
+		}
+	}
+	return "script raised an unhandled exception"
+}
+
+// capStderr enforces MaxStderrBytes with a clear truncation marker so
+// readers know the original was bigger.
+func capStderr(s string) string {
+	if len(s) <= models.MaxStderrBytes {
+		return s
+	}
+	// Keep the LAST MaxStderrBytes — for Python tracebacks, the tail
+	// (where the actual exception message lives) is more useful than
+	// the head (where stack frames start).
+	tail := s[len(s)-models.MaxStderrBytes:]
+	return fmt.Sprintf("...[truncated; original %d bytes]\n%s", len(s), tail)
 }
 
 // ───────────── Errors ─────────────

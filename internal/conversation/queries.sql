@@ -160,6 +160,13 @@ SELECT
        WHERE ct.conversation_id = c.id),
        '[]'::json
    )) AS tags,
+   (SELECT COALESCE(
+       (SELECT json_agg(t.id)
+       FROM tags t
+       INNER JOIN conversation_tags ct ON ct.tag_id = t.id
+       WHERE ct.conversation_id = c.id),
+       '[]'::json
+   )) AS tag_ids,
    ct.id as "contact.id",
    ct.created_at as "contact.created_at",
    ct.updated_at as "contact.updated_at",
@@ -410,7 +417,8 @@ INSERT INTO conversation_tags (conversation_id, tag_id)
   SELECT c.id, t.id
   FROM conversations c, tags t
   WHERE t.name = ANY($2::text[]) AND c.uuid = $1
-  ON CONFLICT (conversation_id, tag_id) DO UPDATE SET tag_id = EXCLUDED.tag_id;
+  ON CONFLICT (conversation_id, tag_id) DO UPDATE
+  SET applied_by = 'manual', ai_operation_id = NULL;
 
 -- name: set-conversation-tags
 WITH conversation_id AS (
@@ -422,7 +430,8 @@ inserted AS (
     SELECT conversation_id.id, t.id
     FROM conversation_id, tags t
     WHERE t.name = ANY($2::text[])
-    ON CONFLICT (conversation_id, tag_id) DO UPDATE SET tag_id = EXCLUDED.tag_id
+    ON CONFLICT (conversation_id, tag_id) DO UPDATE
+    SET applied_by = 'manual', ai_operation_id = NULL
 )
 -- Delete tags that are not in the new list
 DELETE FROM conversation_tags

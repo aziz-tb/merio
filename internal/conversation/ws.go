@@ -58,6 +58,22 @@ func (m *Manager) BroadcastConversationUpdate(conversationUUID string, data map[
 	})
 }
 
+// BroadcastConversationEvent broadcasts an arbitrary conversation-scoped event
+// to agent clients. The payload receives conversation_uuid when absent so
+// callers can keep event-specific data small.
+func (m *Manager) BroadcastConversationEvent(conversationUUID, eventType string, data map[string]any) {
+	if data == nil {
+		data = map[string]any{}
+	}
+	if data["conversation_uuid"] == nil {
+		data["conversation_uuid"] = conversationUUID
+	}
+	m.broadcastToUsers([]int{}, wsmodels.Message{
+		Type: eventType,
+		Data: data,
+	})
+}
+
 // BroadcastContactUpdate broadcasts a contact update to all agent clients.
 func (m *Manager) BroadcastContactUpdate(contactID int, data map[string]any) {
 	data["contact_id"] = contactID
@@ -100,6 +116,9 @@ func (m *Manager) BroadcastTypingToWidgetClientsOnly(conversationUUID string, is
 
 // broadcastToUsers broadcasts a message to a list of users, if the list is empty it broadcasts to all users.
 func (m *Manager) broadcastToUsers(userIDs []int, message wsmodels.Message) {
+	if m.wsHub == nil {
+		return
+	}
 	messageBytes, err := json.Marshal(message)
 	if err != nil {
 		m.lo.Error("error marshalling WS message", "error", err)

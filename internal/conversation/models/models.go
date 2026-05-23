@@ -180,6 +180,7 @@ type Conversation struct {
 	InboxName                 string                 `db:"inbox_name" json:"inbox_name"`
 	InboxChannel              string                 `db:"inbox_channel" json:"inbox_channel"`
 	Tags                      null.JSON              `db:"tags" json:"tags"`
+	TagIDs                    null.JSON              `db:"tag_ids" json:"tag_ids"`
 	Meta                      json.RawMessage        `db:"meta" json:"meta"`
 	CustomAttributes          json.RawMessage        `db:"custom_attributes" json:"custom_attributes"`
 	LastMessageAt             null.Time              `db:"last_message_at" json:"last_message_at"`
@@ -198,6 +199,18 @@ type Conversation struct {
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
+}
+
+// TagSlugs returns tag names attached to the conversation.
+func (c *Conversation) TagSlugs() []string {
+	if c == nil || !c.Tags.Valid || len(c.Tags.JSON) == 0 {
+		return nil
+	}
+	var tags []string
+	if err := json.Unmarshal(c.Tags.JSON, &tags); err != nil {
+		return nil
+	}
+	return tags
 }
 
 type ConversationContact struct {

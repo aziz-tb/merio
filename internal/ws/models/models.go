@@ -12,6 +12,7 @@ const (
 	MessageTypeConversationSubscribed = "conversation_subscribed"
 	MessageTypeConversationViewers    = "conversation_viewers"
 	MessageTypeTyping                 = "typing"
+	MessageTypeAgentValidationDone    = "agent_validation_completed"
 )
 
 // WSMessage represents a WS message.
