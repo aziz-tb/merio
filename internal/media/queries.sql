@@ -20,7 +20,7 @@ FROM media
 WHERE 
    ($1 > 0 AND id = $1)
    OR
-   ($2 != '' AND uuid = $2::uuid)
+   ($2 != '' AND uuid = NULLIF($2, '')::uuid)
 
 -- name: get-media-by-uuid
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta
@@ -51,4 +51,9 @@ WHERE model_type = 'messages'
   AND created_at < NOW() - INTERVAL '7 days';
 
 -- name: content-id-exists
-SELECT uuid FROM media WHERE content_id = $1;
+SELECT m.uuid
+FROM media m
+INNER JOIN conversation_messages cm ON cm.id = m.model_id
+WHERE m.model_type = 'messages'
+  AND m.content_id = $1
+  AND cm.conversation_id = (SELECT id FROM conversations WHERE uuid = $2::uuid LIMIT 1);

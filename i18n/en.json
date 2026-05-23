@@ -1410,6 +1410,7 @@
   "globals.terms.total": "total",
   "globals.terms.updated": "Updated",
   "globals.terms.when": "When",
+  "datatable.itemCount": "{n} item | {n} items",
   "datatable.itemSelected": "{n} item selected | {n} items selected",
   "datatable.selectAll": "Select all",
   "datatable.columns": "Columns",

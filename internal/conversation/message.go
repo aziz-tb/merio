@@ -1009,7 +1009,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			// to make it more unique.
 			contentID = message.ConversationUUID + "_" + contentID
 
-			exists, uuid, err := m.mediaStore.ContentIDExists(contentID)
+			exists, uuid, err := m.mediaStore.ContentIDExists(contentID, message.ConversationUUID)
 			if err != nil {
 				m.lo.Error("error checking media existence by content ID", "content_id", contentID, "error", err)
 			}
