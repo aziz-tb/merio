@@ -8,6 +8,7 @@
       <RouterLink
         :to="{ name: 'edit-article', params: { id: result.article_id } }"
         target="_blank"
+        rel="noopener noreferrer"
         class="flex items-center gap-2 text-sm font-medium text-foreground hover:underline"
       >
         <BookOpen class="h-4 w-4 shrink-0 text-muted-foreground" />

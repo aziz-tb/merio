@@ -2,6 +2,7 @@
   <ComboBox
     :model-value="normalizedValue"
     @update:model-value="$emit('update:modelValue', $event)"
+    @select="$emit('select', $event)"
     :items="items"
     :placeholder="placeholder"
   >
@@ -77,5 +78,5 @@ const isCurrentUser = (item) => {
   )
 }
 
-defineEmits(['update:modelValue'])
+defineEmits(['update:modelValue', 'select'])
 </script>
