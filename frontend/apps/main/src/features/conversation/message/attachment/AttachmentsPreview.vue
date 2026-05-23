@@ -1,39 +1,45 @@
 <template>
-  <div class="flex flex-wrap">
+  <div>
     <TransitionGroup name="attachment-list" tag="div" class="flex flex-wrap gap-2">
       <div
         v-for="attachment in allAttachments"
         :key="attachment.uuid || attachment.tempId"
-        class="flex items-center bg-background border rounded transition-colors duration-150 hover:bg-accent/50 group px-2 gap-2"
+        class="flex items-center gap-2 px-2.5 py-1.5 bg-background border border-border rounded-md hover:bg-muted transition-colors group max-w-xs"
       >
-        <div class="flex items-center space-x-1 py-1">
-          <DotLoader v-if="attachment.loading"/>
-          <PaperclipIcon v-else size="16" />
+        <!-- Icon or loader -->
+        <DotLoader v-if="attachment.loading" />
+        <component
+          v-else
+          :is="getFileIcon(attachment.filename)"
+          :size="16"
+          class="text-muted-foreground flex-shrink-0"
+        />
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <div
-                class="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground"
-              >
-                {{ getAttachmentName(attachment.filename) }}
-                <span class="text-xs text-muted-foreground ml-1">
-                  {{ formatBytes(attachment.size) }}
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p class="text-sm">{{ attachment.filename }}</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        <!-- Filename + size -->
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <div class="flex items-baseline gap-1.5 min-w-0">
+              <span class="text-sm font-medium text-foreground truncate">
+                {{ attachment.filename }}
+              </span>
+              <span class="text-xs text-muted-foreground flex-shrink-0">
+                {{ formatBytes(attachment.size) }}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p class="text-sm">{{ attachment.filename }}</p>
+          </TooltipContent>
+        </Tooltip>
 
+        <!-- Delete button -->
         <button
           v-if="!attachment.loading"
           @click.prevent="onDelete(attachment.uuid)"
-          class="text-muted-foreground hover:text-destructive focus:outline-none rounded transition-colors duration-150"
-          title="Remove attachment"
+          class="ml-auto text-muted-foreground hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded transition-colors flex-shrink-0"
+          :aria-label="`Remove ${attachment.filename}`"
         >
-          <X size="14" />
+          <X :size="14" />
         </button>
       </div>
     </TransitionGroup>
@@ -43,7 +49,8 @@
 <script setup>
 import { computed } from 'vue'
 import { formatBytes } from '@shared-ui/utils/file'
-import { X, Paperclip as PaperclipIcon } from 'lucide-vue-next'
+import { getFileIcon } from '@/composables/useFileIcon'
+import { X } from 'lucide-vue-next'
 import { DotLoader } from '@shared-ui/components/ui/loader'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 
@@ -71,11 +78,6 @@ const allAttachments = computed(() => [
   })),
   ...props.attachments
 ])
-
-const getAttachmentName = (name) => {
-  if (!name) return ''
-  return name.length > 20 ? name.substring(0, 17) + '...' : name
-}
 </script>
 
 <style scoped>
