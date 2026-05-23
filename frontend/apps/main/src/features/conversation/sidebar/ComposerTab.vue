@@ -1,28 +1,25 @@
 <template>
-
-
-      <div class="flex items-center justify-between gap-2 p-3">
-          <div class="w-full">
-            <SelectCombobox
-              v-model="adHocAgentId"
-              :items="adHocAgentOptions"
-              :placeholder="$t('agent.searchAgent')"
-            />
-          </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          class="size-7"
-          :disabled="validating"
-          :title="$t('agent.validation.revalidate')"
-          @click="triggerValidation"
-        >
-          <Loader2 v-if="validating" class="size-4 animate-spin" />
-          <RefreshCw v-else class="size-4" />
-          <span class="sr-only">{{ $t('agent.validation.revalidate') }}</span>
-        </Button>
-      </div>
+  <div class="flex items-center justify-between gap-2 p-4">
+    <div class="w-full">
+      <SelectCombobox
+        v-model="adHocAgentId"
+        :items="adHocAgentOptions"
+        :placeholder="$t('agent.searchAgent')"
+      />
+    </div>
+    <Button
+      variant="outline"
+      size="icon"
+      class="size-9 p-4"
+      :disabled="validating"
+      :title="$t('agent.validation.revalidate')"
+      @click="triggerValidation"
+    >
+      <Loader2 v-if="validating" class="size-4 animate-spin" />
+      <RefreshCw v-else class="size-4" />
+      <span class="sr-only">{{ $t('agent.validation.revalidate') }}</span>
+    </Button>
+  </div>
   <div class="p-4 space-y-4">
     <div v-if="loading" class="text-xs text-muted-foreground">
       {{ $t('globals.messages.loading') }}
