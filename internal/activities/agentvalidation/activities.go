@@ -1,0 +1,51 @@
+package agentvalidation
+
+import (
+	"fmt"
+
+	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
+	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
+	"github.com/abhinavxd/libredesk/internal/conversation"
+	"github.com/abhinavxd/libredesk/internal/detection"
+	"github.com/abhinavxd/libredesk/internal/realtime"
+	"github.com/jmoiron/sqlx"
+	"github.com/zerodha/logf"
+)
+
+type Activities struct {
+	DB              *sqlx.DB
+	Lo              *logf.Logger
+	AgentsMgr       *aiagents.Manager
+	ConversationMgr *conversation.Manager
+	DetectionMgr    *detection.Manager
+	AIOperationsMgr *aioperations.Manager
+	Realtime        realtime.Publisher
+}
+
+func New(a *Activities) (*Activities, error) {
+	if a == nil {
+		return nil, fmt.Errorf("agentvalidation: Activities required")
+	}
+	if a.DB == nil {
+		return nil, fmt.Errorf("agentvalidation: DB required")
+	}
+	if a.Lo == nil {
+		return nil, fmt.Errorf("agentvalidation: Lo required")
+	}
+	if a.AgentsMgr == nil {
+		return nil, fmt.Errorf("agentvalidation: AgentsMgr required")
+	}
+	if a.ConversationMgr == nil {
+		return nil, fmt.Errorf("agentvalidation: ConversationMgr required")
+	}
+	if a.DetectionMgr == nil {
+		return nil, fmt.Errorf("agentvalidation: DetectionMgr required")
+	}
+	if a.AIOperationsMgr == nil {
+		return nil, fmt.Errorf("agentvalidation: AIOperationsMgr required")
+	}
+	if a.Realtime == nil {
+		a.Realtime = realtime.NoopPublisher{}
+	}
+	return a, nil
+}

@@ -1,0 +1,164 @@
+// Package embeddings holds the Temporal workflows for KB embedding
+// indexing. Pure orchestration — every DB / API / file system touch is
+// an activity (see internal/activities/embeddings).
+//
+// Workflow IDs follow the convention from internal/temporal/CONVENTIONS.md:
+//   - EmbedArticleWorkflow  → "embed-article:<id>:v<revision>"
+//   - CleanupOldVectorsWorkflow → "cleanup-vectors:<id>:v<superseded>"
+//   - BulkReindexWorkflow → "bulk-reindex:<content_type>:<model>"
+//
+// The id includes revision so the same workflow id is replayable safely
+// (ON CONFLICT DO NOTHING on the embeddings table handles the
+// idempotency at the row level too).
+package embeddings
+
+import (
+	"fmt"
+	"time"
+
+	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/temporal"
+	"go.temporal.io/sdk/workflow"
+
+	actembeddings "github.com/abhinavxd/libredesk/internal/activities/embeddings"
+)
+
+// EmbedArticleInput drives the per-article indexing workflow.
+type EmbedArticleInput struct {
+	ArticleID int64
+	Revision  int    // source revision being indexed; becomes source_version
+	TraceID   string // correlates with ai_usage + Temporal search attribute
+}
+
+// EmbedArticleOutput summarizes the run for observability.
+type EmbedArticleOutput struct {
+	ChunksEmbedded int
+	EmbeddingModel string
+}
+
+// EmbedArticleWorkflow indexes one KB article into the embeddings
+// table. Stages:
+//
+//	1. FetchSourceContent — load article body + locale.
+//	2. ChunkContent       — markdown-aware split per locked F12 spec.
+//	3. RedactText         — PII redaction over each chunk (loops).
+//	4. GenerateEmbeddings — Voyage call (provider handles batching).
+//	5. StoreEmbeddings    — INSERT ... ON CONFLICT DO NOTHING.
+//	6. SwapActiveVersion  — atomic flip on articles_index_state.
+//	7. CleanupOldVectors (child workflow, ABANDON parent close policy)
+//	   — schedules durable 7-day deletion of the superseded version.
+//
+// Idempotency: workflow id is deterministic ("embed-article:<id>:v<r>");
+// re-running succeeds (already-existing rows hit ON CONFLICT). Step 7
+// uses ALLOW_DUPLICATE_FAILED_ONLY to make the cleanup workflow
+// idempotent across restarts.
+func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArticleOutput, error) {
+	logger := workflow.GetLogger(ctx)
+	logger.Info("EmbedArticleWorkflow", "article_id", in.ArticleID, "revision", in.Revision)
+
+	// Activity retry policy: aggressive on transient errors (Voyage
+	// 5xx / 429, transient DB blips). Five attempts with capped
+	// exponential backoff aligns with the F12 plan's chunk-7 spec.
+	opts := workflow.ActivityOptions{
+		StartToCloseTimeout:    60 * time.Second,
+		ScheduleToCloseTimeout: 10 * time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    30 * time.Second,
+			BackoffCoefficient: 2.0,
+			MaximumAttempts:    5,
+		},
+	}
+	ctx = workflow.WithActivityOptions(ctx, opts)
+
+	// 1. Fetch.
+	var src actembeddings.FetchSourceOutput
+	var acts *actembeddings.Activities // typed nil for symbol lookup
+	if err := workflow.ExecuteActivity(ctx, acts.FetchSourceContent, &actembeddings.FetchSourceInput{
+		ContentType: "kb_chunk",
+		SourceID:    in.ArticleID,
+	}).Get(ctx, &src); err != nil {
+		return nil, fmt.Errorf("fetch source: %w", err)
+	}
+
+	// 2. Chunk.
+	var chunks actembeddings.ChunkOutput
+	if err := workflow.ExecuteActivity(ctx, acts.ChunkContent, &actembeddings.ChunkInput{
+		Text:   src.Body,
+		Format: "markdown",
+	}).Get(ctx, &chunks); err != nil {
+		return nil, fmt.Errorf("chunk: %w", err)
+	}
+	if len(chunks.Chunks) == 0 {
+		logger.Warn("article produced zero chunks; skipping embed", "article_id", in.ArticleID)
+		return &EmbedArticleOutput{}, nil
+	}
+
+	// 3. Redact every chunk before embedding. Serial, not parallel —
+	// each redact call is microseconds (pure Go regex pass) and the
+	// activity boundary is here for testability + retry granularity.
+	redacted := make([]string, len(chunks.Chunks))
+	for i, c := range chunks.Chunks {
+		var r actembeddings.RedactOutput
+		if err := workflow.ExecuteActivity(ctx, acts.RedactText, &actembeddings.RedactInput{Text: c.Text}).Get(ctx, &r); err != nil {
+			return nil, fmt.Errorf("redact chunk %d: %w", i, err)
+		}
+		redacted[i] = r.Text
+	}
+
+	// 4. Generate embeddings — one provider call (Voyage handles
+	// internal batching transparently when len > MaxBatchSize).
+	var emb actembeddings.GenerateEmbeddingsOutput
+	if err := workflow.ExecuteActivity(ctx, acts.GenerateEmbeddings, &actembeddings.GenerateEmbeddingsInput{
+		Texts:   redacted,
+		TraceID: in.TraceID,
+	}).Get(ctx, &emb); err != nil {
+		return nil, fmt.Errorf("generate embeddings: %w", err)
+	}
+
+	// 5. Persist (ON CONFLICT DO NOTHING in SQL).
+	var stored actembeddings.StoreEmbeddingsOutput
+	if err := workflow.ExecuteActivity(ctx, acts.StoreEmbeddings, &actembeddings.StoreEmbeddingsInput{
+		ContentType:    "kb_chunk",
+		SourceID:       in.ArticleID,
+		SourceVersion:  in.Revision,
+		EmbeddingModel: emb.Model,
+		Chunks:         chunks.Chunks,
+		Vectors:        emb.Vectors,
+	}).Get(ctx, &stored); err != nil {
+		return nil, fmt.Errorf("store embeddings: %w", err)
+	}
+
+	// 6. Flip active version.
+	if err := workflow.ExecuteActivity(ctx, acts.SwapActiveVersion, &actembeddings.SwapActiveVersionInput{
+		ArticleID:   in.ArticleID,
+		NewVersion:  in.Revision,
+		ActiveModel: emb.Model,
+	}).Get(ctx, nil); err != nil {
+		return nil, fmt.Errorf("swap version: %w", err)
+	}
+
+	// 7. Schedule cleanup of the superseded version (revision-1).
+	// Skipped on the first-ever indexing of an article (revision=1
+	// has no predecessor). ABANDON close policy so the cleanup keeps
+	// running if EmbedArticleWorkflow itself is terminated.
+	if in.Revision > 1 {
+		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			WorkflowID:        fmt.Sprintf("cleanup-vectors:%d:v%d", in.ArticleID, in.Revision-1),
+			ParentClosePolicy: enumspb.PARENT_CLOSE_POLICY_ABANDON,
+			WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+		})
+		// Fire-and-forget; not awaited.
+		workflow.ExecuteChildWorkflow(childCtx, CleanupOldVectorsWorkflow, CleanupOldVectorsInput{
+			ContentType:       "kb_chunk",
+			SourceID:          in.ArticleID,
+			SupersededVersion: in.Revision - 1,
+			GraceDays:         7,
+		})
+	}
+
+	return &EmbedArticleOutput{
+		ChunksEmbedded: stored.Stored,
+		EmbeddingModel: emb.Model,
+	}, nil
+}
