@@ -10,12 +10,12 @@ import { subscribeToConversation, sendTypingIndicator } from '@main/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 import MessageCache from '../utils/conversation-message-cache'
 import { getI18n } from '../i18n'
-import { useDebounceFn } from '@vueuse/core'
+import { useThrottleFn } from '@vueuse/core'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '@/constants/conversation'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
-  const CONV_LIST_PAGE_SIZE = 50
+  const CONV_LIST_PAGE_SIZE = 25
   const MESSAGE_LIST_PAGE_SIZE = 30
   const priorities = ref([])
   const statuses = ref([])
@@ -117,7 +117,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
   const conversation = reactive({
     data: null,
-    participants: {},
     loading: false,
     errorMessage: '',
     isTyping: false
@@ -132,6 +131,8 @@ export const useConversationStore = defineStore('conversation', () => {
   })
 
   let seenConversationUUIDs = new Map()
+  // Bumped on resetConversations() so in-flight list requests can drop stale responses.
+  let contextSeq = 0
   const emitter = useEmitter()
 
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
@@ -306,22 +307,6 @@ export const useConversationStore = defineStore('conversation', () => {
     currentBCC.value = bcc
   })
 
-  async function fetchParticipants (uuid) {
-    try {
-      const resp = await api.getConversationParticipants(uuid)
-      const participants = resp.data.data.reduce((acc, p) => {
-        acc[p.id] = p
-        return acc
-      }, {})
-      updateParticipants(participants)
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-    }
-  }
-
   async function fetchConversation (uuid) {
     conversation.loading = true
     try {
@@ -411,8 +396,8 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function fetchNextConversations () {
-    conversations.page++
-    fetchConversationsList(true, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page)
+    if (conversations.loading || !conversations.hasMore) return
+    fetchConversationsList(true, conversations.listType, conversations.teamID, conversations.listFilters, conversations.viewID, conversations.page + 1)
   }
 
   function reFetchConversationsList (showLoader = true) {
@@ -442,17 +427,24 @@ export const useConversationStore = defineStore('conversation', () => {
     }
     if (filters) conversations.listFilters = filters
     if (showLoader) conversations.loading = true
+    if (page === 0)
+      page = conversations.page
+    const seq = contextSeq
     try {
       conversations.errorMessage = ''
-      if (page === 0)
-        page = conversations.page
       const response = await makeConversationListRequest(listType, teamID, viewID, filters, page)
+      // Drop response if the list context (type/team/view) switched mid-flight.
+      if (seq !== contextSeq) return
       processConversationListResponse(response)
     } catch (error) {
-      conversations.errorMessage = handleHTTPError(error).message
-      conversations.total = 0
+      if (seq !== contextSeq) return
+      // Keep the existing list visible on error; only surface the error on an empty list.
+      if (conversations.data.length === 0) {
+        conversations.errorMessage = handleHTTPError(error).message
+        conversations.total = 0
+      }
     } finally {
-      conversations.loading = false
+      if (seq === contextSeq) conversations.loading = false
     }
   }
 
@@ -519,7 +511,7 @@ export const useConversationStore = defineStore('conversation', () => {
         // Update existing conversation with fresh data.
         const idx = conversations.data.findIndex(c => c.uuid === conv.uuid)
         if (idx !== -1) {
-          Object.assign(conversations.data[idx], conv)
+          deepMerge(conversations.data[idx], conv)
         }
       } else {
         // Add to seen and new conversations list.
@@ -527,8 +519,9 @@ export const useConversationStore = defineStore('conversation', () => {
         newConversations.push(conv)
       }
     }
-    if (apiResponse.total_pages <= conversations.page) conversations.hasMore = false
-    else conversations.hasMore = true
+    // Advance the page only on a successful response, never optimistically.
+    conversations.page = Math.max(conversations.page, apiResponse.page)
+    conversations.hasMore = apiResponse.total_pages > conversations.page
     if (!conversations.data) conversations.data = []
     conversations.data.push(...newConversations)
     conversations.total = apiResponse.total
@@ -624,13 +617,6 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  function updateParticipants (newParticipants) {
-    conversation.participants = {
-      ...conversation.participants,
-      ...newParticipants
-    }
-  }
-
   function isConversationInList (uuid) {
     return conversations.data?.find(c => c.uuid === uuid) ? true : false
   }
@@ -643,12 +629,11 @@ export const useConversationStore = defineStore('conversation', () => {
     pendingNotificationUUIDs.add(uuid)
   }
 
-  // Debounced to prevent apis calls during many WS events in a short time.
-  const debouncedFetchFirstPage = useDebounceFn(fetchFirstPageConversations, 1000)
-  const debouncedFetchParticipants = useDebounceFn(fetchParticipants, 400)
+  // Throttled to cap list refreshes during bursts of WS events (leading + trailing).
+  const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 30000, true)
 
   function refreshConversationList () {
-    debouncedFetchFirstPage()
+    throttledFetchFirstPage()
   }
 
   function updateConversationLastMessage (uuid, message) {
@@ -689,7 +674,6 @@ export const useConversationStore = defineStore('conversation', () => {
         return
       }
 
-      debouncedFetchParticipants(message.conversation_uuid)
       const fetchedMessage = await fetchMessage(message.conversation_uuid, message.uuid)
       if (fetchedMessage) {
         updateConversationLastMessage(message.conversation_uuid, fetchedMessage)
@@ -822,6 +806,7 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.data = []
     conversations.page = 1
     seenConversationUUIDs = new Map()
+    contextSeq++
   }
 
   /** Macros set for new conversation or an open conversation **/
@@ -955,7 +940,6 @@ export const useConversationStore = defineStore('conversation', () => {
     mergeContactUpdate,
     addNewConversation,
     getContactFullName,
-    fetchParticipants,
     fetchNextMessages,
     fetchNextConversations,
     mergeMessageUpdate,

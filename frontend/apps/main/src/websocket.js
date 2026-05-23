@@ -66,14 +66,16 @@ export class WebSocketClient {
       const handlers = {
         // On new message, refresh list and fetch message if it's in current conversation.
         [WS_EVENT.NEW_MESSAGE]: () => {
+          const uuid = data.data.conversation_uuid
+          const isOpen = this.convStore.conversation.data?.uuid === uuid
           const isFromContact = data.data.sender_type === 'contact'
           if (isFromContact) {
-            if (document.hidden) {
-              // Tab is not visible - always play sound.
+            if (document.hidden && (isOpen || this.convStore.isConversationInList(uuid))) {
+              // Hidden tab + conversation already visible (open or in current list): play now.
               playNotificationSound()
-            } else if (!this.convStore.isConversationInList(data.data.conversation_uuid)) {
-              // Tab is visible - only play for new conversations via deferred check.
-              this.convStore.addPendingNotification(data.data.conversation_uuid)
+            } else if (!this.convStore.isConversationInList(uuid)) {
+              // Not in the current list yet: defer until a refresh confirms it belongs here.
+              this.convStore.addPendingNotification(uuid)
             }
           }
 

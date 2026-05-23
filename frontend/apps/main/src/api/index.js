@@ -439,7 +439,6 @@ const sendMessage = (uuid, data) =>
     }
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`)
-const getConversationParticipants = (uuid) => http.get(`/api/v1/conversations/${uuid}/participants`)
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`)
 const getAllMacros = () => http.get('/api/v1/macros')
 const getMacro = (id) => http.get(`/api/v1/macros/${id}`)
@@ -686,7 +685,6 @@ export default {
   getOverviewCSAT,
   getOverviewMessageVolume,
   getOverviewTagDistribution,
-  getConversationParticipants,
   getConversationVariables,
   evaluateDetection,
   getConversationMessage,
