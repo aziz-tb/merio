@@ -3,168 +3,113 @@
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
   <LoadingOverlay :loading="isLoading">
-    <div class="space-y-4">
-      <form @submit="onSubmit">
-        <div class="space-y-5">
-          <div class="space-y-5">
-            <FormField
-              v-slot="{ value, handleChange }"
-              type="checkbox"
-              name="enabled"
-              v-if="!isNewForm"
-            >
-              <FormItem class="flex flex-row items-start gap-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox :checked="value" @update:checked="handleChange" />
-                </FormControl>
-                <div class="space-y-1 leading-none">
-                  <FormLabel class="text-foreground"> {{ $t('globals.terms.enabled') }} </FormLabel>
-                  <FormMessage />
-                </div>
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ field }" name="name">
-              <FormItem>
-                <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ field }" name="description">
-              <FormItem>
-                <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ componentField, handleInput }" name="type">
-              <FormItem>
-                <FormLabel>{{ $t('globals.terms.type') }}</FormLabel>
-                <FormControl>
-                  <Select v-bind="componentField" @update:modelValue="handleInput">
-                    <SelectTrigger>
-                      <SelectValue
-                        :placeholder="t('placeholders.selectType')"
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="new_conversation">
-                          {{ $t('conversation.newConversation') }}
-                        </SelectItem>
-                        <SelectItem value="conversation_update">
-                          {{ $t('admin.automation.conversationUpdate') }}
-                        </SelectItem>
-                        <SelectItem value="time_trigger">
-                          {{ $t('admin.automation.timeTriggers') }}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <div :class="{ hidden: form.values.type !== 'conversation_update' }">
-              <FormField v-slot="{ componentField, handleChange }" name="events">
-                <FormItem>
-                  <FormLabel>{{ $t('globals.terms.event', 2) }}</FormLabel>
-                  <FormControl>
-                    <SelectTag
-                      v-model="componentField.modelValue"
-                      @update:modelValue="handleChange"
-                      :items="conversationEventOptions"
-                      :placeholder="t('placeholders.selectEvents')"
-                    >
-                    </SelectTag>
-                  </FormControl>
-                  <FormDescription>{{
-                    $t('admin.automation.evaluateRuleOnTheseEvents')
-                  }}</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
+    <form @submit="onSubmit">
+      <div class="space-y-5">
+        <FormField v-if="!isNewForm" v-slot="{ value, handleChange }" type="checkbox" name="enabled">
+          <FormItem class="flex flex-row items-start gap-x-3 space-y-0">
+            <FormControl>
+              <Checkbox :checked="value" @update:checked="handleChange" />
+            </FormControl>
+            <div class="space-y-1 leading-none">
+              <FormLabel class="text-foreground">{{ $t('globals.terms.enabled') }}</FormLabel>
+              <FormMessage />
             </div>
-          </div>
+          </FormItem>
+        </FormField>
 
-          <p class="font-semibold">{{ $t('admin.automation.matchTheseRules') }}</p>
+        <FormField v-slot="{ field }" name="name">
+          <FormItem>
+            <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="field" @keydown.enter.prevent />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-          <RuleBox
-            v-if="form.values.type"
-            :ruleGroup="firstRuleGroup"
-            @update-group="handleUpdateGroup"
-            @add-condition="handleAddCondition"
-            @remove-condition="handleRemoveCondition"
-            :type="form.values.type"
-            :groupIndex="0"
-          />
+        <FormField v-slot="{ field }" name="description">
+          <FormItem>
+            <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="field" @keydown.enter.prevent />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-          <div class="flex justify-center">
-            <div class="flex items-center space-x-2">
-              <Button
-                :variant="groupOperator === 'AND' ? 'default' : 'outline'"
-                @click.prevent="toggleGroupOperator('AND')"
-              >
-                {{ $t('admin.automation.and') }}
-              </Button>
-              <Button
-                :variant="groupOperator === 'OR' ? 'default' : 'outline'"
-                @click.prevent="toggleGroupOperator('OR')"
-              >
-                {{ $t('admin.automation.or') }}
-              </Button>
-            </div>
-          </div>
+        <FormField v-slot="{ componentField, handleInput }" name="type">
+          <FormItem>
+            <FormLabel>{{ $t('globals.terms.type') }}</FormLabel>
+            <FormControl>
+              <Select v-bind="componentField" @update:modelValue="handleInput">
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('placeholders.selectType')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="new_conversation">{{ $t('conversation.newConversation') }}</SelectItem>
+                    <SelectItem value="conversation_update">{{ $t('admin.automation.conversationUpdate') }}</SelectItem>
+                    <SelectItem value="time_trigger">{{ $t('admin.automation.timeTriggers') }}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-          <RuleBox
-            v-if="form.values.type"
-            :ruleGroup="secondRuleGroup"
-            @update-group="handleUpdateGroup"
-            @add-condition="handleAddCondition"
-            @remove-condition="handleRemoveCondition"
-            :type="form.values.type"
-            :groupIndex="1"
-          />
-          <p class="font-semibold mt-2">{{ $t('admin.automation.performTheseActions') }}</p>
-
-          <ActionBox
-            :actions="getActions()"
-            :update-actions="handleUpdateActions"
-            @add-action="handleAddAction"
-            @remove-action="handleRemoveAction"
-          />
-          <Button type="submit" :isLoading="isLoading">{{ isNewForm ? $t('globals.messages.create') : $t('globals.messages.save') }}</Button>
+        <div :class="{ hidden: form.values.type !== 'conversation_update' }">
+          <FormField v-slot="{ componentField, handleChange }" name="events">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.event', 2) }}</FormLabel>
+              <FormControl>
+                <SelectTag
+                  v-model="componentField.modelValue"
+                  :items="conversationEventOptions"
+                  :placeholder="t('placeholders.selectEvents')"
+                  @update:modelValue="handleChange"
+                />
+              </FormControl>
+              <FormDescription>{{ $t('admin.automation.evaluateRuleOnTheseEvents') }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
         </div>
-      </form>
-    </div>
+
+        <p class="font-semibold">{{ $t('admin.automation.matchTheseRules') }}</p>
+        <DetectionBuilder
+          v-if="form.values.type"
+          v-model="rule.detection"
+          :available-sources="['ticket', 'contact', 'tags']"
+        />
+
+        <p class="font-semibold pt-2">{{ $t('admin.automation.performTheseActions') }}</p>
+        <ActionBox
+          :actions="rule.actions"
+          :update-actions="handleUpdateActions"
+          @add-action="handleAddAction"
+          @remove-action="handleRemoveAction"
+        />
+
+        <Button type="submit" :isLoading="isLoading">
+          {{ isNewForm ? $t('globals.messages.create') : $t('globals.messages.save') }}
+        </Button>
+      </div>
+    </form>
   </LoadingOverlay>
 </template>
 
 <script setup>
-import { onMounted, ref, computed } from 'vue'
-import { Input } from '@shared-ui/components/ui/input'
-import { Button } from '@shared-ui/components/ui/button'
-import RuleBox from '@/features/admin/automation/RuleBox.vue'
-import ActionBox from '@/features/admin/automation/ActionBox.vue'
-import api from '../../../api'
-import { Checkbox } from '@shared-ui/components/ui/checkbox'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from '../../../features/admin/automation/formSchema.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
-import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
+import { Input } from '@shared-ui/components/ui/input'
+import { Button } from '@shared-ui/components/ui/button'
+import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { SelectTag } from '@shared-ui/components/ui/select'
-import { OPERATOR } from '../../../constants/filterConfig'
-import { useI18n } from 'vue-i18n'
 import {
   Select,
   SelectContent,
@@ -175,59 +120,20 @@ import {
 } from '@shared-ui/components/ui/select'
 import {
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
-  FormDescription
+  FormMessage
 } from '@shared-ui/components/ui/form'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { useRoute } from 'vue-router'
-import { useRouter } from 'vue-router'
-
-const isLoading = ref(false)
-const { t } = useI18n()
-const route = useRoute()
-const router = useRouter()
-const emitter = useEmitter()
-const rule = ref({
-  id: 0,
-  name: '',
-  description: '',
-  type: 'new_conversation',
-  rules: [
-    {
-      groups: [
-        {
-          rules: [],
-          logical_op: 'OR'
-        },
-        {
-          rules: [],
-          logical_op: 'OR'
-        }
-      ],
-      actions: [],
-      group_operator: 'OR'
-    }
-  ]
-})
-
-const conversationEventOptions = [
-  {
-    label: t('conversation.agentAssigned'),
-    value: 'conversation.user.assigned'
-  },
-  {
-    label: t('conversation.teamAssigned'),
-    value: 'conversation.team.assigned'
-  },
-  { label: t('admin.automation.event.priority.change'), value: 'conversation.priority.change' },
-  { label: t('admin.automation.event.status.change'), value: 'conversation.status.change' },
-  { label: t('admin.automation.event.message.outgoing'), value: 'conversation.message.outgoing' },
-  { label: t('admin.automation.event.message.incoming'), value: 'conversation.message.incoming' }
-]
+import ActionBox from '@/features/admin/automation/ActionBox.vue'
+import DetectionBuilder from '@/features/admin/detection/DetectionBuilder.vue'
+import { createFormSchema } from '@/features/admin/automation/formSchema.js'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
+import api from '@/api'
 
 const props = defineProps({
   id: {
@@ -236,93 +142,68 @@ const props = defineProps({
   }
 })
 
-const breadcrumbPageLabel = () => {
-  if (props.id > 0) return t('automation.editRule')
-  return t('automation.newRule')
-}
+const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const emitter = useEmitter()
+const isLoading = ref(false)
 
-const isNewForm = computed(() => {
-  return props.id ? false : true
+const defaultDetection = () => ({
+  mode: 'rules_only',
+  rules: {
+    op: 'AND',
+    children: []
+  },
+  ai: {
+    prompt: ''
+  }
 })
 
+const rule = ref({
+  id: 0,
+  name: '',
+  description: '',
+  type: 'new_conversation',
+  events: [],
+  enabled: true,
+  execution_mode: 'all',
+  detection: defaultDetection(),
+  actions: []
+})
+
+const conversationEventOptions = [
+  { label: t('conversation.agentAssigned'), value: 'conversation.user.assigned' },
+  { label: t('conversation.teamAssigned'), value: 'conversation.team.assigned' },
+  { label: t('admin.automation.event.priority.change'), value: 'conversation.priority.change' },
+  { label: t('admin.automation.event.status.change'), value: 'conversation.status.change' },
+  { label: t('admin.automation.event.message.outgoing'), value: 'conversation.message.outgoing' },
+  { label: t('admin.automation.event.message.incoming'), value: 'conversation.message.incoming' }
+]
+
+const isNewForm = computed(() => !props.id)
+const breadcrumbPageLabel = () => props.id > 0 ? t('automation.editRule') : t('automation.newRule')
 const breadcrumbLinks = [
   { path: 'automation-list', label: t('globals.terms.automation') },
   { path: '', label: breadcrumbPageLabel() }
 ]
 
-const firstRuleGroup = ref([])
-const secondRuleGroup = ref([])
-const groupOperator = ref('')
-
-const getFirstGroup = () => {
-  if (rule.value.rules?.[0]?.groups?.[0]) {
-    return rule.value.rules[0].groups[0]
-  }
-  return []
-}
-
-const getSecondGroup = () => {
-  if (rule.value.rules?.[0]?.groups?.[1]) {
-    return rule.value.rules[0].groups[1]
-  }
-  return []
-}
-
-const getActions = () => {
-  if (rule.value.rules?.[0]?.actions) {
-    return rule.value.rules[0].actions
-  }
-  return []
-}
-
-const toggleGroupOperator = (value) => {
-  if (rule.value.rules?.[0]) {
-    rule.value.rules[0].group_operator = value
-    groupOperator.value = value
-  }
-}
-
-const getGroupOperator = () => {
-  if (rule.value.rules?.[0]) {
-    return rule.value.rules[0].group_operator
-  }
-  return ''
-}
-
-const handleUpdateGroup = (value, groupIndex) => {
-  rule.value.rules[0].groups[groupIndex] = value.value
-}
-
-const handleAddCondition = (groupIndex) => {
-  rule.value.rules[0].groups[groupIndex].rules.push({})
-}
-
-const handleRemoveCondition = (groupIndex, ruleIndex) => {
-  rule.value.rules[0].groups[groupIndex].rules.splice(ruleIndex, 1)
-}
-
-const handleUpdateActions = (value, index) => {
-  rule.value.rules[0].actions[index] = value
-}
-
-const handleAddAction = () => {
-  rule.value.rules[0].actions.push({})
-}
-
-const handleRemoveAction = (index) => {
-  rule.value.rules[0].actions.splice(index, 1)
-}
-
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(t)),
+  initialValues: {
+    name: '',
+    description: '',
+    enabled: true,
+    type: 'new_conversation',
+    events: []
+  }
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
-  handleSave(values)
+  await handleSave(values)
 })
 
 const handleSave = async (values) => {
-  const validationError = getRulesValidationError()
+  const validationError = getValidationError()
   if (validationError) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'warning',
@@ -333,14 +214,11 @@ const handleSave = async (values) => {
 
   try {
     isLoading.value = true
-    const updatedRule = { ...rule.value, ...values }
-    // Delete fields not required.
-    delete updatedRule.created_at
-    delete updatedRule.updated_at
+    const payload = buildPayload(values)
     if (props.id > 0) {
-      await api.updateAutomationRule(props.id, updatedRule)
+      await api.updateAutomationRule(props.id, payload)
     } else {
-      await api.createAutomationRule(updatedRule)
+      await api.createAutomationRule(payload)
       router.push({ name: 'automation-list' })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -356,77 +234,114 @@ const handleSave = async (values) => {
   }
 }
 
-// Returns a specific validation error message, or empty string if valid.
-const getRulesValidationError = () => {
-  // Must have groups.
-  if (rule.value.rules[0].groups.length == 0) {
+const buildPayload = (values) => {
+  const events = values.type === 'conversation_update' ? values.events || [] : []
+  const ruleJSON = [{
+    type: values.type,
+    execution_mode: rule.value.execution_mode || 'all',
+    event: events,
+    detection: rule.value.detection,
+    actions: rule.value.actions
+  }]
+
+  return {
+    ...rule.value,
+    ...values,
+    events,
+    rules: ruleJSON
+  }
+}
+
+const getValidationError = () => {
+  if (rulesRequired(rule.value.detection) && !hasCondition(rule.value.detection.rules)) {
     return t('admin.automation.validation.addCondition')
   }
+  const conditionError = validateTree(rule.value.detection.rules)
+  if (conditionError) return conditionError
 
-  // At least one group should have at least one rule.
-  const group1HasRules = rule.value.rules[0].groups[0].rules.length > 0
-  const group2HasRules = rule.value.rules[0].groups[1].rules.length > 0
-  if (!group1HasRules && !group2HasRules) {
-    return t('admin.automation.validation.addCondition')
+  if (aiRequired(rule.value.detection) && !rule.value.detection.ai?.prompt) {
+    return t('admin.detection.validation.aiPrompt')
   }
 
-  // For both groups, each rule should have field, operator, and value.
-  for (const group of rule.value.rules[0].groups) {
-    for (const rule of group.rules) {
-      if (!rule.field) {
-        return t('admin.automation.validation.selectField')
-      }
-      if (!rule.operator) {
-        return t('admin.automation.validation.selectOperator')
-      }
-      // For 'set' and 'not set' operator, value is not required.
-      if (rule.operator !== OPERATOR.SET && rule.operator !== OPERATOR.NOT_SET && !rule.value) {
-        return t('admin.automation.validation.setConditionValue')
-      }
-    }
-  }
-
-  // Must have at least one action.
-  if (rule.value.rules[0].actions.length == 0) {
+  if (rule.value.actions.length === 0) {
     return t('admin.automation.validation.addAction')
   }
-
-  // Make sure each action has a type and value.
-  for (const action of rule.value.rules[0].actions) {
-    if (!action.type) {
-      return t('admin.automation.validation.selectActionType')
-    }
-
-    // CSAT action does not require value, set dummy value.
-    if (action.type === 'send_csat') {
-      action.value = ['0']
-    }
-
-    // Empty array, no value selected.
-    if (action.value.length === 0) {
+  for (const action of rule.value.actions) {
+    if (!action.type) return t('admin.automation.validation.selectActionType')
+    if (action.type === 'send_csat') action.value = ['0']
+    if (!Array.isArray(action.value) || action.value.length === 0) {
       return t('admin.automation.validation.setActionValue')
     }
+    if (action.value.some((value) => !value)) {
+      return t('admin.automation.validation.setActionValue')
+    }
+  }
+  return ''
+}
 
-    // Check if all values are present.
-    for (const key in action.value) {
-      if (!action.value[key]) {
-        return t('admin.automation.validation.setActionValue')
+const rulesRequired = (detection) => !['ai_only', 'manual_only'].includes(detection.mode)
+const aiRequired = (detection) => ['ai_only', 'rules_and_ai', 'rules_or_ai'].includes(detection.mode)
+
+const hasCondition = (tree) => {
+  if (!tree?.children?.length) return false
+  return tree.children.some((child) => child.leaf || hasCondition(child.tree))
+}
+
+const validateTree = (tree) => {
+  if (!tree?.children) return ''
+  for (const child of tree.children) {
+    if (child.tree) {
+      const err = validateTree(child.tree)
+      if (err) return err
+    }
+    if (child.leaf) {
+      const leaf = child.leaf
+      if (!leaf.source) return t('admin.detection.validation.selectSource')
+      if (leaf.source !== 'tags' && !leaf.path) return t('admin.detection.validation.selectPath')
+      if (!leaf.operator) return t('admin.automation.validation.selectOperator')
+      if (!['is null', 'is not null'].includes(leaf.operator)) {
+        if (Array.isArray(leaf.value) && leaf.value.length === 0) {
+          return t('admin.automation.validation.setConditionValue')
+        }
+        if (!Array.isArray(leaf.value) && !leaf.value) {
+          return t('admin.automation.validation.setConditionValue')
+        }
       }
     }
   }
   return ''
 }
 
+const handleUpdateActions = (value, index) => {
+  rule.value.actions[index] = value.value[index]
+}
+
+const handleAddAction = () => {
+  rule.value.actions.push({ type: '', value: [] })
+}
+
+const handleRemoveAction = (index) => {
+  rule.value.actions.splice(index, 1)
+}
+
+const normalizeRuleRecord = (record) => {
+  const firstRule = Array.isArray(record.rules) && record.rules.length > 0 ? record.rules[0] : null
+  return {
+    ...record,
+    events: record.events || firstRule?.event || [],
+    execution_mode: record.execution_mode || firstRule?.execution_mode || 'all',
+    detection: firstRule?.detection || defaultDetection(),
+    actions: firstRule?.actions || []
+  }
+}
+
 onMounted(async () => {
   if (props.id > 0) {
     try {
       isLoading.value = true
-      let resp = await api.getAutomationRule(props.id)
-      rule.value = resp.data.data
-      if (resp.data.data.type === 'conversation_update') {
-        rule.value.rules.events = []
-      }
-      form.setValues(resp.data.data)
+      const resp = await api.getAutomationRule(props.id)
+      rule.value = normalizeRuleRecord(resp.data.data)
+      form.setValues(rule.value)
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -435,12 +350,13 @@ onMounted(async () => {
     } finally {
       isLoading.value = false
     }
+  } else {
+    if (route.query.type) {
+      rule.value.type = route.query.type
+      form.setFieldValue('type', route.query.type)
+    } else {
+      form.setValues(rule.value)
+    }
   }
-  if (route.query.type) {
-    form.setFieldValue('type', route.query.type)
-  }
-  firstRuleGroup.value = getFirstGroup()
-  secondRuleGroup.value = getSecondGroup()
-  groupOperator.value = getGroupOperator()
 })
 </script>

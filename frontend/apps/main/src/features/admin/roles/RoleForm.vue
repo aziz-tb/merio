@@ -164,6 +164,7 @@ const permissions = ref([
       { name: perms.STATUS_MANAGE, label: t('admin.role.status.manage') },
       { name: perms.OIDC_MANAGE, label: t('admin.role.oidc.manage') },
       { name: perms.TAGS_MANAGE, label: t('admin.role.tags.manage') },
+      { name: perms.TAGS_VIEW_PRIVATE, label: t('admin.role.tags.viewPrivate') },
       { name: perms.MACROS_MANAGE, label: t('admin.role.macros.manage') },
       { name: perms.USERS_MANAGE, label: t('admin.role.users.manage') },
       { name: perms.TEAMS_MANAGE, label: t('admin.role.teams.manage') },

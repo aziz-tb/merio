@@ -20,6 +20,34 @@ export const createColumns = (t, { onEdit } = {}) => [
     }
   },
   {
+    accessorKey: 'type',
+    header: function () {
+      return h('div', { class: 'text-center' }, t('admin.tags.type'))
+    },
+    cell: function ({ row }) {
+      return h('div', { class: 'text-center' }, row.getValue('type') || 'skill')
+    }
+  },
+  {
+    accessorKey: 'visibility',
+    header: function () {
+      return h('div', { class: 'text-center' }, t('admin.tags.visibility'))
+    },
+    cell: function ({ row }) {
+      return h('div', { class: 'text-center' }, row.getValue('visibility') || 'public')
+    }
+  },
+  {
+    accessorFn: (row) => row.detection?.mode || 'manual_only',
+    id: 'mode',
+    header: function () {
+      return h('div', { class: 'text-center' }, t('admin.detection.mode'))
+    },
+    cell: function ({ row }) {
+      return h('div', { class: 'text-center' }, row.getValue('mode'))
+    }
+  },
+  {
     accessorKey: 'created_at',
     enableGlobalFilter: false,
     header: function () {

@@ -56,10 +56,12 @@ import { useEmitter } from '../../../composables/useEmitter.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
 import api from '../../../api/index.js'
+import { useTagStore } from '@/stores/tag'
 
 const { t } = useI18n()
 const alertOpen = ref(false)
 const emitter = useEmitter()
+const tagStore = useTagStore()
 
 const props = defineProps({
   tag: {
@@ -81,6 +83,7 @@ const editTag = () => {
 
 const deleteTag = async () => {
   await api.deleteTag(props.tag.id)
+  await tagStore.fetchTags(true)
   alertOpen.value = false
   emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'tags' })
 }
