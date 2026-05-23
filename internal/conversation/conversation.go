@@ -1394,22 +1394,20 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			return fmt.Errorf("sending private note: %w", err)
 		}
 	case amodels.ActionReply:
-		// Make recipient list.
-		to, cc, bcc, err := m.makeRecipients(conv.ID, conv.Contact.Email.String, conv.InboxMail, conv.InboxReplyTo)
-		if err != nil {
-			return fmt.Errorf("making recipients for reply action: %w", err)
+		if conv.Contact.Email.String == "" {
+			return fmt.Errorf("contact email is empty")
 		}
-		_, err = m.QueueReply(
+		_, err := m.QueueReply(
 			[]mmodels.Media{},
 			conv.InboxID,
 			user.ID,
 			conv.ContactID,
 			conv.UUID,
 			action.Value[0],
-			to,
-			cc,
-			bcc,
-			map[string]any{}, /**meta**/
+			[]string{conv.Contact.Email.String},
+			nil,
+			nil,
+			map[string]any{"is_automated": true}, /**meta**/
 		)
 		if err != nil {
 			return fmt.Errorf("sending reply: %w", err)
@@ -1470,6 +1468,11 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 
 // SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent.
 func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversation) error {
+	if conversation.Contact.Email.String == "" {
+		m.lo.Warn("no contact email for conversation, skipping CSAT reply", "conversation_uuid", conversation.UUID)
+		return nil
+	}
+
 	csatResp, err := m.csatStore.Create(conversation.ID)
 	if err != nil {
 		if errors.Is(err, csat.ErrCSATAlreadyExists) {
@@ -1499,18 +1502,13 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 
 	// Store `is_csat` meta to identify and filter CSAT public url from the message.
 	meta := map[string]interface{}{
-		"is_csat":   true,
-		"csat_uuid": csatResp.UUID,
-	}
-
-	// Make recipient list.
-	to, cc, bcc, err := m.makeRecipients(conversation.ID, conversation.Contact.Email.String, conversation.InboxMail, conversation.InboxReplyTo)
-	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		"is_csat":      true,
+		"is_automated": true,
+		"csat_uuid":    csatResp.UUID,
 	}
 
 	// Send CSAT reply.
-	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, cc, bcc, meta)
+	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, meta)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

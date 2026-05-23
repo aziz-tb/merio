@@ -7,7 +7,6 @@ import (
 	"net/mail"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -235,45 +234,6 @@ func DedupAndExcludePlusVariants(list []string, excludeAddresses ...string) []st
 		}
 	}
 	return cleaned
-}
-
-// ComputeRecipients computes new recipients using last message's recipients and direction.
-func ComputeRecipients(
-	from, to, cc, bcc []string,
-	contactEmail, inboxEmail, inboxReplyTo string,
-	lastMessageIncoming bool,
-) (finalTo, finalCC, finalBCC []string) {
-	if lastMessageIncoming {
-		if len(from) > 0 {
-			finalTo = from
-		} else if contactEmail != "" {
-			finalTo = []string{contactEmail}
-		}
-	} else {
-		if len(to) > 0 {
-			finalTo = to
-		} else if contactEmail != "" {
-			finalTo = []string{contactEmail}
-		}
-	}
-
-	finalCC = append([]string{}, cc...)
-
-	if lastMessageIncoming {
-		if len(to) > 0 {
-			finalCC = append(finalCC, to...)
-		}
-		if contactEmail != "" && !slices.Contains(finalTo, contactEmail) && !slices.Contains(finalCC, contactEmail) {
-			finalCC = append(finalCC, contactEmail)
-		}
-	}
-
-	finalTo = DedupAndExcludePlusVariants(finalTo, inboxEmail, inboxReplyTo)
-	finalCC = DedupAndExcludePlusVariants(finalCC, inboxEmail, inboxReplyTo)
-	// BCC is one-time only, user is supposed to add it manually.
-	finalBCC = []string{}
-
-	return
 }
 
 // ExtractUUID finds and returns the first valid UUID v4 in the given text.

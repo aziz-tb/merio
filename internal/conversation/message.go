@@ -1209,19 +1209,6 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 	return nil
 }
 
-// getLatestMessage returns the latest message in a conversation.
-func (m *Manager) getLatestMessage(conversationID int, typ []string, status []string, excludePrivate bool) (models.Message, error) {
-	var message models.Message
-	if err := m.q.GetLatestMessage.Get(&message, conversationID, pq.Array(typ), pq.Array(status), excludePrivate); err != nil {
-		if err == sql.ErrNoRows {
-			return message, sql.ErrNoRows
-		}
-		m.lo.Error("error fetching latest message from DB", "error", err)
-		return message, fmt.Errorf("fetching latest message: %w", err)
-	}
-	return message, nil
-}
-
 // ProcessIncomingMessageHooks handles automation rules, webhooks, SLA events, and other post-processing
 // for incoming messages. This allows other channels to insert messages first and then call this
 // function to trigger the necessary hooks.
