@@ -158,6 +158,7 @@ import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent'
 
 const props = defineProps({
   showPreChatForm: {
@@ -184,7 +185,7 @@ const getMessageTime = (timestamp) => {
 }
 
 const hasQuotedContent = (content) => {
-  return content && content.includes('<blockquote')
+  return containsQuoteMarkers(content)
 }
 
 const isQuotedTextVisible = (messageUuid) => {

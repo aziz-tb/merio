@@ -43,7 +43,7 @@
           v-else
           :html="sanitizedContent"
           :allowedSchemas="['cid', 'https', 'http', 'mailto']"
-          class="native-html whitespace-pre-wrap break-words"
+          class="native-html break-words"
           :class="{
             'mb-3': message.attachments.length > 0,
             'show-quoted-text': showQuotedText,
@@ -118,6 +118,7 @@ import { Lock, Mail, RotateCcw, Check, MoreHorizontal } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
+import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Letter } from 'vue-letter'
 import MessageAttachmentPreview from '@main/features/conversation/message/attachment/MessageAttachmentPreview.vue'
@@ -177,7 +178,7 @@ const retryMessage = (msg) => {
 // Incoming-only: quoted text toggle
 const showQuotedText = ref(false)
 const hasQuotedContent = computed(
-  () => !isOutgoing.value && sanitizedContent.value.includes('<blockquote')
+  () => !isOutgoing.value && containsQuoteMarkers(sanitizedContent.value)
 )
 const toggleQuote = () => {
   showQuotedText.value = !showQuotedText.value
