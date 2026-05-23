@@ -106,6 +106,7 @@
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
           @fileUpload="handleFileUpload"
+          @filesDropped="uploadFiles"
           @fileDelete="handleFileDelete"
           @aiPromptSelected="handleAiPromptSelected"
           class="h-full flex-grow"
@@ -141,6 +142,7 @@
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
         @fileUpload="handleFileUpload"
+        @filesDropped="uploadFiles"
         @fileDelete="handleFileDelete"
         @aiPromptSelected="handleAiPromptSelected"
       />
@@ -213,6 +215,7 @@ const {
   uploadingFiles,
   handleFileUpload,
   handleFileDelete,
+  uploadFiles,
   mediaFiles,
   clearMediaFiles,
   setMediaFiles

@@ -151,6 +151,7 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import { useTypingIndicator } from '@shared-ui/composables'
 import { useConversationStore } from '@main/stores/conversation'
+import { useFileDropAttachments } from '@main/composables/useFileDropAttachments'
 import mentionSuggestion from './mentionSuggestion'
 
 const textContent = defineModel('textContent', { default: '' })
@@ -184,9 +185,10 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['send', 'aiPromptSelected', 'mentionsChanged'])
+const emit = defineEmits(['send', 'aiPromptSelected', 'mentionsChanged', 'files-dropped'])
 
 const emitPrompt = (key) => emit('aiPromptSelected', key)
+const { handleDrop } = useFileDropAttachments((files) => emit('files-dropped', files))
 
 // Set up typing indicator
 const conversationStore = useConversationStore()
@@ -309,6 +311,7 @@ const editor = useEditor({
   editorProps: {
     attributes: { class: 'outline-none' },
     getSuggestions: props.getSuggestions,
+    handleDrop,
     handleKeyDown: (view, event) => {
       if (event.ctrlKey && event.key.toLowerCase() === 'b') {
         event.stopPropagation()

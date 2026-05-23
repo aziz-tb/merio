@@ -202,6 +202,7 @@
                       :autoFocus="false"
                       class="w-full flex-1 overflow-y-auto p-2 box min-h-0"
                       @send="createConversation"
+                      @files-dropped="uploadFiles"
                     />
 
                     <MacroActionsPreview
@@ -328,10 +329,16 @@ const handleEmojiSelect = (emoji) => {
   nextTick(() => (insertContent.value = emoji))
 }
 
-const { uploadingFiles, handleFileUpload, handleFileDelete, mediaFiles, clearMediaFiles } =
-  useFileUpload({
-    linkedModel: 'messages'
-  })
+const {
+  uploadingFiles,
+  handleFileUpload,
+  handleFileDelete,
+  uploadFiles,
+  mediaFiles,
+  clearMediaFiles
+} = useFileUpload({
+  linkedModel: 'messages'
+})
 
 const isDisabled = computed(() => {
   if (loading.value || uploadingFiles.value.length > 0) {
