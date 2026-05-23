@@ -33,6 +33,6 @@ const trimAttachmentName = (name) => {
 }
 
 const downloadAttachment = () => {
-  window.open(props.attachment.url, '_blank');
+  window.open(props.attachment.url, '_blank', 'noopener,noreferrer');
 }
 </script>
