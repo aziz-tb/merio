@@ -48,7 +48,7 @@ SELECT id, created_at, updated_at, "uuid", store, filename, content_type, conten
 FROM media
 WHERE model_type = 'messages' 
   AND (model_id IS NULL OR model_id = 0) 
-  AND created_at < NOW() - INTERVAL '1 day';
+  AND created_at < NOW() - INTERVAL '7 days';
 
 -- name: content-id-exists
 SELECT uuid FROM media WHERE content_id = $1;

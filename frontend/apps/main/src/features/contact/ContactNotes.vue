@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full space-y-6 pb-8 relative">
+  <div class="w-full space-y-4 relative">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <span class="text-xl font-semibold text-foreground">
@@ -45,7 +45,7 @@
     <!-- Notes card list -->
     <div class="space-y-4">
       <Card
-        v-for="note in notes"
+        v-for="note in visibleNotes"
         :key="note.id"
         class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow"
       >
@@ -106,6 +106,12 @@
           />
         </CardContent>
       </Card>
+      <!-- Load more notes -->
+      <div v-if="notes.length > NOTES_LIMIT && !showAll" class="flex justify-center pt-2">
+       <Button variant="ghost" size="sm" @click="showAll = true">
+         {{ $t('globals.terms.loadMore') }} ({{ notes.length - NOTES_LIMIT }})
+       </Button>
+      </div>
     </div>
 
     <!-- No notes message -->
@@ -133,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { format } from 'date-fns'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
@@ -171,23 +177,30 @@ const notes = ref([])
 const isAddingNote = ref(false)
 const newNote = ref('')
 const isLoading = ref(false)
+const NOTES_LIMIT = 10
+const showAll = ref(false)
+const latestFetchId = ref(0)
 
-const fetchNotes = async () => {
+
+const fetchNotes = async (contactId = props.contactId) => {
+  const fetchId = ++latestFetchId.value
   try {
     isLoading.value = true
-    const { data } = await api.getContactNotes(props.contactId)
+    const { data } = await api.getContactNotes(contactId)
+    if (fetchId !== latestFetchId.value) return
     notes.value = data.data
   } catch (error) {
+    if (fetchId !== latestFetchId.value) return
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
   } finally {
-    isLoading.value = false
+    if (fetchId === latestFetchId.value) {
+      isLoading.value = false
+    }
   }
 }
-
-onMounted(fetchNotes)
 
 const formatDate = (date) => format(new Date(date), 'PPP p')
 
@@ -225,4 +238,19 @@ const deleteNote = async (noteId) => {
     await fetchNotes()
   }
 }
+
+const visibleNotes = computed(() => showAll.value ? notes.value : notes.value.slice(0, NOTES_LIMIT))
+
+watch(() => props.contactId, (newId) => {
+  latestFetchId.value++
+  showAll.value = false
+  cancelAddNote()
+  notes.value = []
+  if (!newId) {
+    isLoading.value = false
+    return
+  }
+  fetchNotes(newId)
+}, { immediate: true })
+
 </script>
