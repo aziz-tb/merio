@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
-import { adminNavItems, reportsNavItems } from '../constants/navigation'
+import { adminNavItems, reportsNavItems, aiNavItems } from '../constants/navigation'
 import { filterNavItems } from '../utils/nav-permissions'
 import api from '../api'
 import { useStorage } from '@vueuse/core'
@@ -54,6 +54,10 @@ export const useUserStore = defineStore('user', () => {
 
   const hasReportTabPermissions = computed(() => {
     return filterNavItems(reportsNavItems, can).length > 0
+  })
+
+  const hasAITabPermissions = computed(() => {
+    return filterNavItems(aiNavItems, can).length > 0
   })
 
   const getCurrentUser = async () => {
@@ -133,6 +137,7 @@ export const useUserStore = defineStore('user', () => {
     getInitials,
     hasAdminTabPermissions,
     hasReportTabPermissions,
+    hasAITabPermissions,
     setCurrentUser,
     getCurrentUser,
     clearAvatar,

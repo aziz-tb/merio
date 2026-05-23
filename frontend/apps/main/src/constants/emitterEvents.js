@@ -4,6 +4,8 @@ export const EMITTER_EVENTS = {
     SHOW_TOAST: 'show-toast',
     SHOW_SOONER: 'show-sooner',
     NEW_MESSAGE: 'new-message',
+    TAG_CLASSIFICATION_UPDATE: 'tag-classification-update',
+    AGENT_VALIDATION_COMPLETED: 'agent-validation-completed',
     SET_NESTED_COMMAND: 'set-nested-command',
     CONVERSATION_SIDEBAR_TOGGLE: 'conversation-sidebar-toggle',
     SCROLL_TO_MESSAGE: 'scroll-to-message'

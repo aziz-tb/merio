@@ -76,6 +76,128 @@ const routes = [
         path: '/admin/knowledge/articles/:id/edit',
         redirect: (to) => ({ name: 'edit-article', params: { id: to.params.id } })
       },
+      // AI — top-level area (sibling to /knowledge, /contacts, /reports).
+      // Originally placed under /admin/ai/* in F9; promoted to top-level since
+      // AI will grow well beyond what fits as an admin sub-section (presets,
+      // eval, dashboards, audit trace, etc.). See navigation proposal in F9 plan.
+      {
+        path: '/ai',
+        name: 'ai',
+        component: () => import('@main/views/ai/AI.vue'),
+        redirect: { name: 'ai-agent-list' },
+        meta: { titleKey: 'globals.terms.ai' },
+        children: [
+          {
+            path: 'agents',
+            name: 'ai-agent-list',
+            component: () => import('@main/views/ai/AgentList.vue'),
+            meta: { titleKey: 'globals.terms.aiAgent', titleCount: 2 }
+          },
+          {
+            path: 'agents/new',
+            props: true,
+            name: 'new-ai-agent',
+            component: () => import('@main/views/ai/CreateOrEditAgent.vue'),
+            meta: { titleKey: 'aiAgent.new' }
+          },
+          {
+            // Edit Agent layout. The shared AI sidebar owns the left
+            // navigation; this route contributes a route-scoped layout
+            // context so both the sidebar and the editor content can
+            // inject the same live edit state.
+            //
+            // meta.fullBleed tells App.vue to drop the outer rounded
+            // card + PageHeader so the editor can own its own card
+            // frames, same treatment as inbox routes.
+            path: 'agents/:id/edit',
+            name: 'edit-ai-agent',
+            component: () => import('@main/layouts/ai/AgentEditLayout.vue'),
+            props: true,
+            redirect: { name: 'edit-ai-agent-identity' },
+            meta: { titleKey: 'aiAgent.edit', layoutContext: 'ai-agent-edit', fullBleed: true },
+            children: [
+              {
+                path: 'identity',
+                name: 'edit-ai-agent-identity',
+                component: () => import('@main/features/ai/agents/edit/tabs/IdentityTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.identity' }
+              },
+              {
+                path: 'instructions',
+                name: 'edit-ai-agent-instructions',
+                component: () => import('@main/features/ai/agents/edit/tabs/InstructionsTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.instructions' }
+              },
+              {
+                path: 'tools',
+                name: 'edit-ai-agent-tools',
+                component: () => import('@main/features/ai/agents/edit/tabs/ToolsTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.tools' }
+              },
+              {
+                path: 'knowledge',
+                name: 'edit-ai-agent-knowledge',
+                component: () => import('@main/features/ai/agents/edit/tabs/KnowledgeTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.knowledge' }
+              },
+              {
+                path: 'detection',
+                name: 'edit-ai-agent-detection',
+                component: () => import('@main/features/ai/agents/edit/tabs/DetectionTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.detection' }
+              },
+              {
+                path: 'history',
+                name: 'edit-ai-agent-history',
+                component: () => import('@main/features/ai/agents/edit/tabs/HistoryTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.history' }
+              },
+              {
+                // Changelog is disabled in the sidebar; this route exists
+                // only so deep-links / bookmarks don't 404.
+                path: 'changelog',
+                name: 'edit-ai-agent-changelog',
+                component: () => import('@main/features/ai/agents/edit/tabs/ChangelogTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.changelog' }
+              }
+            ]
+          },
+          {
+            path: 'tools',
+            name: 'ai-tool-list',
+            component: () => import('@main/views/ai/ToolList.vue'),
+            meta: { titleKey: 'globals.terms.aiTool', titleCount: 2 }
+          },
+          {
+            path: 'tools/new',
+            props: true,
+            name: 'new-ai-tool',
+            component: () => import('@main/views/ai/CreateOrEditTool.vue'),
+            meta: { titleKey: 'aiTool.new' }
+          },
+          {
+            path: 'tools/:id/edit',
+            props: true,
+            name: 'edit-ai-tool',
+            component: () => import('@main/views/ai/CreateOrEditTool.vue'),
+            meta: { titleKey: 'aiTool.edit' }
+          }
+        ]
+      },
+      // Bookmark redirects from the old /admin/ai/* paths.
+      { path: '/admin/ai', redirect: { name: 'ai-agent-list' } },
+      { path: '/admin/ai/agents', redirect: { name: 'ai-agent-list' } },
+      { path: '/admin/ai/agents/new', redirect: { name: 'new-ai-agent' } },
+      {
+        path: '/admin/ai/agents/:id/edit',
+        redirect: (to) => ({ name: 'edit-ai-agent', params: { id: to.params.id } })
+      },
+      { path: '/admin/ai/tools', redirect: { name: 'ai-tool-list' } },
+      { path: '/admin/ai/tools/new', redirect: { name: 'new-ai-tool' } },
+      {
+        path: '/admin/ai/tools/:id/edit',
+        redirect: (to) => ({ name: 'edit-ai-tool', params: { id: to.params.id } })
+      },
       {
         path: 'contacts/:id',
         name: 'contact-detail',
@@ -534,8 +656,22 @@ const routes = [
             children: [
               {
                 path: 'tags',
+                name: 'tags-list',
                 component: () => import('@main/views/admin/tags/TagsView.vue'),
                 meta: { titleKey: 'globals.terms.tag', titleCount: 2 }
+              },
+              {
+                path: 'tags/new',
+                name: 'new-tag',
+                component: () => import('@main/views/admin/tags/TagFormView.vue'),
+                meta: { titleKey: 'tag.new' }
+              },
+              {
+                path: 'tags/:id/edit',
+                name: 'edit-tag',
+                props: true,
+                component: () => import('@main/views/admin/tags/TagFormView.vue'),
+                meta: { titleKey: 'tag.edit' }
               },
               {
                 path: 'statuses',

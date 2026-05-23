@@ -185,6 +185,27 @@ export const adminNavItems = [
   }
 ]
 
+// AI is its own top-level area (sibling to inbox/knowledge/admin in the icon
+// rail), not nested under /admin. v1 is a flat list of two items; the future
+// plan groups them as Configure / Operate / Quality / Analytics once a third
+// item lands. See F9 navigation proposal.
+export const aiNavItems = [
+  {
+    titleKey: 'globals.terms.aiAgent',
+    href: '/ai/agents',
+    permission: 'ai_agents:manage',
+    isTitleKeyPlural: true,
+    icon: 'Bot'
+  },
+  {
+    titleKey: 'globals.terms.aiTool',
+    href: '/ai/tools',
+    permission: 'ai_tools:manage',
+    isTitleKeyPlural: true,
+    icon: 'Wrench'
+  }
+]
+
 export const accountNavItems = [
   {
     titleKey: 'globals.terms.profile',

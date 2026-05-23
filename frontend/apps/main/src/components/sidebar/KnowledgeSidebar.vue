@@ -10,7 +10,7 @@
       <SidebarMenu>
         <SidebarMenuItem>
           <div class="px-1">
-            <span class="text-xs font-normal text-muted-foreground uppercase tracking-wider px-2">
+            <span class="text-lg font-semibold text-foreground px-2">
               {{ isFormRoute ? t('admin.knowledge.actions.editArticle') : t('globals.terms.knowledgeBase') }}
             </span>
           </div>

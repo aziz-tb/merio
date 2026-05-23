@@ -12,7 +12,7 @@
           <DropdownMenuTrigger as-child>
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 px-1 -ml-1 rounded text-sm font-semibold hover:bg-accent transition-colors"
+              class="inline-flex items-center gap-1.5 p-1 rounded text-sm font-semibold hover:bg-accent transition-colors"
               :class="messageType === 'private_note' ? 'text-amber-700' : 'text-foreground'"
             >
               <component :is="modeIcon" class="size-4" />

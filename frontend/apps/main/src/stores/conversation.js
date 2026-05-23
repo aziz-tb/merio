@@ -781,12 +781,21 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function mergeConversationUpdate (update) {
+    const classificationUpdate = update?.tag_classification
+    const fields = classificationUpdate ? { ...update } : update
+    if (classificationUpdate) {
+      delete fields.tag_classification
+    }
+
     if (conversation.data?.uuid === update.uuid) {
-      deepMerge(conversation.data, update)
+      deepMerge(conversation.data, fields)
     }
     const existing = conversations?.data?.find(c => c.uuid === update.uuid)
     if (existing) {
-      deepMerge(existing, update)
+      deepMerge(existing, fields)
+    }
+    if (classificationUpdate) {
+      emitter.emit(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, update)
     }
   }
 
@@ -802,6 +811,10 @@ export const useConversationStore = defineStore('conversation', () => {
         deepMerge(c.contact, fields)
       }
     })
+  }
+
+  function emitAgentValidationCompleted (payload) {
+    emitter.emit(EMITTER_EVENTS.AGENT_VALIDATION_COMPLETED, payload)
   }
 
   // Clears the list and pagination state so the next fetch starts fresh (removes stale rows).
@@ -938,6 +951,7 @@ export const useConversationStore = defineStore('conversation', () => {
     isConversationInList,
     addPendingNotification,
     mergeConversationUpdate,
+    emitAgentValidationCompleted,
     mergeContactUpdate,
     addNewConversation,
     getContactFullName,

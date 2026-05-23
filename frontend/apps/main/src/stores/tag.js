@@ -12,10 +12,11 @@ export const useTagStore = defineStore('tags', () => {
     const tagOptions = computed(() => tags.value.map(tag => ({
         label: tag.name,
         value: String(tag.id),
+        color: tag.color || 'grey',
     })))
 
-    const fetchTags = async () => {
-        if (tags.value.length) return
+    const fetchTags = async (force = false) => {
+        if (tags.value.length && !force) return
         try {
             const response = await api.getTags()
             tags.value = response?.data?.data || []

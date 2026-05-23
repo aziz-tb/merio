@@ -21,6 +21,7 @@ export const permissions = {
   STATUS_MANAGE: 'status:manage',
   OIDC_MANAGE: 'oidc:manage',
   TAGS_MANAGE: 'tags:manage',
+  TAGS_VIEW_PRIVATE: 'tags:view_private',
   MACROS_MANAGE: 'macros:manage',
   USERS_MANAGE: 'users:manage',
   TEAMS_MANAGE: 'teams:manage',

@@ -103,6 +103,7 @@ import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
 import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
 import KnowledgeSidebar from '@main/components/sidebar/KnowledgeSidebar.vue'
+import AiSidebar from '@main/components/sidebar/AiSidebar.vue'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -236,6 +237,23 @@ const hoveredViewId = ref(null)
 // Track delete confirmation dialog state
 const isDeleteOpen = ref(false)
 const viewToDelete = ref(null)
+
+// Whether ANY inner template in the <aside> would render content for
+// the current route. The aside carries bg-sidebar + border + rounded
+// styling, so without this guard it shows as an empty card strip on
+// routes that opt out of every sidebar mode. Mirror each v-if in the
+// template below exactly.
+const hasSidebarContent = computed(
+  () =>
+    route.matched.some((r) => r.name && r.name.startsWith('contact')) ||
+    (userStore.hasReportTabPermissions &&
+      route.matched.some((r) => r.name && r.name.startsWith('reports'))) ||
+    (route.path && route.path.startsWith('/knowledge')) ||
+    (route.path && route.path.startsWith('/ai')) ||
+    route.matched.some((r) => r.name && r.name.startsWith('admin')) ||
+    isActiveParent('/account') ||
+    (route.path && isInboxRoute(route.path))
+)
 </script>
 
 <template>
@@ -320,6 +338,11 @@ const viewToDelete = ref(null)
     <!-- Knowledge sidebar -->
     <template v-if="route.path && route.path.startsWith('/knowledge')">
       <KnowledgeSidebar />
+    </template>
+
+    <!-- AI sidebar -->
+    <template v-if="route.path && route.path.startsWith('/ai')">
+      <AiSidebar />
     </template>
 
     <!-- Admin Sidebar -->
@@ -428,8 +451,8 @@ const viewToDelete = ref(null)
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <div class="flex items-center justify-between w-full px-2">
-                <span class="text-base font-semibold text-foreground">{{ t('globals.terms.inbox') }}</span>
+              <div class="flex items-center justify-between w-full">
+                <span class="text-lg font-semibold text-foreground pl-2">{{ t('globals.terms.inbox') }}</span>
                 <div class="flex items-center gap-1">
                   <Button asChild variant="ghost" size="icon" class="size-7 text-muted-foreground hover:text-foreground">
                     <router-link :to="{ name: 'search' }" :title="t('globals.terms.search')">
@@ -647,4 +670,3 @@ const viewToDelete = ref(null)
     </AlertDialogContent>
   </AlertDialog>
 </template>
-

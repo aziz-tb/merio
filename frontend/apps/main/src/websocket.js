@@ -88,6 +88,9 @@ export class WebSocketClient {
         [WS_EVENT.CONVERSATION_VIEWERS]: () => {
           this.convStore.setViewers(data.data.conversation_uuid, data.data.user_ids || [])
         },
+        [WS_EVENT.AGENT_VALIDATION_COMPLETED]: () => {
+          this.convStore.emitAgentValidationCompleted(data.data)
+        },
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },

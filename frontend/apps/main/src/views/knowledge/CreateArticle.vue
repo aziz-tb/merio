@@ -45,7 +45,7 @@ import { useKnowledgeStore } from '@main/stores/knowledge'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { slugify } from '@/features/knowledge/utils/slugify.js'
+import { slugify } from '@/utils/slugify.js'
 import api from '@/api/index.js'
 
 const { t } = useI18n()

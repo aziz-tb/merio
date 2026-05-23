@@ -11,12 +11,10 @@
             Details
           </TabsTrigger>
           <TabsTrigger
-            value="copilot"
-            disabled
-            title="Coming soon"
-            class="bg-transparent rounded-none px-0 h-12 shadow-none border-b-2 border-transparent text-muted-foreground/60"
+            value="composer"
+            class="bg-transparent rounded-none px-0 h-12 shadow-none border-b-2 border-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-amber-500 data-[state=active]:text-foreground text-muted-foreground"
           >
-            Copilot
+            {{ $t('composer.tabTitle') }}
           </TabsTrigger>
         </TabsList>
       </div>
@@ -54,12 +52,27 @@
               @select="selectPriority"
               type="priority"
             />
-            <SelectTag
-              v-if="conversationStore.current"
-              v-model="conversationStore.current.tags"
-              :items="tags.map((tag) => ({ label: tag, value: tag }))"
-              :placeholder="t('placeholders.selectTags')"
-            />
+            
+            <div class="relative">
+              <SelectTag
+                v-if="conversationStore.current"
+                v-model="conversationStore.current.tags"
+                :items="tagOptions"
+                :placeholder="t('placeholders.selectTags')"
+              />
+
+              <Button
+                v-if="conversationStore.current?.uuid"
+                variant="ghost"
+                size="icon"
+                class="absolute right-1 top-1 z-10 size-7 bg-background/80"
+                :disabled="reloading"
+                :title="t('tag.reload.tooltip')"
+                @click.stop="triggerReload"
+              >
+                <RefreshCw color="gray" :class="{ 'animate-spin': reloading }" />
+              </Button>
+            </div>
           </CollapsibleContent>
         </Collapsible>
 
@@ -120,23 +133,27 @@
         </Collapsible>
       </TabsContent>
 
-      <!-- Copilot tab (placeholder) -->
-      <TabsContent value="copilot" class="flex-1 overflow-y-auto m-0 p-4 text-center text-sm text-muted-foreground">
-        Coming soon
+      <!-- Composer tab — AI agents the operator can run on this ticket.
+           Body fetches latest runs + enabled agents on mount; see
+           ComposerTab.vue for the action flow (Run / Send / Edit /
+           Regenerate). -->
+      <TabsContent value="composer" class="flex-1 overflow-y-auto m-0">
+        <ComposerTab v-if="conversationUUID" :uuid="conversationUUID" />
       </TabsContent>
     </Tabs>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useTagStore } from '@/stores/tag'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@shared-ui/components/ui/collapsible'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, RefreshCw } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
 import ConversationInfo from './ConversationInfo.vue'
 import ConversationSideBarContact from '@/features/conversation/sidebar/ConversationSideBarContact.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
@@ -148,6 +165,7 @@ import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.v
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import PreviousConversations from '@/features/conversation/sidebar/PreviousConversations.vue'
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
+import ComposerTab from '@/features/conversation/sidebar/ComposerTab.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import api from '../../../api'
 
@@ -158,8 +176,11 @@ const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
 const tags = ref([])
+const reloadingUUID = ref('')
 const { t } = useI18n()
 let isConversationChange = false
+let reloadTimeout = null
+const reloadTimeoutMs = 2 * 60 * 1000
 customAttributeStore.fetchCustomAttributes()
 
 // Watch for changes in the current conversation and set the flag
@@ -176,6 +197,12 @@ watch(
 
 onMounted(async () => {
   await fetchTags()
+  emitter.on(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, handleTagClassificationUpdate)
+})
+
+onUnmounted(() => {
+  emitter.off(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, handleTagClassificationUpdate)
+  clearReloadTimeout()
 })
 
 // Watch for changes in the tags and upsert the tags
@@ -206,10 +233,81 @@ watch(
 )
 
 const priorityOptions = computed(() => conversationStore.priorityOptions)
+const tagOptions = computed(() => {
+  return tagStore.tags.map((tag) => ({
+    label: tag.name,
+    value: tag.name,
+    color: tag.color || 'grey'
+  }))
+})
+
+// Composer needs the conversation UUID to fetch / persist runs. Tracked
+// as a computed so the tab re-fetches when the page swaps tickets.
+const conversationUUID = computed(() => conversationStore.current?.uuid || '')
+const reloading = computed(() => reloadingUUID.value === conversationUUID.value)
 
 const fetchTags = async () => {
   await tagStore.fetchTags()
   tags.value = tagStore.tags.map((item) => item.name)
+}
+
+const triggerReload = async () => {
+  const uuid = conversationStore.current?.uuid
+  if (!uuid) return
+  startReloading(uuid)
+  try {
+    await api.classifyConversationTags(uuid)
+  } catch (error) {
+    const status = error?.response?.status
+    if (status === 409) {
+      return
+    }
+    stopReloading(uuid)
+    let description = handleHTTPError(error).message
+    if (status === 503) description = t('tag.reload.notAvailable')
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description
+    })
+  }
+}
+
+const startReloading = (uuid) => {
+  reloadingUUID.value = uuid
+  clearReloadTimeout()
+  reloadTimeout = window.setTimeout(() => {
+    if (reloadingUUID.value !== uuid) return
+    stopReloading(uuid)
+    if (conversationStore.current?.uuid === uuid) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: t('tag.reload.timeout')
+      })
+    }
+  }, reloadTimeoutMs)
+}
+
+const stopReloading = (uuid) => {
+  if (uuid && reloadingUUID.value !== uuid) return
+  reloadingUUID.value = ''
+  clearReloadTimeout()
+}
+
+const clearReloadTimeout = () => {
+  if (!reloadTimeout) return
+  window.clearTimeout(reloadTimeout)
+  reloadTimeout = null
+}
+
+const handleTagClassificationUpdate = (update) => {
+  if (!update?.uuid || update.uuid !== reloadingUUID.value) return
+  stopReloading(update.uuid)
+  if (update.tag_classification?.status === 'failed') {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: t('tag.reload.failed')
+    })
+  }
 }
 
 const handleAssignedUserChange = (id) => {

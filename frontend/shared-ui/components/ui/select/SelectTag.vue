@@ -3,7 +3,12 @@
   <TagsInput v-model="tags" class="px-0 gap-0" :displayValue="getLabel">
     <!-- Tags visible to the user -->
     <div class="flex gap-2 flex-wrap items-center px-3">
-      <TagsInputItem v-for="tagValue in tags" :key="tagValue" :value="tagValue">
+      <TagsInputItem
+        v-for="tagValue in tags"
+        :key="tagValue"
+        :value="tagValue"
+        :color="getColor(tagValue)"
+      >
         <TagsInputItemText />
         <TagsInputItemDelete />
       </TagsInputItem>
@@ -118,6 +123,11 @@ const visibleOptions = computed(() => filteredOptions.value.slice(0, RENDER_CAP)
 const getLabel = (value) => {
   const item = props.items.find((item) => item.value === value)
   return item?.label || value
+}
+
+const getColor = (value) => {
+  const item = props.items.find((item) => item.value === value)
+  return item?.color || 'grey'
 }
 
 const handleSelect = (event) => {

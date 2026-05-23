@@ -58,6 +58,13 @@ const deleteCustomAttribute = (id) => http.delete(`/api/v1/custom-attributes/${i
 const searchConversations = (params) => http.get('/api/v1/conversations/search', { params })
 const searchMessages = (params) => http.get('/api/v1/messages/search', { params })
 const searchContacts = (params) => http.get('/api/v1/contacts/search', { params })
+const getConversationVariables = (identifier) => http.get(`/api/v1/conversations/${encodeURIComponent(identifier)}/variables`)
+const evaluateDetection = (data) =>
+  http.post('/api/v1/detection/evaluate', data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getEmailNotificationSettings = () => http.get('/api/v1/settings/notifications/email')
 const updateEmailNotificationSettings = (data) =>
   http.put('/api/v1/settings/notifications/email', data)
@@ -69,6 +76,13 @@ const deleteStatus = (id) => http.delete(`/api/v1/statuses/${id}`)
 const createTag = (data) => http.post('/api/v1/tags', data)
 const updateTag = (id, data) => http.put(`/api/v1/tags/${id}`, data)
 const deleteTag = (id) => http.delete(`/api/v1/tags/${id}`)
+const getTag = (id) => http.get(`/api/v1/tags/${id}`)
+const testTagDetection = (id, data) =>
+  http.post(`/api/v1/tags/${id}/test`, data, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const getTemplate = (id) => http.get(`/api/v1/templates/${id}`)
 const getTemplates = (type) => http.get('/api/v1/templates', { params: { type: type } })
 const createTemplate = (data) =>
@@ -175,6 +189,91 @@ const updateAutomationRulesExecutionMode = (data) =>
       'Content-Type': 'application/json'
     }
   })
+
+// AI agents (F9 — configuration data model)
+const getAIAgents = (params) => http.get('/api/v1/ai/agents', { params })
+const getAIAgent = (id) => http.get(`/api/v1/ai/agents/${id}`)
+const createAIAgent = (data) =>
+  http.post('/api/v1/ai/agents', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const updateAIAgent = (id, data) =>
+  http.put(`/api/v1/ai/agents/${id}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteAIAgent = (id) => http.delete(`/api/v1/ai/agents/${id}`)
+
+// AI tools (F9)
+const getAITools = (params) => http.get('/api/v1/ai/tools', { params })
+const getAITool = (id) => http.get(`/api/v1/ai/tools/${id}`)
+const createAITool = (data) =>
+  http.post('/api/v1/ai/tools', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const updateAITool = (id, data) =>
+  http.put(`/api/v1/ai/tools/${id}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteAITool = (id) => http.delete(`/api/v1/ai/tools/${id}`)
+// Manual tool invocation. After the F5 dispatcher unification this
+// endpoint accepts kind="custom" (default — Python sandbox) and
+// kind="internal" (in-process Go capability).
+const invokeAITool = (slug, body) =>
+  http.post(`/api/v1/ai/tools/${slug}/invoke`, body, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+
+// Manual agent run — POST /api/v1/ai/agents/:id/run. Returns 202
+// Accepted with { trace_id, status }. The caller then follows the SSE
+// stream until run.completed / run.failed.
+const runAIAgent = (id, body) =>
+  http.post(`/api/v1/ai/agents/${id}/run`, body, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 10000
+  })
+
+// History — paginated past runs for one agent. Params: status, q,
+// before_run_at + before_id (cursor), limit. Returns { executions: [...] }.
+const listAIAgentRuns = (id, params) =>
+  http.get(`/api/v1/ai/agents/${id}/runs`, { params })
+
+// List internal capabilities — read-only registry view used by the
+// agent edit form's tool picker (added in chunk 9).
+const getAIInternalCapabilities = () => http.get('/api/v1/ai/internal-capabilities')
+
+// List enabled reasoning presets (config/ai_presets.json). Consumed by
+// the agent edit form's preset-overrides picker.
+const getAIPresets = () => http.get('/api/v1/ai/presets')
+
+// Composer tab — list the latest composer-source run per enabled agent
+// on the conversation, joined with outcome + is_stale flag.
+const getLatestAgentExecutions = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/agent-executions/latest`)
+
+const getConversationAgentRunState = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/agent-run-state`)
+
+const validateConversationAgents = (uuid) =>
+  http.post(`/api/v1/conversations/${uuid}/agents/validate`)
+
+const getLatestAgentValidation = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/agents/validation/latest`)
+
+const getAgentExecution = (id) =>
+  http.get(`/api/v1/ai/executions/${id}`)
+
+// Composer tab — send the agent's draft as a customer-facing reply,
+// close the ticket, and record the outcome row. Returns a partial-
+// failure-aware response shape; see cmd/ai_executions.go.
+const sendAgentExecution = (uuid, executionId) =>
+  http.post(
+    `/api/v1/conversations/${uuid}/agent-executions/${executionId}/send`,
+    {},
+    { headers: { 'Content-Type': 'application/json' } }
+  )
+
+// (runAIAgent already declared above — Composer reuses the same helper.)
+
 const getRoles = () => http.get('/api/v1/roles')
 const getRole = (id) => http.get(`/api/v1/roles/${id}`)
 const createRole = (data) =>
@@ -265,6 +364,12 @@ const createUser = (data) =>
     }
   })
 const getTags = () => http.get('/api/v1/tags')
+const classifyConversationTags = (uuid) =>
+  http.post(`/api/v1/conversations/${uuid}/tags/classify`, {}, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
 const importTags = (data) =>
   http.post('/api/v1/tags/import', data, {
     headers: {
@@ -582,6 +687,8 @@ export default {
   getOverviewMessageVolume,
   getOverviewTagDistribution,
   getConversationParticipants,
+  getConversationVariables,
+  evaluateDetection,
   getConversationMessage,
   getConversationMessages,
   getCurrentUser,
@@ -653,6 +760,9 @@ export default {
   createTag,
   updateTag,
   deleteTag,
+  getTag,
+  testTagDetection,
+  classifyConversationTags,
   getStatuses,
   getPriorities,
   createStatus,
@@ -718,5 +828,26 @@ export default {
   markAllNotificationsAsRead,
   deleteNotification,
   deleteAllNotifications,
-  getContactPageVisits
+  getContactPageVisits,
+  getAIAgents,
+  getAIAgent,
+  createAIAgent,
+  updateAIAgent,
+  deleteAIAgent,
+  getAITools,
+  getAITool,
+  runAIAgent,
+  listAIAgentRuns,
+  getAIInternalCapabilities,
+  getAIPresets,
+  getLatestAgentExecutions,
+  getConversationAgentRunState,
+  validateConversationAgents,
+  getLatestAgentValidation,
+  getAgentExecution,
+  sendAgentExecution,
+  createAITool,
+  updateAITool,
+  deleteAITool,
+  invokeAITool
 }

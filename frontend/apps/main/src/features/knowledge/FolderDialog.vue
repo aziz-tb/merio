@@ -51,7 +51,7 @@ import {
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { createFolderSchema } from './formSchema.js'
-import { slugify } from './utils/slugify.js'
+import { slugify } from '@/utils/slugify.js'
 
 const { t } = useI18n()
 

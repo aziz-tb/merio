@@ -8,6 +8,7 @@ export const WS_EVENT = {
     CONVERSATION_VIEWERS: 'conversation_viewers',
     TYPING: 'typing',
     NEW_NOTIFICATION: 'new_notification',
+    AGENT_VALIDATION_COMPLETED: 'agent_validation_completed',
 }
 
 // Message types that should not be queued because they become stale quickly

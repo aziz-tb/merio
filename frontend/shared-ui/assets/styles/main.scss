@@ -221,11 +221,11 @@
   }
 
   :root {
-    --ld-sidebar-collapsed-width: 56px;
+    --ld-sidebar-collapsed-width: 45px;
     /* Responsive sidebar width: 15% of viewport, with sane bounds for tiny / huge screens. */
-    --ld-sidebar-width: clamp(220px, 16vw, 300px);
+    --ld-sidebar-width: clamp(220px, 15vw, 300px);
     --aside-width: 50px;
-    --page-space: 10px;
+    --page-space: 5px;
   }
 }
 
@@ -274,12 +274,21 @@
 }
 
 // Scrollbar start
+// Scrollbars are hidden by default and revealed when the scrollable
+// element (or any descendant) is hovered. The 8px gutter is always
+// reserved, so revealing the thumb never shifts content.
+//
+// Two paths: the standards path (Firefox, plus any engine without
+// ::-webkit-scrollbar) and the WebKit path (Chrome, Safari, Edge).
+// Inside @supports the standards props are reset to `initial` so they
+// don't fight the pseudo-elements — this is why Safari never keeps
+// `scrollbar-width: thin` and no browser-detection class is needed.
 * {
-  scrollbar-width: auto;
-  scrollbar-color: hsl(var(--border)) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
-.dark * {
+*:hover {
   scrollbar-color: hsl(var(--border)) transparent;
 }
 
@@ -289,33 +298,24 @@
     scrollbar-color: initial;
   }
 
-  .dark * {
-    scrollbar-color: initial;
-  }
-
-  *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
 
   *::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
 
   *::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
+    background: transparent;
     border-radius: 3px;
+    transition: background-color 0.2s ease;
   }
 
-  *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
-  }
-
-  .dark *::-webkit-scrollbar-thumb {
+  // Reveal the thumb while the scrollable element (or a child) is hovered.
+  *:hover::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
   }
 
-  .dark *::-webkit-scrollbar-thumb:hover {
+  // Brighter while the cursor is directly on the thumb.
+  *::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
   }
 }

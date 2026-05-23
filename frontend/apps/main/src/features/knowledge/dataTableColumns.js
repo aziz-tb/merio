@@ -1,102 +1,74 @@
+// Knowledge articles list — column definitions for the unified DataTable.
+//
+// Read-B pattern: no actions column (per-row + bulk actions both live
+// in DataTable's items-bar #selected-actions slot, rendered from
+// KnowledgeList).
+//
+// Title is a single-line link to the editor — no subtitle, no
+// folder-path. Folder and Language are first-class columns.
+
 import { h } from 'vue'
-import { formatDistanceToNow } from 'date-fns'
-import { Badge } from '@shared-ui/components/ui/badge'
-import dropdown from './dataTableDropdown.vue'
+import { RouterLink } from 'vue-router'
+import { badgeCol, dateCol, textCol } from '@/components/datatable/helpers.js'
 
-// Build the chain "Parent / Child / Grandchild" for a folder id from the
-// flat folders array (cheap; tree depth in practice is shallow).
-const buildFolderPath = (folderId, byId) => {
-  const parts = []
-  let cur = byId[folderId]
-  while (cur) {
-    parts.unshift(cur.name)
-    cur = cur.parent_id != null ? byId[cur.parent_id] : null
-  }
-  return parts.join(' / ')
-}
-
-export const createColumns = (t, { onEdit, folderById = {} } = {}) => [
+export const createColumns = (t, { folderById = {} } = {}) => [
+  // Title — primary navigation. Single line, always shown.
   {
     accessorKey: 'title',
+    enableHiding: false,
     header: () => h('div', { class: 'text-left' }, t('globals.terms.title')),
-    cell: ({ row }) => {
-      const article = row.original
-      const folderPath = buildFolderPath(article.folder_id, folderById)
-      // Secondary line: folder path · locale. AI-grounded flag is shown in
-      // the article form itself (not in the row, to avoid re-using/inventing
-      // an i18n key for a row-level chip).
-      const segments = [folderPath, article.locale?.toUpperCase()]
-      const secondary = segments.filter(Boolean).join(' · ')
-
-      return h('div', { class: 'text-left' }, [
-        onEdit
-          ? h(
-              'button',
-              {
-                type: 'button',
-                class:
-                  'block text-foreground hover:text-primary hover:underline cursor-pointer font-medium text-left',
-                onClick: () => onEdit(article)
-              },
-              row.getValue('title')
-            )
-          : h('span', { class: 'block font-medium' }, row.getValue('title')),
-        secondary
-          ? h(
-              'span',
-              { class: 'block text-xs text-muted-foreground mt-0.5 truncate' },
-              secondary
-            )
-          : null
-      ])
-    }
-  },
-  {
-    accessorKey: 'status',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
-    cell: ({ row }) => {
-      const v = row.getValue('status')
-      return h(
-        'div',
-        { class: 'text-center' },
-        h(
-          Badge,
-          { variant: v === 'published' ? 'default' : 'secondary' },
-          { default: () => t(`admin.knowledge.status.${v}`) }
-        )
-      )
-    }
-  },
-  {
-    accessorKey: 'classification',
-    header: () => h('div', { class: 'text-center' }, t('admin.knowledge.classification.label')),
+    meta: { align: 'left', label: t('globals.terms.title') },
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
-        t(`admin.knowledge.classification.${row.getValue('classification')}`)
-      )
+        { class: 'text-left' },
+        h(
+          RouterLink,
+          {
+            to: { name: 'edit-article', params: { id: row.original.id } },
+            class: 'text-primary hover:underline font-medium',
+          },
+          () => row.getValue('title')
+        )
+      ),
   },
+
+  // Folder — just the folder name, no path. accessorFn lets sort +
+  // global filter operate on the resolved name rather than the id.
   {
-    accessorKey: 'updated_at',
-    enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
+    id: 'folder',
+    accessorFn: (row) => folderById[row.folder_id]?.name ?? '',
+    header: () =>
+      h('div', { class: 'text-left' }, t('admin.knowledge.folder.label')),
+    meta: { align: 'left', label: t('admin.knowledge.folder.label') },
     cell: ({ row }) => {
-      const d = new Date(row.getValue('updated_at'))
+      const name = folderById[row.original.folder_id]?.name
       return h(
         'div',
-        { class: 'text-center text-muted-foreground' },
-        formatDistanceToNow(d, { addSuffix: true })
+        { class: 'text-left text-sm text-muted-foreground' },
+        name || '—'
       )
-    }
+    },
   },
-  {
-    id: 'actions',
-    enableHiding: false,
-    enableSorting: false,
-    cell: ({ row }) => {
-      const article = row.original
-      return h('div', { class: 'relative' }, h(dropdown, { article }))
-    }
-  }
+
+  // Language — uppercase locale code (EN / DE / FR / …).
+  textCol(t, 'locale', {
+    headerKey: 'admin.knowledge.locale.label',
+    formatter: (v) => v?.toUpperCase() ?? '—',
+  }),
+
+  // Status — badge.
+  badgeCol(t, 'status', {
+    variant: (v) => (v === 'published' ? 'default' : 'secondary'),
+    label: (v, t) => t(`admin.knowledge.status.${v}`),
+  }),
+
+  // Classification — localized enum label.
+  textCol(t, 'classification', {
+    headerKey: 'admin.knowledge.classification.label',
+    formatter: (v, t) => t(`admin.knowledge.classification.${v}`),
+  }),
+
+  // Updated — smart date.
+  dateCol(t, 'updated_at'),
 ]

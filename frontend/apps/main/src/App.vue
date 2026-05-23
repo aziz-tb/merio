@@ -1,59 +1,4 @@
 <!-- frontend/apps/main/src/App.vue -->
-<template>
-  <SmallScreenOverlay v-if="showSmallScreenOverlay" @dismiss="dismissSmallScreen" />
-
-  <SidebarProvider class="contents">
-  <div class="bg-canvas h-screen text-foreground">
-    <!-- Icon rail (extracted to its own component for clarity) -->
-    <IconRail />
-
-    <!-- Secondary sidebar (5 modes, fixed-positioned internally) -->
-    <Sidebar
-      :userTeams="userStore.teams"
-      :userViews="userViews"
-      :sharedViews="sharedViewStore.sharedViewList"
-      @create-view="openCreateViewForm = true"
-      @edit-view="editView"
-      @delete-view="deleteView"
-      @create-conversation="() => (openCreateConversationDialog = true)"
-    />
-
-    <!-- Main content area, offset by both fixed columns. Margin shrinks when the secondary sidebar slides out.
-         The start-padding is dropped only when on an inbox route AND the sidebar is open — that's the only
-         case where we want the conversation list to sit flush against the sidebar with no canvas gap. In every
-         other case (non-inbox route, or sidebar collapsed) we add ps so panels read as standalone rounded cards. -->
-    <div
-      :class="[
-        'h-screen py-[var(--page-space)] pe-[var(--page-space)] overflow-hidden transition-[margin-inline-start] duration-200 ease-out',
-        (isInboxRoute && sidebarOpen) ? '' : 'ps-[var(--page-space)]',
-        sidebarOpen
-          ? 'ms-[calc(var(--ld-sidebar-collapsed-width)+var(--ld-sidebar-width))]'
-          : 'ms-[var(--ld-sidebar-collapsed-width)]'
-      ]"
-    >
-      <div
-        :class="[
-          'flex flex-col h-full overflow-hidden',
-          isInboxRoute
-            ? ''
-            : 'rounded-lg bg-background border border-input shadow-sm'
-        ]"
-      >
-        <PageHeader v-if="!isInboxRoute" />
-        <RouterView class="flex-grow" />
-      </div>
-      <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
-    </div>
-  </div>
-  </SidebarProvider>
-
-  <!-- Command box -->
-  <Command />
-
-  <!-- Create conversation dialog -->
-  <CreateConversation v-model="openCreateConversationDialog" v-if="openCreateConversationDialog" />
-</template>
-
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
@@ -89,6 +34,7 @@ import SmallScreenOverlay from '@/components/SmallScreenOverlay.vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { SidebarProvider } from '@shared-ui/components/ui/sidebar'
+import RouteContextHost from '@main/components/layout/RouteContextHost.vue'
 import api from '@main/api'
 
 const route = useRoute()
@@ -104,6 +50,16 @@ function dismissSmallScreen() {
 // True for any /inboxes/* route. Used to drop the outer card on inbox routes
 // where InboxLayout's two ResizablePanels supply their own card frames.
 const isInboxRoute = computed(() => route.path.startsWith('/inboxes'))
+
+// True for routes that render their own multi-panel card frames and
+// must NOT be wrapped in App.vue's outer rounded card + PageHeader.
+// Inbox qualifies; the agent-edit three-rail layout opts in via
+// meta.fullBleed. Keep this distinct from isInboxRoute — the
+// padding-start logic (ps-[var(--page-space)]) is inbox-specific
+// because only the inbox sits flush against the secondary sidebar.
+const isFullBleedRoute = computed(
+  () => isInboxRoute.value || route.matched.some((r) => r.meta?.fullBleed)
+)
 
 // Open/closed state for the secondary sidebar — shared with Sidebar.vue and PageHeader.vue.
 // When closed, the sidebar slides off-canvas and main content reclaims the 240px.
@@ -246,3 +202,59 @@ const refreshViews = async (data) => {
 }
 </script>
 
+<template>
+  <SmallScreenOverlay v-if="showSmallScreenOverlay" @dismiss="dismissSmallScreen" />
+
+  <SidebarProvider class="contents">
+    <RouteContextHost>
+      <div class="bg-canvas h-screen text-foreground">
+        <!-- Icon rail (extracted to its own component for clarity) -->
+        <IconRail />
+
+        <!-- Secondary sidebar (5 modes, fixed-positioned internally) -->
+        <Sidebar
+          :userTeams="userStore.teams"
+          :userViews="userViews"
+          :sharedViews="sharedViewStore.sharedViewList"
+          @create-view="openCreateViewForm = true"
+          @edit-view="editView"
+          @delete-view="deleteView"
+          @create-conversation="() => (openCreateConversationDialog = true)"
+        />
+
+        <!-- Main content area, offset by both fixed columns. Margin shrinks when the secondary sidebar slides out.
+             The start-padding is dropped only when on an inbox route AND the sidebar is open — that's the only
+             case where we want the conversation list to sit flush against the sidebar with no canvas gap. In every
+             other case (non-inbox route, or sidebar collapsed) we add ps so panels read as standalone rounded cards. -->
+        <div
+          :class="[
+            'h-screen py-[var(--page-space)] pe-[var(--page-space)] overflow-hidden transition-[margin-inline-start] duration-200 ease-out',
+            (isInboxRoute && sidebarOpen) ? '' : 'ps-[var(--page-space)]',
+            sidebarOpen
+              ? 'ms-[calc(var(--ld-sidebar-collapsed-width)+var(--ld-sidebar-width))]'
+              : 'ms-[var(--ld-sidebar-collapsed-width)]'
+          ]"
+        >
+          <div
+            :class="[
+              'flex flex-col h-full overflow-hidden ',
+              isFullBleedRoute
+                ? ''
+                : 'rounded-lg bg-background border border-input shadow-sm'
+            ]"
+          >
+            <PageHeader v-if="!isFullBleedRoute" />
+            <RouterView class="flex-grow" />
+          </div>
+          <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
+        </div>
+      </div>
+    </RouteContextHost>
+  </SidebarProvider>
+
+  <!-- Command box -->
+  <Command />
+
+  <!-- Create conversation dialog -->
+  <CreateConversation v-model="openCreateConversationDialog" v-if="openCreateConversationDialog" />
+</template>
