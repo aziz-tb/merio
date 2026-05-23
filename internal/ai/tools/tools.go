@@ -1,8 +1,7 @@
 // Package aitools provides CRUD access to the ai_tools configuration
-// table (F9). Tools are read/write/decision/universal capabilities
-// available to ai agents at runtime; this package owns persistence
-// only — dispatch to the F6 sandbox (for python_script tools) lands
-// in a later chunk.
+// table. After the F5 schema cleanup ai_tools holds only Python custom
+// tools; internal capabilities (kb_search, etc.) are registered in Go
+// code via internal/ai/tools/builtin/.
 package aitools
 
 import (
@@ -37,13 +36,14 @@ type Opts struct {
 }
 
 type queries struct {
-	GetAll   *sqlx.Stmt `query:"get-all"`
-	CountAll *sqlx.Stmt `query:"count-all"`
-	GetByID  *sqlx.Stmt `query:"get-by-id"`
-	GetByIDs *sqlx.Stmt `query:"get-by-ids"`
-	Insert   *sqlx.Stmt `query:"insert"`
-	Update   *sqlx.Stmt `query:"update"`
-	Delete   *sqlx.Stmt `query:"delete"`
+	GetAll    *sqlx.Stmt `query:"get-all"`
+	CountAll  *sqlx.Stmt `query:"count-all"`
+	GetByID   *sqlx.Stmt `query:"get-by-id"`
+	GetBySlug *sqlx.Stmt `query:"get-by-slug"`
+	GetByIDs  *sqlx.Stmt `query:"get-by-ids"`
+	Insert    *sqlx.Stmt `query:"insert"`
+	Update    *sqlx.Stmt `query:"update"`
+	Delete    *sqlx.Stmt `query:"delete"`
 }
 
 // New builds a Manager.
@@ -83,6 +83,21 @@ func (m *Manager) Get(id int) (models.Tool, error) {
 	return t, nil
 }
 
+// getBySlug returns one tool by its slug. Used internally by the
+// dispatcher; not exposed via the HTTP CRUD surface (the public list/get
+// endpoints use ID).
+func (m *Manager) getBySlug(slug string) (models.Tool, error) {
+	var t models.Tool
+	if err := m.q.GetBySlug.Get(&t, slug); err != nil {
+		if err == sql.ErrNoRows {
+			return t, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error fetching ai tool by slug", "slug", slug, "error", err)
+		return t, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return t, nil
+}
+
 // GetByIDs returns tools whose ID is in the provided list. Used by the
 // Agent handler to validate that every tools[].tool_id reference points
 // to an existing ai_tools row.
@@ -107,8 +122,8 @@ func (m *Manager) Create(t models.Tool) (models.Tool, error) {
 	defaults(&t)
 	var out models.Tool
 	if err := m.q.Insert.Get(&out,
-		t.Name, t.Slug, t.Description, t.Type, t.Category,
-		t.InputParameters, t.OutputSchema, t.Implementation,
+		t.Name, t.Slug, t.Description,
+		t.InputParameters, t.OutputSchema, t.Implementation, t.Category,
 		t.MinLegitimation, t.TimeoutMS, t.Async, t.Enabled,
 	); err != nil {
 		if isUniqueViolation(err) {
@@ -125,8 +140,8 @@ func (m *Manager) Update(id int, t models.Tool) (models.Tool, error) {
 	defaults(&t)
 	var out models.Tool
 	if err := m.q.Update.Get(&out, id,
-		t.Name, t.Slug, t.Description, t.Type, t.Category,
-		t.InputParameters, t.OutputSchema, t.Implementation,
+		t.Name, t.Slug, t.Description,
+		t.InputParameters, t.OutputSchema, t.Implementation, t.Category,
 		t.MinLegitimation, t.TimeoutMS, t.Async, t.Enabled,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -170,6 +185,9 @@ func defaults(t *models.Tool) {
 	}
 	if t.TimeoutMS == 0 {
 		t.TimeoutMS = 30000
+	}
+	if t.Category == "" {
+		t.Category = "write"
 	}
 }
 
