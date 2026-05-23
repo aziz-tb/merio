@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/automation/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
@@ -48,6 +50,7 @@ type ConversationTask struct {
 type Engine struct {
 	rules             []models.Rule
 	rulesMu           sync.RWMutex
+	detectionMgr      *detection.Manager
 	q                 queries
 	lo                *logf.Logger
 	i18n              *i18n.I18n
@@ -59,9 +62,10 @@ type Engine struct {
 }
 
 type Opts struct {
-	DB   *sqlx.DB
-	Lo   *logf.Logger
-	I18n *i18n.I18n
+	DB           *sqlx.DB
+	Lo           *logf.Logger
+	I18n         *i18n.I18n
+	DetectionMgr *detection.Manager
 }
 
 type conversationStore interface {
@@ -84,12 +88,16 @@ type queries struct {
 
 // New initializes a new Engine.
 func New(opt Opts) (*Engine, error) {
+	if opt.DetectionMgr == nil {
+		return nil, fmt.Errorf("automation: detection manager is required")
+	}
 	var (
 		q queries
 		e = &Engine{
-			lo:        opt.Lo,
-			i18n:      opt.I18n,
-			taskQueue: make(chan ConversationTask, MaxQueueSize),
+			lo:           opt.Lo,
+			i18n:         opt.I18n,
+			taskQueue:    make(chan ConversationTask, MaxQueueSize),
+			detectionMgr: opt.DetectionMgr,
 		}
 	)
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opt.DB, efs); err != nil {
@@ -374,6 +382,45 @@ func (e *Engine) handleTimeTrigger() {
 	}
 }
 
+// evalConversationRules evaluates each rule's detection against the
+// conversation. On match, the rule's actions are applied.
+func (e *Engine) evalConversationRules(rules []models.Rule, conv cmodels.Conversation) {
+	tags := extractTagSlugs(conv)
+	ec := detection.EvaluationContext{Conversation: conv, Tags: tags}
+
+	for _, rule := range rules {
+		result, err := e.detectionMgr.Evaluate(context.Background(), rule.Detection, ec)
+		if err != nil {
+			e.lo.Error("error evaluating rule", "rule_id", rule.RuleID, "conversation_uuid", conv.UUID, "error", err)
+			continue
+		}
+		if !result.Matched {
+			continue
+		}
+
+		for _, action := range rule.Actions {
+			if err := e.conversationStore.ApplyAction(action, conv, umodels.User{}); err != nil {
+				e.lo.Error("error applying action", "action", action, "rule_id", rule.RuleID, "conversation_uuid", conv.UUID, "error", err)
+			}
+		}
+		if rule.ExecutionMode == models.ExecutionModeFirstMatch {
+			break
+		}
+	}
+}
+
+// extractTagSlugs returns the tag slugs from a conversation's Tags JSON.
+func extractTagSlugs(conv cmodels.Conversation) []string {
+	if !conv.Tags.Valid {
+		return nil
+	}
+	var tags []string
+	if err := json.Unmarshal([]byte(conv.Tags.JSON), &tags); err != nil {
+		return nil
+	}
+	return tags
+}
+
 // queryRules fetches automation rules from the database.
 func (e *Engine) queryRules() []models.Rule {
 	var (
@@ -389,11 +436,12 @@ func (e *Engine) queryRules() []models.Rule {
 	for _, rule := range rules {
 		var rulesBatch []models.Rule
 		if err := json.Unmarshal([]byte(rule.Rules), &rulesBatch); err != nil {
-			e.lo.Error("error unmarshalling rule JSON", "error", err)
+			e.lo.Error("error unmarshalling rule JSON", "rule_id", rule.ID, "error", err)
 			continue
 		}
 		// Set values from DB.
 		for i := range rulesBatch {
+			rulesBatch[i].RuleID = rule.ID
 			rulesBatch[i].Type = rule.Type
 			rulesBatch[i].Events = rule.Events
 			rulesBatch[i].ExecutionMode = rule.ExecutionMode

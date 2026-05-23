@@ -5,6 +5,7 @@ import (
 	"time"
 
 	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
+	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/lib/pq"
 )
 
@@ -21,34 +22,9 @@ const (
 	ActionRemoveTags      = "remove_tags"
 	ActionSendCSAT        = "send_csat"
 
-	OperatorAnd = "AND"
-	OperatorOR  = "OR"
-
-	RuleOperatorContains    = "contains"
-	RuleOperatorNotContains = "not contains"
-	RuleOperatorEquals      = "equals"
-	RuleOperatorNotEqual    = "not equals"
-	RuleOperatorSet         = "set"
-	RuleOperatorNotSet      = "not set"
-	RuleOperatorGreaterThan = "greater than"
-	RuleOperatorLessThan    = "less than"
-
 	RuleTypeNewConversation    = "new_conversation"
 	RuleTypeConversationUpdate = "conversation_update"
 	RuleTypeTimeTrigger        = "time_trigger"
-
-	ConversationSubject              = "subject"
-	ConversationContent              = "content"
-	ConversationStatus               = "status"
-	ConversationPriority             = "priority"
-	ConversationAssignedUser         = "assigned_user"
-	ConversationAssignedTeam         = "assigned_team"
-	ConversationHoursSinceCreated    = "hours_since_created"
-	ConversationHoursSinceFirstReply = "hours_since_first_reply"
-	ConversationHoursSinceLastReply  = "hours_since_last_reply"
-	ConversationHoursSinceResolved   = "hours_since_resolved"
-	ConversationInbox                = "inbox"
-	ContactEmail                     = "contact_email"
 
 	EventConversationUserAssigned    = "conversation.user.assigned"
 	EventConversationTeamAssigned    = "conversation.team.assigned"
@@ -59,9 +35,6 @@ const (
 
 	ExecutionModeAll        = "all"
 	ExecutionModeFirstMatch = "first_match"
-
-	FieldTypeContactCustomAttribute      = "contact_custom_attribute"
-	FieldTypeConversationField           = "conversation"
 )
 
 // ActionPermissions maps actions to permissions
@@ -93,25 +66,12 @@ type RuleRecord struct {
 }
 
 type Rule struct {
-	Type          string       `json:"type"`
-	ExecutionMode string       `json:"execution_mode"`
-	Events        []string     `json:"event"`
-	GroupOperator string       `json:"group_operator"`
-	Groups        []RuleGroup  `json:"groups"`
-	Actions       []RuleAction `json:"actions"`
-}
-
-type RuleGroup struct {
-	LogicalOp string       `json:"logical_op" db:"logical_op"`
-	Rules     []RuleDetail `json:"rules" db:"rules"`
-}
-
-type RuleDetail struct {
-	Field              string `json:"field" db:"field"`
-	FieldType          string `json:"field_type" db:"field_type"`
-	Operator           string `json:"operator" db:"operator"`
-	Value              string `json:"value" db:"value"`
-	CaseSensitiveMatch bool   `json:"case_sensitive_match" db:"case_sensitive_match"`
+	RuleID        int                 `json:"-"`
+	Type          string              `json:"type"`
+	ExecutionMode string              `json:"execution_mode"`
+	Events        []string            `json:"event"`
+	Detection     detection.Detection `json:"detection"`
+	Actions       []RuleAction        `json:"actions"`
 }
 
 type RuleAction struct {
