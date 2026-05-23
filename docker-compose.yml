@@ -1,39 +1,57 @@
 services:
-  # Libredesk app
+  # Libredesk app.
   app:
-    image: libredesk/libredesk:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Build args plumbed through from .env so the binary stamps the
+      # current commit. Without this, `make deploy` produces an image
+      # with no way to tell what commit it came from.
+      args:
+        VERSION: ${VERSION:-dev}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: libredesk_app
     restart: unless-stopped
     ports:
       - "9000:9000"
     environment:
-      # If the password is set during first docker-compose up, the system user password will be set to this value.
-      # You can always set system user password later by running `docker exec -it libredesk_app ./libredesk --set-system-user-password`.
       LIBREDESK_SYSTEM_USER_PASSWORD: ${LIBREDESK_SYSTEM_USER_PASSWORD:-}
+      LIBREDESK_EXEC__SANDBOX_URL: http://host.docker.internal:8090/v1/execute
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - libredesk
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
-      - ./uploads:/libredesk/uploads:rw 
+      - ./uploads:/libredesk/uploads:rw
       - ./config.toml:/libredesk/config.toml
+      - ./config:/libredesk/config:ro
+    healthcheck:
+      # Hits a known-cheap endpoint. If 9000 doesn't respond, the app
+      # is considered unhealthy and restart policy applies.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/health 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     command: [sh, -c, "./libredesk --install --idempotent-install --yes --config /libredesk/config.toml && ./libredesk --upgrade --yes --config /libredesk/config.toml && ./libredesk --config /libredesk/config.toml"]
 
-  # PostgreSQL database
+  # PostgreSQL — main application database.
   db:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: libredesk_db
     restart: unless-stopped
     networks:
       - libredesk
     ports:
-      # Only bind on the local interface. To connect to Postgres externally, change this to 0.0.0.0
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     environment:
-      # Set these environment variables to configure the database, defaults to libredesk.
       POSTGRES_USER: ${POSTGRES_USER:-libredesk}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-libredesk} 
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-libredesk}
       POSTGRES_DB: ${POSTGRES_DB:-libredesk}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-libredesk} -d ${POSTGRES_DB:-libredesk}"]
@@ -43,18 +61,121 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
-  # Redis
+  # Redis.
   redis:
     image: redis:7-alpine
     container_name: libredesk_redis
     restart: unless-stopped
     ports:
-      # Only bind on the local interface.
       - "127.0.0.1:6379:6379"
     networks:
       - libredesk
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # Temporal Postgres (dedicated; separate from the app's main DB).
+  temporal-postgresql:
+    image: postgres:17-alpine
+    container_name: libredesk_temporal_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:-temporal}
+      POSTGRES_DB: temporal
+    networks:
+      - libredesk
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - temporal-postgresql-data:/var/lib/postgresql/data
+      - ./config/temporal/temporal-init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # Temporal server (dev/local pattern via auto-setup image).
+  temporal:
+    image: temporalio/auto-setup:1.29
+    container_name: libredesk_temporal
+    restart: unless-stopped
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:-temporal}
+      POSTGRES_SEEDS: temporal-postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      DEFAULT_NAMESPACE: libredesk
+      DEFAULT_NAMESPACE_RETENTION: 30d
+    networks:
+      - libredesk
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+    volumes:
+      - ./config/temporal:/etc/temporal/config/dynamicconfig:ro
+
+  # Temporal Web UI.
+  temporal-ui:
+    image: temporalio/ui:2.32.0
+    container_name: libredesk_temporal_ui
+    restart: unless-stopped
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    networks:
+      - libredesk
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - temporal
+
+  # Temporal worker.
+  #
+  # Now version-stamped via build args and depends on the main DB
+  # being healthy (worker activities read from libredesk DB, not just
+  # Temporal's own DB). Healthcheck verifies the worker can reach
+  # Temporal; if Temporal is down or the worker has crashed, restart
+  # policy kicks in.
+  temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.temporal-worker
+      args:
+        VERSION: ${VERSION:-dev}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    container_name: libredesk_temporal_worker
+    restart: unless-stopped
+    environment:
+      LIBREDESK_TEMPORAL__ENABLED: "true"
+      LIBREDESK_TEMPORAL__ADDRESS: "temporal:7233"
+      LIBREDESK_TEMPORAL__NAMESPACE: "libredesk"
+    volumes:
+      - ./config.toml:/worker/config.toml:ro
+      - ./config:/worker/config:ro
+    networks:
+      - libredesk
+    depends_on:
+      db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z temporal 7233 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 networks:
   libredesk:
@@ -62,3 +183,4 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  temporal-postgresql-data:

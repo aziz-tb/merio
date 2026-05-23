@@ -1,0 +1,64 @@
+{
+  "_comment": "AI preset definitions, per-purpose default mappings, and platform-level provider API keys. Loaded once at app startup into the in-memory preset registry. Edits require a restart (v1 limitation; revisit when ops surfaces a real need for live reload). Every preset's `model` field is validated against config/anthropic_models.json at startup; references to unknown models fail loudly. Slugs referenced from ai_agents.preset_overrides are validated at agent save time once the registry is loaded (chunk 2). `provider_keys.anthropic` is read at boot — leave empty to disable the agent runner; the run endpoint returns 503 in that case.",
+  "provider_keys": {
+    "anthropic": "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",
+    "voyage": "pa-0-UL9dbV32AwQQ4vOpso-lxX4I7midnSnteaKAb-nzB"
+  },
+  "presets": [
+    {
+      "slug": "default-sonnet",
+      "name": "Default Sonnet",
+      "description": "General-purpose preset for agent reasoning and synthesis. Balanced cost/quality; the workhorse for stages that need real reasoning capability.",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "temperature": 0.5,
+      "max_tokens": 4000,
+      "top_p": null,
+      "top_k": null,
+      "stop_sequences": null,
+      "caching_enabled": true,
+      "caching_extended_ttl": false,
+      "enabled": true
+    },
+    {
+      "slug": "fast-haiku",
+      "name": "Fast Haiku",
+      "description": "Fast, cheap preset for high-volume narrow tasks (classification, extraction, redaction). Lower temperature for more deterministic outputs.",
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "temperature": 0.3,
+      "max_tokens": 2000,
+      "top_p": null,
+      "top_k": null,
+      "stop_sequences": null,
+      "caching_enabled": true,
+      "caching_extended_ttl": false,
+      "enabled": true
+    },
+    {
+      "slug": "fast-haiku-4-5",
+      "name": "Fast Haiku 4.5",
+      "description": "Version-pinned alias for tag classification and other high-volume narrow tasks. Switch purpose_mappings to newer aliases as Haiku versions roll forward.",
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "temperature": 0.3,
+      "max_tokens": 2000,
+      "top_p": null,
+      "top_k": null,
+      "stop_sequences": null,
+      "caching_enabled": true,
+      "caching_extended_ttl": false,
+      "enabled": true
+    }
+  ],
+  "purpose_mappings": {
+    "classify": "fast-haiku",
+    "classification": "fast-haiku",
+    "summarize": "fast-haiku",
+    "reason": "default-sonnet",
+    "synthesize": "default-sonnet",
+    "redact_pii": "fast-haiku",
+    "brief": "default-sonnet",
+    "extract_parameters": "default-sonnet"
+  }
+}

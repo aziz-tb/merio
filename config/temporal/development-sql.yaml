@@ -1,0 +1,21 @@
+# Temporal dynamic configuration overrides (dev/local).
+#
+# This file is mounted into the temporal container at
+# /etc/temporal/config/dynamicconfig/development-sql.yaml and referenced
+# by DYNAMIC_CONFIG_FILE_PATH. It must exist for the server to start.
+#
+# Empty overrides mean Temporal server defaults apply. Add entries here
+# when a workflow type needs tuning beyond defaults (task-queue read
+# partitions, history retention beyond namespace default, etc.).
+#
+# Reference: https://docs.temporal.io/references/dynamic-configuration
+#
+# Example shape (commented; uncomment + tune as needed):
+#
+# matching.numTaskqueueReadPartitions:
+#   - value: 4
+#     constraints:
+#       taskQueueName: embeddings
+# frontend.enableClientVersionCheck:
+#   - value: true
+#     constraints: {}

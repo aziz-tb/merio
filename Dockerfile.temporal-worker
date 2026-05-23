@@ -1,0 +1,44 @@
+# Dockerfile.temporal-worker
+#
+# Two-stage build for the Temporal worker binary. Version and git commit
+# are injected via build args so the running worker can report exactly
+# which commit it was built from — critical for confirming a deploy
+# actually picked up your changes vs. silently reusing a cached image.
+
+FROM golang:1.25-alpine AS builder
+
+RUN apk --no-cache add git
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+
+# -ldflags injects build metadata into main.buildString and main.versionString
+# so the worker can log "version=<commit>" on startup. Keep this in sync
+# with the main Dockerfile's ldflags so both binaries report versions
+# the same way.
+RUN CGO_ENABLED=0 go build \
+    -ldflags="-s -w \
+        -X 'main.buildString=${VERSION} (${GIT_COMMIT})' \
+        -X 'main.versionString=${VERSION}'" \
+    -o /out/temporal-worker \
+    ./cmd/temporal_worker
+
+# Runtime stage
+FROM alpine:3.18
+
+# ca-certificates: outbound HTTPS to Anthropic / Voyage.
+# tzdata: time.LoadLocation for user-configured business-hours timezones.
+# netcat-openbsd: used by the docker-compose healthcheck.
+RUN apk --no-cache add ca-certificates tzdata netcat-openbsd
+
+WORKDIR /worker
+COPY --from=builder /out/temporal-worker .
+COPY config.sample.toml config.toml
+
+CMD ["./temporal-worker", "--config", "/worker/config.toml"]

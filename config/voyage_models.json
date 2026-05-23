@@ -1,0 +1,33 @@
+{
+  "_comment": "Voyage AI model catalog. Mirrors config/anthropic_models.json shape for the same reason — pricing and capacity are deployment config, not code. Loaded at startup; mismatch between a configured embedding model and what's listed here fails boot loudly.",
+  "models": [
+    {
+      "id": "voyage-3-large",
+      "display_name": "Voyage 3 Large",
+      "kind": "embedding",
+      "dimensions": 1024,
+      "context_window": 32000,
+      "max_batch_size": 128,
+      "pricing": {
+        "input_per_million_tokens_usd": 0.18,
+        "output_per_million_tokens_usd": 0.0,
+        "currency": "USD",
+        "effective_from": "2025-01-01"
+      }
+    },
+    {
+      "id": "rerank-2",
+      "display_name": "Voyage Rerank 2",
+      "kind": "reranker",
+      "dimensions": 0,
+      "context_window": 16000,
+      "max_batch_size": 1000,
+      "pricing": {
+        "input_per_million_tokens_usd": 0.05,
+        "output_per_million_tokens_usd": 0.0,
+        "currency": "USD",
+        "effective_from": "2025-01-01"
+      }
+    }
+  ]
+}

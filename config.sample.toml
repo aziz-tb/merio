@@ -25,7 +25,7 @@ disable_secure_cookies = false
 session_lifetime = "9h"
 # Request read and write timeouts.
 read_timeout = "5s"
-write_timeout = "5s"
+write_timeout = "90s"
 # Maximum request body size in bytes (100MB)
 # If you are using proxy, you may need to configure them to allow larger request bodies.
 max_body_size = 104857600
@@ -139,3 +139,107 @@ continuity_scan_interval = "5m"
 [sla]
 # How often to evaluate SLA compliance for conversations
 evaluation_interval = "5m"
+
+[exec]
+# Sandbox HTTP endpoint (the Python exec-runner service).
+sandbox_url = "http://localhost:8090"
+
+# Shared service token authorizing this Go binary to call exec-runner.
+# Must match the SERVICE_TOKEN env var on the Python service.
+# Generate with: openssl rand -hex 32
+sandbox_token = "<replace-with-openssl-rand-hex-32>"
+
+# Where exec-runner sends scripts' SDK callbacks. Typically the same
+# host:port the Go binary listens on, localhost-only.
+platform_base_url = "http://localhost:9000"
+
+# Temporal — durable workflow infrastructure. Used by all async work
+# going forward: KB embedding indexing (F12), inbound AI pipeline,
+# SLA timers, etc.
+#
+# When enabled = false, the main app starts cleanly without Temporal
+# running; workflow-starting code paths fall back to sync or refuse
+# loudly. See internal/temporal/CONVENTIONS.md.
+[temporal]
+enabled = false
+# Frontend gRPC address. "temporal:7233" inside docker-compose,
+# "127.0.0.1:7233" for local dev outside compose.
+address = "temporal:7233"
+namespace = "libredesk"
+# Caps how long client.Dial may block at startup.
+dial_timeout = "10s"
+# Time the worker is given to drain in-flight activities after
+# SIGINT/SIGTERM before the process exits.
+shutdown_grace = "30s"
+
+# Per-task-queue worker pool tuning. Queue names match the constants
+# in internal/temporal/queues.go. Zero-valued fields are filled in
+# with sensible per-queue defaults (30 activities, 100 workflows).
+[temporal.workers.embeddings]
+max_concurrent_activities = 30
+max_concurrent_workflows = 100
+
+[temporal.workers.pipeline]
+max_concurrent_activities = 20
+max_concurrent_workflows = 50
+
+[temporal.workers.ai-runs]
+max_concurrent_activities = 10
+max_concurrent_workflows = 30
+
+[temporal.workers.sla-timers]
+max_concurrent_activities = 5
+max_concurrent_workflows = 100
+
+[temporal.workers.default]
+max_concurrent_activities = 10
+max_concurrent_workflows = 30
+
+# Agent-run live progress. Controls the Redis event stream and the SSE
+# channel that surface live agent-run progress to the admin UI.
+[agent_run]
+# How long agent-run event streams are retained in Redis.
+event_ttl = "1h"
+# Interval between SSE keepalive comments sent to the browser. Lower this
+# if a proxy buffers or severs idle connections.
+sse_keepalive = "15s"
+# After a run completes, how long the run-state endpoint keeps reporting
+# it as "completed" to clients that reconnect.
+recent_completion_window = "10m"
+
+# F12 — RAG, embeddings, and semantic search.
+#
+# Provider keys for Voyage live in config/ai_presets.json under
+# provider_keys.voyage (same pattern as the Anthropic key). Leave it
+# empty to disable the hybrid kb_search path — the capability returns a
+# clear error at invocation time.
+[embeddings]
+provider = "voyage"
+model = "voyage-3-large"
+dimensions = 1024
+concurrency = 10
+total_timeout = "30s"
+
+# Per-chunk cosine similarity threshold applied before RRF fusion.
+# Chunks whose semantic similarity to the query is below this value are
+# dropped before fusion + reranking. Set to 0.0 to disable filtering
+# (default). Tune after observing real similarity values in trace JSON.
+min_semantic_similarity = 0.0
+
+# Reranker score threshold applied after Voyage rerank-2 returns.
+# Articles whose reranker score is below this are dropped before the
+# results reach the agent. 0.3 is a conservative default. Set to 0.0
+# to disable.
+min_reranker_score = 0.3
+
+# Query embedding cache (Redis-backed). Disabling makes every kb_search
+# call hit Voyage again — fine for dev, wasteful in prod.
+[embeddings.cache]
+enabled = true
+ttl = "1h"
+
+[reranker]
+provider = "voyage"
+model = "rerank-2"
+concurrency = 5
+total_timeout = "30s"
