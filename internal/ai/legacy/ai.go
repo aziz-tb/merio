@@ -1,5 +1,15 @@
-// Package ai manages AI prompts and integrates with LLM providers.
-package ai
+// Package legacy contains the rewrite manager — the original AI subsystem
+// of this codebase, used by the reply-box "rewrite" feature (e.g.,
+// make-this-polite, make-this-shorter). It uses OpenAI directly and predates
+// the new agent system in internal/ai/{agents,runner,llm,embeddings,...}.
+//
+// Deprecated: New code should use the new AI subsystem. This package is
+// retained for the rewrite feature only and will be ported to use
+// llm.Provider in a future batch (see docs/architecture.md Known Debt #2).
+//
+// Cost-tracking gap: rewrite calls do not currently land in ai_usage.
+// The port to llm.Provider will close this gap.
+package legacy
 
 import (
 	"database/sql"
@@ -7,7 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/abhinavxd/libredesk/internal/ai/models"
+	"github.com/abhinavxd/libredesk/internal/ai/legacy/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"

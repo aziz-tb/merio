@@ -1,4 +1,4 @@
-package ai
+package legacy
 
 // ProviderClient is the interface all providers should implement.
 type ProviderClient interface {
