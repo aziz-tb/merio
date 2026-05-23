@@ -14,7 +14,23 @@ import (
 	"html/template"
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
-	"github.com/abhinavxd/libredesk/internal/ai"
+	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
+	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
+	voyageembed "github.com/abhinavxd/libredesk/internal/ai/embeddings/voyage"
+	aiexecutions "github.com/abhinavxd/libredesk/internal/ai/executions"
+	aiLegacy "github.com/abhinavxd/libredesk/internal/ai/legacy"
+	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/abhinavxd/libredesk/internal/ai/llm/anthropic"
+	aicatalog "github.com/abhinavxd/libredesk/internal/ai/llm/catalog"
+	aipreset "github.com/abhinavxd/libredesk/internal/ai/llm/preset"
+	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
+	"github.com/abhinavxd/libredesk/internal/ai/reranker"
+	voyagerank "github.com/abhinavxd/libredesk/internal/ai/reranker/voyage"
+	"github.com/abhinavxd/libredesk/internal/ai/runner"
+	runnerevents "github.com/abhinavxd/libredesk/internal/ai/runner/events"
+	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
+	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
+	aiusage "github.com/abhinavxd/libredesk/internal/ai/usage"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	"github.com/abhinavxd/libredesk/internal/autoassigner"
@@ -27,6 +43,9 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/detection"
+	execrunner "github.com/abhinavxd/libredesk/internal/exec/runner"
+	exectoken "github.com/abhinavxd/libredesk/internal/exec/token"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
@@ -37,6 +56,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/media"
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
 	"github.com/abhinavxd/libredesk/internal/media/stores/s3"
+	"github.com/abhinavxd/libredesk/internal/migrations"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
@@ -49,6 +69,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
+	"github.com/abhinavxd/libredesk/internal/temporal"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/abhinavxd/libredesk/internal/webhook"
@@ -140,6 +161,14 @@ func initFlags() {
 	f.Bool("upgrade", false, "upgrade the database schema")
 	f.Bool("set-system-user-password", false, "set password for the system user")
 	f.String("static-dir", "", "path to a directory with custom static files and templates to override the defaults")
+
+	// F12 RAG reindex CLI. --reindex-embeddings starts a Temporal
+	// BulkReindexWorkflow; the binary exits after dispatch (the workflow
+	// runs on the embeddings worker pool).
+	f.Bool("reindex-embeddings", false, "trigger a Temporal bulk-reindex of embeddings and exit")
+	f.String("reindex-content-type", "kb_chunk", "content type to reindex (default: kb_chunk)")
+	f.Int("reindex-batch-size", 100, "articles per page during bulk reindex (default: 100)")
+	f.Int("reindex-parallelism", 4, "concurrent child workflows in flight (default: 4)")
 
 	if err := f.Parse(os.Args[1:]); err != nil {
 		log.Fatalf("loading flags: %v", err)
@@ -312,6 +341,7 @@ func initConversations(
 	webhook *webhook.Manager,
 	worklog *worklog.Manager,
 	dispatcher *notifier.Dispatcher,
+	temporalClient *temporal.Client,
 ) *conversation.Manager {
 	continuityConfig := &conversation.ContinuityConfig{}
 	if ko.Exists("conversation.continuity_scan_interval") {
@@ -325,6 +355,7 @@ func initConversations(
 		IncomingMessageQueueSize: ko.MustInt("message.incoming_queue_size"),
 		ContinuityConfig:         continuityConfig,
 		SubjectRefFormat:         ko.String("conversation.subject_ref_format"),
+		TemporalClient:           temporalClient,
 	})
 	if err != nil {
 		log.Fatalf("error initializing conversation manager: %v", err)
@@ -386,6 +417,61 @@ func initKnowledge(db *sqlx.DB, i18n *i18n.I18n) *knowledge.Manager {
 		log.Fatalf("error initializing knowledge manager: %v", err)
 	}
 	return m
+}
+
+// initExecToken constructs the script-execution token manager. Reuses
+// the shared Redis client.
+func initExecToken(rdb *redis.Client) *exectoken.Manager {
+	lo := initLogger("exec-token")
+	mgr, err := exectoken.New(exectoken.Opts{
+		Redis:  rdb,
+		Logger: lo,
+	})
+	if err != nil {
+		log.Fatalf("error initializing exec-token manager: %v", err)
+	}
+	return mgr
+}
+
+// initSystemUserID looks up the System Agent user's ID. The user is
+// created by the v2.5.0 migration (and seeded in schema.sql for fresh
+// installs). Boots fatally if the user is missing — that indicates the
+// migration didn't run.
+//
+// The system user is identified by a stable email, not by ID, so this
+// works across deployments.
+func initSystemUserID(db *sqlx.DB) int {
+	const systemEmail = "system@libredesk.local"
+	var id int
+	err := db.QueryRow(
+		`SELECT id FROM users WHERE email = $1 AND type = 'agent' AND deleted_at IS NULL`,
+		systemEmail,
+	).Scan(&id)
+	if err != nil {
+		log.Fatalf("System Agent user not found (email=%s) — did the v2.5.0 migration run? %v",
+			systemEmail, err)
+	}
+	return id
+}
+
+// initExecRunner constructs the script-execution dispatcher. Fatally
+// errors if the [exec] config block is missing or incomplete; that's
+// deliberate, the platform should not boot in a half-configured state.
+func initExecRunner(db *sqlx.DB, tokMgr *exectoken.Manager, systemUserID int) *execrunner.Manager {
+	lo := initLogger("exec-runner")
+	mgr, err := execrunner.New(execrunner.Opts{
+		Token:           tokMgr,
+		DB:              db,
+		Logger:          lo,
+		SandboxURL:      ko.MustString("exec.sandbox_url"),
+		SandboxToken:    ko.MustString("exec.sandbox_token"),
+		PlatformBaseURL: ko.MustString("exec.platform_base_url"),
+		SystemUserID:    systemUserID,
+	})
+	if err != nil {
+		log.Fatalf("error initializing exec-runner: %v", err)
+	}
+	return mgr
 }
 
 // initBusinessHours inits business hours manager.
@@ -630,13 +716,297 @@ func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 	return mgr
 }
 
-// initAutomationEngine initializes the automation engine.
-func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n) *automation.Engine {
-	var lo = initLogger("automation_engine")
-	engine, err := automation.New(automation.Opts{
+// initAIAgents initializes the ai_agents CRUD manager (F9).
+func initAIAgents(db *sqlx.DB, i18n *i18n.I18n) *aiagents.Manager {
+	var lo = initLogger("ai-agents")
+	m, err := aiagents.New(aiagents.Opts{
 		DB:   db,
 		Lo:   lo,
 		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing ai agents manager: %v", err)
+	}
+	return m
+}
+
+// initAITools initializes the ai_tools CRUD manager (F9).
+func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
+	var lo = initLogger("ai-tools")
+	m, err := aitools.New(aitools.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing ai tools manager: %v", err)
+	}
+	return m
+}
+
+// initAIExecutions wires the persistence manager for agent_executions +
+// agent_execution_outcomes (the Composer tab's storage layer, migration
+// v2_7_6).
+func initAIExecutions(db *sqlx.DB, i18n *i18n.I18n) *aiexecutions.Manager {
+	var lo = initLogger("ai-executions")
+	m, err := aiexecutions.New(aiexecutions.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing ai executions manager: %v", err)
+	}
+	return m
+}
+
+// initAIOperations wires the unified per-logical-AI-operation audit manager.
+func initAIOperations(db *sqlx.DB) *aioperations.Manager {
+	m, err := aioperations.New(aioperations.Opts{
+		DB: db,
+		Lo: initLogger("ai-operations"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing ai operations manager: %v", err)
+	}
+	return m
+}
+
+// initAIUsage wires the ai_usage Manager — one row per LLM provider
+// call. Depends on the model catalog (cost calculation reads
+// per-million-token rates from there); fails loudly if the catalog
+// hasn't been loaded yet.
+func initAIUsage(db *sqlx.DB, cat *aicatalog.Catalog) *aiusage.Manager {
+	var lo = initLogger("ai-usage")
+	m, err := aiusage.New(aiusage.Opts{
+		DB:      db,
+		Catalog: cat,
+		Lo:      lo,
+	})
+	if err != nil {
+		log.Fatalf("error initializing ai usage manager: %v", err)
+	}
+	return m
+}
+
+// initSystemInboxID resolves the seeded "System (Internal)" inbox row
+// by its stable UUID (see migrations.SystemInboxUUID). Every ai_usage
+// row that has no real conversation context FKs to this id. Fails
+// loudly when the seed row is missing — that indicates the v2.7.7
+// migration didn't run, and a missing FK target means every system-
+// scoped LLM call would error at insert time.
+func initSystemInboxID(db *sqlx.DB) int {
+	var id int
+	err := db.QueryRow(
+		`SELECT id FROM inboxes WHERE uuid = $1`,
+		migrations.SystemInboxUUID,
+	).Scan(&id)
+	if err != nil {
+		log.Fatalf("error resolving system inbox by uuid %s: %v (run --upgrade?)",
+			migrations.SystemInboxUUID, err)
+	}
+	if id <= 0 {
+		log.Fatalf("system inbox uuid %s resolved to zero id", migrations.SystemInboxUUID)
+	}
+	return id
+}
+
+// initAIModelCatalog loads config/anthropic_models.json into an in-memory
+// catalog used to validate preset model references at startup. Path is
+// configurable via `ai.models_catalog_path` (defaults to
+// config/anthropic_models.json relative to the working directory).
+//
+// Missing or malformed catalog is fatal: a typo in a model id should
+// crash startup, not silently fall back to a default.
+func initAIModelCatalog() *aicatalog.Catalog {
+	path := ko.String("ai.models_catalog_path")
+	if path == "" {
+		path = "config/anthropic_models.json"
+	}
+	abs, err := filepath.Abs(path)
+	if err == nil {
+		path = abs
+	}
+	cat, err := aicatalog.Load(path)
+	if err != nil {
+		log.Fatalf("error loading AI model catalog: %v", err)
+	}
+	colorlog.Green("AI model catalog: %d models loaded from %s", len(cat.IDs()), path)
+	return cat
+}
+
+// initAIPresetRegistry loads config/ai_presets.json into the in-memory
+// preset registry, validating every preset's model against the catalog
+// and every purpose mapping against llm.KnownPurposes. Path is
+// configurable via `ai.presets_path`. Validation failure is fatal — the
+// alternative (silently starting with broken config) is worse than a
+// crash on launch.
+func initAIPresetRegistry(cat *aicatalog.Catalog) *aipreset.Registry {
+	path := ko.String("ai.presets_path")
+	if path == "" {
+		path = "config/ai_presets.json"
+	}
+	abs, err := filepath.Abs(path)
+	if err == nil {
+		path = abs
+	}
+	reg, err := aipreset.Load(path, cat)
+	if err != nil {
+		log.Fatalf("error loading AI preset registry: %v", err)
+	}
+	colorlog.Green("AI preset registry: %d presets loaded from %s", len(reg.Slugs()), path)
+	return reg
+}
+
+// initAnthropicProvider builds the production llm.LLMProvider against
+// Anthropic. Resolution order for the API key:
+//
+//  1. config/ai_presets.json → provider_keys.anthropic (platform key,
+//     set by engineering at deploy time)
+//  2. ai_providers row WHERE provider='anthropic' (encrypted, fallback
+//     path for when a per-tenant secrets UI lands)
+//
+// Returns nil + warns when neither is set. The agent runner is nil in
+// that case; the run endpoint returns 503 at run time.
+func initAnthropicProvider(db *sqlx.DB, registry *aipreset.Registry, cat *aicatalog.Catalog) llm.LLMProvider {
+	apiKey := registry.ProviderKey("anthropic")
+	source := "config/ai_presets.json"
+	if apiKey == "" {
+		// Fall back to the DB-stored key.
+		encKey := ko.MustString("app.encryption_key")
+		k, err := anthropic.LookupAPIKey(db, encKey)
+		if err != nil {
+			log.Fatalf("error reading Anthropic api key from ai_providers: %v", err)
+		}
+		if k != "" {
+			apiKey = k
+			source = "ai_providers row"
+		}
+	}
+	if apiKey == "" {
+		colorlog.Red("Anthropic API key not set — set provider_keys.anthropic in config/ai_presets.json (or the ai_providers row) to enable the agent runner")
+		return nil
+	}
+	lo := initLogger("anthropic")
+	p, err := anthropic.New(anthropic.Opts{
+		APIKey:   apiKey,
+		Catalog:  cat,
+		Registry: registry,
+		Lo:       lo,
+	})
+	if err != nil {
+		log.Fatalf("error initializing Anthropic provider: %v", err)
+	}
+	colorlog.Green("Anthropic provider: ready (key from %s)", source)
+	return p
+}
+
+// initAgentRunner wires up the agent runner. Returns nil when the
+// Anthropic provider isn't configured (agent runs error at run time
+// rather than at boot — keeps the rest of the app available).
+func initAgentRunner(
+	provider llm.LLMProvider,
+	agents *aiagents.Manager,
+	tools *aitools.Manager,
+	dispatcher *aitools.Dispatcher,
+	presetReg *aipreset.Registry,
+	knowledgeMgr *knowledge.Manager,
+	conversationMgr *conversation.Manager,
+	userMgr *user.Manager,
+	usageMgr *aiusage.Manager,
+	eventPub runner.EventPublisher,
+) *runner.Runner {
+	if provider == nil {
+		return nil
+	}
+	lo := initLogger("agent-runner")
+	r, err := runner.New(runner.Opts{
+		Provider:     provider,
+		Agents:       agents,
+		Resolver:     resolver.New(tools, nil),
+		Dispatcher:   dispatcher,
+		PresetReg:    presetReg,
+		Lo:           lo,
+		Events:       eventPub,
+		Knowledge:    knowledgeMgr,
+		Conversation: conversationMgr,
+		User:         userMgr,
+		Usage:        &runnerUsageAdapter{m: usageMgr},
+	})
+	if err != nil {
+		log.Fatalf("error initializing agent runner: %v", err)
+	}
+	return r
+}
+
+func initAgentRunEventPublisher(rdb *redis.Client) runner.EventPublisher {
+	if rdb == nil {
+		return nil
+	}
+	pub, err := runnerevents.NewRedisStreamPublisher(rdb, initLogger("ai-run-events"), ko.Duration("agent_run.event_ttl"))
+	if err != nil {
+		log.Fatalf("error initializing ai run event publisher: %v", err)
+	}
+	return pub
+}
+
+// runnerUsageAdapter bridges runner.UsageRecorder (which uses
+// runner.UsageRow to avoid importing internal/ai/usage from inside the
+// runner package) and the real usage.Manager.Record. The adapter
+// copies fields 1:1; CreatedAt is stamped here so the
+// (trace_id, call_sequence, created_at) idempotency invariant holds
+// even on retry of the parent HTTP request.
+type runnerUsageAdapter struct {
+	m *aiusage.Manager
+}
+
+func (a *runnerUsageAdapter) Record(ctx context.Context, in runner.UsageRow) error {
+	if a == nil || a.m == nil {
+		return nil
+	}
+	return a.m.Record(ctx, aiusage.Row{
+		CreatedAt:           time.Now().UTC(),
+		TraceID:             in.TraceID,
+		CallSequenceInTrace: in.CallSequenceInTrace,
+		InboxID:             in.InboxID,
+		ConversationID:      in.ConversationID,
+		AgentID:             in.AgentID,
+		UserID:              in.UserID,
+		Provider:            in.Provider,
+		Model:               in.Model,
+		PresetSlug:          in.PresetSlug,
+		Purpose:             in.Purpose,
+		StopReason:          in.StopReason,
+		InputTokens:         in.InputTokens,
+		OutputTokens:        in.OutputTokens,
+		CachedInputTokens:   in.CachedInputTokens,
+		CacheMarkersUsed:    in.CacheMarkersUsed,
+		LatencyMs:           in.LatencyMs,
+		RetryCount:          in.RetryCount,
+		Outcome:             in.Outcome,
+		ProviderRequestID:   in.ProviderRequestID,
+		ProviderMetadata:    in.ProviderMetadata,
+	})
+}
+
+func initDetectionManager(provider llm.LLMProvider, usageMgr *aiusage.Manager, systemInboxID int) *detection.Manager {
+	lo := initLogger("detection")
+	return detection.New(detection.Opts{
+		Lo:            lo,
+		LLMProvider:   provider,
+		UsageMgr:      usageMgr,
+		SystemInboxID: systemInboxID,
+	})
+}
+
+// initAutomationEngine initializes the automation engine.
+func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n, detectionMgr *detection.Manager) *automation.Engine {
+	var lo = initLogger("automation_engine")
+	engine, err := automation.New(automation.Opts{
+		DB:           db,
+		Lo:           lo,
+		I18n:         i18n,
+		DetectionMgr: detectionMgr,
 	})
 	if err != nil {
 		log.Fatalf("error initializing automation engine: %v", err)
@@ -986,9 +1356,9 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n) *ai.Manager {
+func initAI(db *sqlx.DB, i18n *i18n.I18n) *aiLegacy.Manager {
 	lo := initLogger("ai")
-	m, err := ai.New(ai.Opts{
+	m, err := aiLegacy.New(aiLegacy.Opts{
 		DB:            db,
 		Lo:            lo,
 		I18n:          i18n,
@@ -1159,6 +1529,156 @@ func getLogLevel(lvl string) logf.Level {
 	default:
 		return logf.InfoLevel
 	}
+}
+
+// initEmbeddingProvider builds the Voyage embeddings.Provider. Returns
+// nil when no Voyage API key is configured — the main app stays up,
+// but kb_search returns "RAG subsystem not initialized" until the key
+// is set. Wire the key in config/ai_presets.json provider_keys.voyage.
+func initEmbeddingProvider(reg *aipreset.Registry) embeddings.Provider {
+	apiKey := reg.ProviderKey("voyage")
+	if apiKey == "" {
+		colorlog.Red("Voyage API key not set (provider_keys.voyage in config/ai_presets.json) — kb_search hybrid search disabled")
+		return nil
+	}
+	lo := initLogger("voyage-embeddings")
+	p, err := voyageembed.New(voyageembed.Opts{
+		APIKey: apiKey,
+		Lo:     lo,
+	})
+	if err != nil {
+		log.Fatalf("error initializing Voyage embeddings provider: %v", err)
+	}
+	colorlog.Green("Voyage embeddings provider: ready (model=%s)", p.Model())
+	return p
+}
+
+// initRerankProvider builds the Voyage reranker.Provider. Shares the
+// same API key as the embedding provider. Returns nil when the key is
+// absent (kb_search degrades to RRF-order fallback).
+func initRerankProvider(reg *aipreset.Registry) reranker.Provider {
+	apiKey := reg.ProviderKey("voyage")
+	if apiKey == "" {
+		return nil
+	}
+	lo := initLogger("voyage-reranker")
+	p, err := voyagerank.New(voyagerank.Opts{
+		APIKey: apiKey,
+		Lo:     lo,
+	})
+	if err != nil {
+		log.Fatalf("error initializing Voyage reranker: %v", err)
+	}
+	colorlog.Green("Voyage reranker: ready (model=%s)", p.Model())
+	return p
+}
+
+// initEmbeddingsStore prepares the embedded SQL statements for the
+// hybrid-search + indexing storage layer.
+func initEmbeddingsStore(db *sqlx.DB) *embeddings.Store {
+	lo := initLogger("embeddings-store")
+	s, err := embeddings.NewStore(embeddings.StoreOpts{DB: db, Lo: lo})
+	if err != nil {
+		log.Fatalf("error initializing embeddings store: %v", err)
+	}
+	return s
+}
+
+// initQueryEmbeddingCache wires the Redis-backed query embedding cache.
+// TTL is configurable via [embeddings.cache].ttl_seconds (default 1h).
+// Setting [embeddings.cache].enabled = false returns nil — Searcher
+// falls through to always-embed.
+func initQueryEmbeddingCache(rdb *redis.Client) *embeddings.QueryEmbeddingCache {
+	if !ko.Bool("embeddings.cache.enabled") {
+		return nil
+	}
+	ttl := ko.Duration("embeddings.cache.ttl")
+	if ttl == 0 {
+		ttl = time.Hour
+	}
+	lo := initLogger("embeddings-cache")
+	c, err := embeddings.NewQueryEmbeddingCache(rdb, ttl, lo)
+	if err != nil {
+		log.Fatalf("error initializing query embedding cache: %v", err)
+	}
+	return c
+}
+
+// initSearcher composes the hybrid search engine. Returns nil if the
+// embedding provider isn't configured — kb_search will report the
+// disabled state via SetKBSearcher receiving nil.
+func initSearcher(store *embeddings.Store, embed embeddings.Provider, rank reranker.Provider, cache *embeddings.QueryEmbeddingCache) *embeddings.Searcher {
+	if embed == nil {
+		return nil
+	}
+	lo := initLogger("embeddings-searcher")
+	// Reranker threshold defaults to 0.3 when the key is absent so older
+	// configs keep the documented filtering behaviour; an explicit 0.0
+	// in TOML disables the filter. Semantic threshold defaults to 0.0
+	// (no filter) — only enabled once operators have tuned against real
+	// trace similarity values.
+	minReranker := 0.3
+	if ko.Exists("embeddings.min_reranker_score") {
+		minReranker = ko.Float64("embeddings.min_reranker_score")
+	}
+	s, err := embeddings.NewSearcher(embeddings.SearcherOpts{
+		Store:                 store,
+		Embed:                 embed,
+		Reranker:              rank,
+		Cache:                 cache,
+		Lo:                    lo,
+		MinSemanticSimilarity: ko.Float64("embeddings.min_semantic_similarity"),
+		MinRerankerScore:      minReranker,
+	})
+	if err != nil {
+		log.Fatalf("error initializing embeddings searcher: %v", err)
+	}
+	return s
+}
+
+// initTemporal builds the Temporal client used by handlers and
+// managers to start workflows. Returns nil when [temporal].enabled
+// is false (graceful-degradation per CONVENTIONS.md) — callers
+// branch on app.temporal == nil before starting a workflow.
+//
+// Dial failures are NOT fatal: Temporal outages shouldn't take down
+// the inbox. The error is logged and the client stays nil so
+// workflow-starting paths fall back to their documented behaviour
+// (sync, or refuse-and-log).
+func initTemporal() *temporal.Client {
+	cfg := temporal.Config{
+		Enabled:       ko.Bool("temporal.enabled"),
+		Address:       ko.String("temporal.address"),
+		Namespace:     ko.String("temporal.namespace"),
+		DialTimeout:   ko.Duration("temporal.dial_timeout"),
+		ShutdownGrace: ko.Duration("temporal.shutdown_grace"),
+	}
+	if !cfg.Enabled {
+		colorlog.Red("Temporal disabled (temporal.enabled=false); workflow-starting paths will fall back to sync or refuse-and-log")
+		return nil
+	}
+	if cfg.Address == "" {
+		cfg.Address = "127.0.0.1:7233"
+	}
+	if cfg.Namespace == "" {
+		cfg.Namespace = "libredesk"
+	}
+	if cfg.DialTimeout == 0 {
+		cfg.DialTimeout = 10 * time.Second
+	}
+	if cfg.ShutdownGrace == 0 {
+		cfg.ShutdownGrace = 30 * time.Second
+	}
+
+	lo := initLogger("temporal")
+	c, err := temporal.New(temporal.Opts{Config: cfg, Lo: lo})
+	if err != nil {
+		// Dial failures are warn-and-continue: the main API binary
+		// stays available, the worker binary fails fast separately.
+		colorlog.Red("Temporal dial failed (%v) — workflow-starting paths will fall back; check the temporal service", err)
+		return nil
+	}
+	return c
 }
 
 // initRateLimit initializes the rate limiter with default rules.

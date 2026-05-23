@@ -15,7 +15,7 @@ import (
 	_ "time/tzdata"
 
 	activitylog "github.com/abhinavxd/libredesk/internal/activity_log"
-	"github.com/abhinavxd/libredesk/internal/ai"
+	aiLegacy "github.com/abhinavxd/libredesk/internal/ai/legacy"
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/authz"
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
@@ -31,11 +31,33 @@ import (
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/redis/go-redis/v9"
 
+	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
+	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
+	aiexecutions "github.com/abhinavxd/libredesk/internal/ai/executions"
+	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	aicatalog "github.com/abhinavxd/libredesk/internal/ai/llm/catalog"
+	aipreset "github.com/abhinavxd/libredesk/internal/ai/llm/preset"
+	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
+	"github.com/abhinavxd/libredesk/internal/ai/reranker"
+	"github.com/abhinavxd/libredesk/internal/ai/runner"
+	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
+	aibuiltin "github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
+	aiusage "github.com/abhinavxd/libredesk/internal/ai/usage"
+	aiusagepartitions "github.com/abhinavxd/libredesk/internal/ai/usage/partitions"
+	// aicapabilities is imported by alias so cmd/main.go can call
+	// SetKBSearcher after the embeddings subsystem boots. The init()
+	// blocks under capabilities/ still fire on import and register
+	// kb_search / get_customer_data / get_conversation_history into
+	// builtin.Default().
+	aicapabilities "github.com/abhinavxd/libredesk/internal/ai/tools/builtin/capabilities"
 	"github.com/abhinavxd/libredesk/internal/automation"
 	contextlink "github.com/abhinavxd/libredesk/internal/context_link"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/detection"
+	execrunner "github.com/abhinavxd/libredesk/internal/exec/runner"
+	exectoken "github.com/abhinavxd/libredesk/internal/exec/token"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/knowledge"
@@ -47,6 +69,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
 	"github.com/abhinavxd/libredesk/internal/template"
+	"github.com/abhinavxd/libredesk/internal/temporal"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/webhook"
 	"github.com/abhinavxd/libredesk/internal/worklog"
@@ -76,34 +99,64 @@ const (
 
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
-	ctx              context.Context
-	fs               stuffbin.FileSystem
-	consts           atomic.Value
-	auth             *auth_.Auth
-	authz            *authz.Enforcer
-	i18n             *i18n.I18n
-	lo               *logf.Logger
-	oidc             *oidc.Manager
-	media            *media.Manager
-	setting          *setting.Manager
-	role             *role.Manager
-	user             *user.Manager
-	team             *team.Manager
-	status           *status.Manager
-	priority         *priority.Manager
-	tag              *tag.Manager
-	inbox            *inbox.Manager
-	tmpl             *template.Manager
-	macro            *macro.Manager
-	knowledge        *knowledge.Manager
+	ctx        context.Context
+	fs         stuffbin.FileSystem
+	consts     atomic.Value
+	auth       *auth_.Auth
+	authz      *authz.Enforcer
+	i18n       *i18n.I18n
+	lo         *logf.Logger
+	oidc       *oidc.Manager
+	media      *media.Manager
+	setting    *setting.Manager
+	role       *role.Manager
+	user       *user.Manager
+	team       *team.Manager
+	status     *status.Manager
+	priority   *priority.Manager
+	tag        *tag.Manager
+	inbox      *inbox.Manager
+	tmpl       *template.Manager
+	macro      *macro.Manager
+	knowledge  *knowledge.Manager
+	execToken  *exectoken.Manager
+	execRunner *execrunner.Manager
+	// toolRegistry is nil in v1 — handleToolCall returns 404 until the AI
+	// Manager lands and provides a registry implementation.
+	toolRegistry     toolRegistry
 	worklog          *worklog.Manager
+	detectionMgr     *detection.Manager
 	conversation     *conversation.Manager
 	automation       *automation.Engine
 	businessHours    *businesshours.Manager
 	sla              *sla.Manager
 	csat             *csat.Manager
 	view             *view.Manager
-	ai               *ai.Manager
+	ai               *aiLegacy.Manager
+	aiAgents         *aiagents.Manager
+	aiTools          *aitools.Manager
+	aiToolDispatcher *aitools.Dispatcher
+	aiExecutions     *aiexecutions.Manager
+	aiOperations     *aioperations.Manager
+	aiUsage          *aiusage.Manager
+	// systemInboxID is the id of the seeded "System (Internal)" inbox
+	// (see migration v2_7_7 / SystemInboxUUID). Resolved once at boot
+	// by UUID; every ai_usage row that has no real conversation
+	// context FKs to this id. Zero if seeding failed — boot is
+	// expected to fail before that path.
+	systemInboxID int
+	// AI runtime: model catalog (loaded from config/anthropic_models.json)
+	// and preset registry (loaded from config/ai_presets.json). Both are
+	// read-only after startup; reload requires app restart in v1.
+	aiCatalog *aicatalog.Catalog
+	aiPresets *aipreset.Registry
+	// LLM provider — nil when no Anthropic API key is configured.
+	// Run endpoint returns 503 in that case.
+	aiProvider llm.LLMProvider
+	// Agent runner — nil when aiProvider is nil. The handler checks.
+	agentRunner *runner.Runner
+	// aiRunEvents publishes live progress for manual agent runs.
+	aiRunEvents      runner.EventPublisher
 	search           *search.Manager
 	activityLog      *activitylog.Manager
 	notifier         *notifier.Service
@@ -115,6 +168,23 @@ type App struct {
 	rateLimit        *ratelimit.Limiter
 	redis            *redis.Client
 	importer         *importer.Importer
+	// temporal is the workflow client used by handlers and managers
+	// to start async workflows. Nil when Temporal is disabled or the
+	// dial failed at startup; callers MUST check before use and fall
+	// back to sync or refuse loudly (see internal/temporal/CONVENTIONS.md).
+	temporal *temporal.Client
+	// F12 hybrid-search engine — used directly by the kb_search
+	// capability via aicapabilities.SetKBSearcher. Stored on App for
+	// future direct uses (e.g., admin "preview search" endpoints).
+	// Nil when Voyage key is unset.
+	searcher *embeddings.Searcher
+	// embeddingsStore is the synchronous DB surface used by handlers
+	// (Unpublish / Delete) that need to drop vectors without spinning
+	// up a workflow. Always populated (no provider dependency).
+	embeddingsStore *embeddings.Store
+	// reranker is held so cmd/main.go can advertise its readiness in
+	// the boot log; the Searcher already holds its own reference.
+	reranker reranker.Provider
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
@@ -138,6 +208,14 @@ func main() {
 
 	// Build string injected at build time.
 	colorlog.Green("Build: %s", buildString)
+
+	// version=<...> token mirrors the temporal-worker startup line so
+	// `make deploy-verify` can grep both services the same way.
+	appVersion := versionString
+	if appVersion == "" {
+		appVersion = "dev"
+	}
+	colorlog.Green("libredesk starting: version=%s build=%s", appVersion, buildString)
 
 	// Load the config files into Koanf.
 	initConfig(ko)
@@ -209,6 +287,9 @@ func main() {
 		slaEvaluationInterval       = ko.MustDuration("sla.evaluation_interval")
 		lo                          = initLogger(appName)
 		rdb                         = initRedis()
+		execTokenMgr                = initExecToken(rdb)
+		systemUserID                = initSystemUserID(db)
+		execRunnerMgr               = initExecRunner(db, execTokenMgr, systemUserID)
 		constants                   = initConstants()
 		i18n                        = initI18n(fs)
 		csat                        = initCSAT(db, i18n)
@@ -227,13 +308,39 @@ func main() {
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)
 		notifDispatcher             = initNotifDispatcher(userNotification, notifier, wsHub, ko.Bool("notification.email.enabled"))
-		automation                  = initAutomationEngine(db, i18n)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		worklogMgr                  = initWorklog(db, i18n)
-		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher)
-		autoassigner                = initAutoAssigner(team, user, conversation)
 		rateLimiter                 = initRateLimit(rdb)
+		// Catalog and preset registry are loaded here so the registry's
+		// model-existence validation has the catalog available. Both fail
+		// fast on bad config — see initAIModelCatalog / initAIPresetRegistry.
+		aiCatalogInst     = initAIModelCatalog()
+		aiPresetsInst     = initAIPresetRegistry(aiCatalogInst)
+		aiProviderInst    = initAnthropicProvider(db, aiPresetsInst, aiCatalogInst)
+		aiUsageInst       = initAIUsage(db, aiCatalogInst)
+		aiOperationsInst  = initAIOperations(db)
+		systemInboxIDInst = initSystemInboxID(db)
+		detectionMgrInst  = initDetectionManager(aiProviderInst, aiUsageInst, systemInboxIDInst)
+		temporalClient    = initTemporal()
+		automation        = initAutomationEngine(db, i18n, detectionMgrInst)
+		conversation      = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher, temporalClient)
+		autoassigner      = initAutoAssigner(team, user, conversation)
+		// F12: hybrid-search subsystem. Each piece is independently
+		// nil-safe — if Voyage key is absent or Redis is down, kb_search
+		// surfaces a clear error at first invocation rather than
+		// crashing the boot.
+		embedProviderInst   = initEmbeddingProvider(aiPresetsInst)
+		rerankProviderInst  = initRerankProvider(aiPresetsInst)
+		embeddingsStoreInst = initEmbeddingsStore(db)
+		queryEmbedCacheInst = initQueryEmbeddingCache(rdb)
+		searcherInst        = initSearcher(embeddingsStoreInst, embedProviderInst, rerankProviderInst, queryEmbedCacheInst)
 	)
+
+	// Log the registered built-in AI capabilities. The init() blocks in
+	// internal/ai/tools/builtin/capabilities/* fire on import (blank
+	// import in this file's import block); this line confirms the
+	// registry is populated before the agent runtime reads from it.
+	colorlog.Green("AI built-in capabilities: %v", aibuiltin.Default().IDs())
 
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
@@ -259,47 +366,121 @@ func main() {
 	go userNotification.RunNotificationCleaner(ctx)
 
 	var app = &App{
-		ctx:              ctx,
-		lo:               lo,
-		fs:               fs,
-		sla:              sla,
-		oidc:             oidc,
-		i18n:             i18n,
-		auth:             auth,
-		media:            media,
-		setting:          settings,
-		inbox:            inbox,
-		user:             user,
-		team:             team,
-		csat:             csat,
-		status:           status,
-		priority:         priority,
-		tmpl:             template,
-		notifier:         notifier,
-		consts:           atomic.Value{},
-		worklog:          worklogMgr,
-		conversation:     conversation,
-		automation:       automation,
-		businessHours:    businessHours,
-		activityLog:      initActivityLog(db, i18n),
-		customAttribute:  initCustomAttribute(db, i18n),
-		authz:            initAuthz(i18n),
-		view:             initView(db, i18n),
-		report:           initReport(db, i18n),
-		search:           initSearch(db, i18n),
-		role:             initRole(db, i18n),
-		tag:              initTag(db, i18n),
-		macro:            initMacro(db, i18n),
-		knowledge:        initKnowledge(db, i18n),
-		ai:               initAI(db, i18n),
+		ctx:             ctx,
+		lo:              lo,
+		fs:              fs,
+		sla:             sla,
+		oidc:            oidc,
+		i18n:            i18n,
+		auth:            auth,
+		media:           media,
+		setting:         settings,
+		inbox:           inbox,
+		user:            user,
+		team:            team,
+		csat:            csat,
+		status:          status,
+		priority:        priority,
+		tmpl:            template,
+		notifier:        notifier,
+		consts:          atomic.Value{},
+		worklog:         worklogMgr,
+		detectionMgr:    detectionMgrInst,
+		conversation:    conversation,
+		automation:      automation,
+		businessHours:   businessHours,
+		activityLog:     initActivityLog(db, i18n),
+		customAttribute: initCustomAttribute(db, i18n),
+		authz:           initAuthz(i18n),
+		view:            initView(db, i18n),
+		report:          initReport(db, i18n),
+		search:          initSearch(db, i18n),
+		role:            initRole(db, i18n),
+		tag:             initTag(db, i18n),
+		macro:           initMacro(db, i18n),
+		knowledge:       initKnowledge(db, i18n),
+		execToken:       execTokenMgr,
+		execRunner:      execRunnerMgr,
+		ai:              initAI(db, i18n),
+		aiAgents:        initAIAgents(db, i18n),
+		aiTools:         initAITools(db, i18n),
+		aiExecutions:    initAIExecutions(db, i18n),
+		aiOperations:    aiOperationsInst,
+		aiUsage:         aiUsageInst,
+		systemInboxID:   systemInboxIDInst,
+		aiCatalog:       aiCatalogInst,
+		aiPresets:       aiPresetsInst,
+		aiProvider:      aiProviderInst,
+		// Dispatcher bridges ai_tools to the F6 runner for manual
+		// invocation. Wired here (after the AI managers and execRunner
+		// are constructed) so handlers can reach it via app.aiToolDispatcher.
+		aiToolDispatcher: nil, // assigned below — see line just after this struct literal
 		importer:         initImporter(i18n),
 		webhook:          webhook,
 		contextLink:      initContextLink(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		userNotification: userNotification,
+		// Temporal client: nil when disabled or dial failed. The main
+		// API binary stays up either way; workflow-starting handlers
+		// branch on app.temporal == nil.
+		temporal: temporalClient,
+		// Assigned below once the shared Redis-backed publisher is built.
+		aiRunEvents: nil,
+		// F12 hybrid-search engine. Nil when Voyage key unset; kb_search
+		// surfaces that as a clear error at invocation time.
+		searcher:        searcherInst,
+		embeddingsStore: embeddingsStoreInst,
+		reranker:        rerankProviderInst,
+	}
+	// Wire the searcher into the kb_search capability. The capability
+	// is registered at package init() with nil; this assignment makes
+	// hybrid search live for every agent that lists kb_search in tools.
+	aicapabilities.SetKBSearcher(searcherInst)
+
+	// --reindex-embeddings: dispatch the bulk-reindex Temporal workflow
+	// and exit. Runs after all subsystems are wired so the Temporal
+	// client + searcher are available, but before the HTTP server
+	// starts.
+	if ko.Bool("reindex-embeddings") {
+		runReindexEmbeddings(app.temporal)
 	}
 	app.consts.Store(constants)
+	app.aiRunEvents = initAgentRunEventPublisher(rdb)
+	startRealtimeBridge(ctx, rdb, wsHub, initLogger("realtime"))
+	// Wire the AI tool dispatcher now that App is built — it needs both
+	// the tools manager and the execRunner.
+	app.aiToolDispatcher = aitools.NewDispatcher(app.aiTools, app.execRunner)
+	// Wire the agent runner — depends on the dispatcher above. Returns
+	// nil when the Anthropic provider isn't configured; the run endpoint
+	// returns 503 in that case.
+	app.agentRunner = initAgentRunner(
+		app.aiProvider,
+		app.aiAgents,
+		app.aiTools,
+		app.aiToolDispatcher,
+		app.aiPresets,
+		app.knowledge,
+		app.conversation,
+		app.user,
+		app.aiUsage,
+		app.aiRunEvents,
+	)
+
+	// Keep the ai_usage monthly partition runway extended. Boot-time
+	// EnsureRunway is a no-op when the migration's pre-created
+	// partitions are still in the future; the daily goroutine takes
+	// over as months roll. See internal/ai/usage/partitions.
+	usagePartitions := aiusagepartitions.New(aiusagepartitions.Opts{
+		DB:      db,
+		Table:   "ai_usage",
+		Premake: 4,
+		Lo:      initLogger("ai-usage-partitions"),
+	})
+	if err := usagePartitions.EnsureRunway(context.Background()); err != nil {
+		log.Fatalf("error ensuring ai_usage partition runway: %v", err)
+	}
+	go usagePartitions.RunDaily(context.Background())
 
 	g := fastglue.NewGlue()
 	g.SetContext(app)
@@ -349,6 +530,10 @@ func main() {
 	sla.Close()
 	colorlog.Red("Shutting down importer...")
 	app.importer.Close()
+	if app.temporal != nil {
+		colorlog.Red("Shutting down Temporal client...")
+		app.temporal.Close()
+	}
 	colorlog.Red("Shutting down database...")
 	db.Close()
 	colorlog.Red("Shutting down redis...")

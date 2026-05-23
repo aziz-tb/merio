@@ -56,6 +56,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/teams/{id}/conversations/unassigned", perm(handleGetTeamUnassignedConversations, "conversations:read_team_inbox"))
 	g.GET("/api/v1/views/{id}/conversations", perm(handleGetViewConversations, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}", perm(handleGetConversation, "conversations:read"))
+	g.GET("/api/v1/conversations/{uuid}/variables", perm(handleGetConversationVariables, "conversations:read"))
+	g.POST("/api/v1/detection/evaluate", perm(handleEvaluateDetection, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}/participants", perm(handleGetConversationParticipants, "conversations:read"))
 	g.PUT("/api/v1/conversations/{uuid}/assignee/user", perm(handleUpdateUserAssignee, "conversations:update_user_assignee"))
 	g.PUT("/api/v1/conversations/{uuid}/assignee/team", perm(handleUpdateTeamAssignee, "conversations:update_team_assignee"))
@@ -66,6 +68,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/conversations/{uuid}/last-seen", perm(handleUpdateConversationAssigneeLastSeen, "conversations:read"))
 	g.PUT("/api/v1/conversations/{uuid}/mark-unread", perm(handleMarkConversationAsUnread, "conversations:read"))
 	g.POST("/api/v1/conversations/{uuid}/tags", perm(handleUpdateConversationtags, "conversations:update_tags"))
+	g.POST("/api/v1/conversations/{uuid}/tags/classify", perm(handleClassifyConversationTags, "conversations:update_tags"))
+	g.POST("/api/v1/conversations/{uuid}/agents/validate", perm(handleValidateConversationAgents, "ai_agents:run"))
+	g.GET("/api/v1/conversations/{uuid}/agents/validation/latest", perm(handleGetLatestAgentValidation, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}/page-visits", perm(handleGetContactPageVisits, "conversations:read"))
 	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleGetMessage, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/messages", perm(handleGetMessages, "messages:read"))
@@ -113,6 +118,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.DELETE("/api/v1/tags/{id}", perm(handleDeleteTag, "tags:manage"))
 	g.POST("/api/v1/tags/import", perm(handleImportTags, "tags:manage"))
 	g.GET("/api/v1/tags/import/status", perm(handleGetTagImportStatus, "tags:manage"))
+	g.GET("/api/v1/tags/{id}", perm(handleGetTag, "tags:manage"))
+	g.POST("/api/v1/tags/{id}/test", perm(handleTestTagDetection, "tags:manage"))
 
 	// Macros.
 	g.GET("/api/v1/macros", auth(handleGetMacros))
@@ -137,6 +144,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/knowledge/articles/{id}/unpublish", perm(handleUnpublishKnowledgeArticle, "knowledge:publish"))
 	g.POST("/api/v1/knowledge/articles/{id}/move", perm(handleMoveKnowledgeArticle, "knowledge:write"))
 	g.DELETE("/api/v1/knowledge/articles/{id}", perm(handleDeleteKnowledgeArticle, "knowledge:delete"))
+
+	// Script-side recursive tool dispatch. Only callable with a valid
+	// script-execution token; the handler rejects session/API-key callers.
+	// Inert in v1 (app.toolRegistry is nil → 404). Becomes live when the
+	// AI Manager registers a tool registry.
+	g.POST("/api/v1/tools/{name}/call", perm(handleToolCall, "tools:call"))
 
 	// Agents.
 	g.GET("/api/v1/agents/me", auth(handleGetCurrentAgent))
@@ -259,6 +272,56 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
 	g.PUT("/api/v1/ai/provider", perm(handleUpdateAIProvider, "ai:manage"))
 
+	// AI agents (F9 — configuration data model).
+	g.GET("/api/v1/ai/agents", perm(handleListAIAgents, "ai_agents:manage"))
+	g.GET("/api/v1/ai/agents/{id}", perm(handleGetAIAgent, "ai_agents:manage"))
+	g.POST("/api/v1/ai/agents", perm(handleCreateAIAgent, "ai_agents:manage"))
+	g.PUT("/api/v1/ai/agents/{id}", perm(handleUpdateAIAgent, "ai_agents:manage"))
+	g.DELETE("/api/v1/ai/agents/{id}", perm(handleDeleteAIAgent, "ai_agents:manage"))
+
+	// AI tools (F9).
+	g.GET("/api/v1/ai/tools", perm(handleListAITools, "ai_tools:manage"))
+	g.GET("/api/v1/ai/tools/{id}", perm(handleGetAITool, "ai_tools:manage"))
+	g.POST("/api/v1/ai/tools", perm(handleCreateAITool, "ai_tools:manage"))
+	g.PUT("/api/v1/ai/tools/{id}", perm(handleUpdateAITool, "ai_tools:manage"))
+	g.DELETE("/api/v1/ai/tools/{id}", perm(handleDeleteAITool, "ai_tools:manage"))
+	// Manual tool invocation (F9 Chunk 6) — admin testing pre-agent-runtime.
+	// After the F5 dispatcher unification, this endpoint accepts both
+	// custom (Python) tools and internal capabilities; see handleInvokeAITool.
+	g.POST("/api/v1/ai/tools/{slug}/invoke", perm(handleInvokeAITool, "ai_tools:invoke"))
+
+	// AI internal capabilities — list-only (registered in code, not DB).
+	// Gated on ai_agents:manage because the only consumer is the agent
+	// edit form's tool picker.
+	g.GET("/api/v1/ai/internal-capabilities", perm(handleListAIInternalCapabilities, "ai_agents:manage"))
+
+	// AI presets — list of enabled reasoning presets from
+	// config/ai_presets.json. Same gate; consumed by the agent edit
+	// form's preset-overrides picker.
+	g.GET("/api/v1/ai/presets", perm(handleListAIPresets, "ai_agents:manage"))
+
+	// AI agent runner — manual run endpoint for testing pre-pipeline.
+	// Gated on ai_agents:run, distinct from :manage so token-spending
+	// authority can be granted independently.
+	g.POST("/api/v1/ai/agents/{id}/run", perm(handleRunAIAgent, "ai_agents:run"))
+	g.GET("/api/v1/ai/runs/{trace_id}/stream", perm(handleAgentRunStream, "ai_agents:run"))
+
+	// History tab — paginated past runs for one agent. ai_agents:manage
+	// gates editing the agent; viewing its run history is part of that
+	// permission's surface.
+	g.GET("/api/v1/ai/agents/{id}/runs", perm(handleListAgentRuns, "ai_agents:manage"))
+	g.GET("/api/v1/ai/executions/{id}", perm(handleGetAgentExecution, "ai_agents:run"))
+
+	// Composer tab — per-conversation persistence + send-reply action.
+	// Same permission as the run endpoint (the Composer tab is just the
+	// run endpoint with a persistence layer).
+	g.GET("/api/v1/conversations/{uuid}/agent-run-state",
+		perm(handleConversationAgentRunState, "ai_agents:run"))
+	g.GET("/api/v1/conversations/{uuid}/agent-executions/latest",
+		perm(handleListLatestAgentExecutions, "ai_agents:run"))
+	g.POST("/api/v1/conversations/{uuid}/agent-executions/{execution_id}/send",
+		perm(handleSendAgentExecution, "ai_agents:run"))
+
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))
 	g.POST("/api/v1/custom-attributes", perm(handleCreateCustomAttribute, "custom_attributes:manage"))
@@ -307,6 +370,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/teams/{all:*}", authPage(serveIndexPage))
 	g.GET("/views/{all:*}", authPage(serveIndexPage))
 	g.GET("/admin/{all:*}", authPage(serveIndexPage))
+	g.GET("/ai/{all:*}", authPage(serveIndexPage))
 	g.GET("/contacts/{all:*}", authPage(serveIndexPage))
 	g.GET("/reports/{all:*}", authPage(serveIndexPage))
 	g.GET("/account/{all:*}", authPage(serveIndexPage))

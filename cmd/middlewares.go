@@ -7,6 +7,8 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	execTokenPkg "github.com/abhinavxd/libredesk/internal/exec/token"
+	execTokenModels "github.com/abhinavxd/libredesk/internal/exec/token/models"
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
@@ -14,15 +16,33 @@ import (
 	"github.com/zerodha/simplesessions/v3"
 )
 
-// authenticateUser handles both API key and session-based authentication
-// Returns the authenticated user or an error
-// For session-based auth, CSRF is checked for POST/PUT/DELETE requests
+// headerScriptSystem is the per-call override scripts send to make the
+// callback act as the System Agent instead of the original invoker.
+// The Python SDK sets this to "true" when sdk.api.<verb>(..., system=True).
+const headerScriptSystem = "X-Script-System"
+
+// authenticateUser handles three authentication paths in priority order:
+//  1. Authorization header carrying a script execution token (sx_...) —
+//     resolved via app.execToken; the actor (invoker vs. System) is picked
+//     from the X-Script-System header.
+//  2. Authorization header carrying an API key (Basic or Token).
+//  3. Session cookie — the standard agent UI flow. CSRF is checked for
+//     POST/PUT/DELETE.
+// Returns the authenticated user or an error.
 func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	var user models.User
 
-	// Check for Authorization header first (API key authentication)
+	// Check for Authorization header first (script token OR API key)
 	apiKey, apiSecret, err := r.ParseAuthHeader(fastglue.AuthBasic | fastglue.AuthToken)
 	if err == nil && len(apiKey) > 0 && len(apiSecret) > 0 {
+		// Script execution tokens share the wire shape of Token-auth but
+		// resolve through the script-token manager. Recognized by the
+		// `sx_` prefix on the key half of the tuple.
+		if strings.HasPrefix(string(apiKey), execTokenPkg.TokenPrefix) {
+			return authenticateScriptToken(r, app, string(apiKey))
+		}
+
+		// Ordinary API-key auth.
 		user, err = app.user.ValidateAPIKey(string(apiKey), string(apiSecret))
 		if err != nil {
 			return user, err
@@ -66,6 +86,46 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	}
 
 	r.RequestCtx.SetUserValue("auth_method", "session")
+	return user, nil
+}
+
+// authenticateScriptToken resolves an sx_-prefixed token and loads the
+// resolved user. Picks invoker vs. System Agent identity based on the
+// X-Script-System header. Surfaces token + actor metadata on the request
+// context so handlers (like handleToolCall) can read it for recursive
+// dispatch attribution.
+func authenticateScriptToken(r *fastglue.Request, app *App, prefixedToken string) (models.User, error) {
+	var user models.User
+
+	mode := execTokenModels.ActorInvoker
+	if string(r.RequestCtx.Request.Header.Peek(headerScriptSystem)) == "true" {
+		mode = execTokenModels.ActorSystem
+	}
+
+	res, err := app.execToken.Resolve(r.RequestCtx, prefixedToken, mode)
+	if err != nil {
+		app.lo.Debug("script token rejected", "error", err)
+		// Don't leak why (expired vs. unknown vs. malformed) — uniform
+		// envelope error; the middleware below maps this to HTTP 401.
+		return user, envelope.NewError(envelope.GeneralError,
+			app.i18n.T("auth.invalidOrExpiredSession"), nil)
+	}
+
+	// Load the full user record so authz works as usual. GetAgentCachedOrLoad
+	// is what the session path uses too — keeping the same call avoids
+	// cache divergence between auth modes.
+	user, err = app.user.GetAgentCachedOrLoad(res.UserID)
+	if err != nil {
+		return user, err
+	}
+	if !user.Enabled {
+		return user, envelope.NewError(envelope.PermissionError,
+			app.i18n.T("user.accountDisabled"), nil)
+	}
+
+	r.RequestCtx.SetUserValue("auth_method", "script_token")
+	r.RequestCtx.SetUserValue("script_token", res.Token)
+	r.RequestCtx.SetUserValue("script_actor_mode", string(res.Mode))
 	return user, nil
 }
 

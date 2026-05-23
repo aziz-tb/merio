@@ -202,6 +202,10 @@ func handleCreateKnowledgeArticle(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// F12: trigger embed workflow when the new row is already
+	// published. Create-as-draft path no-ops; the embed fires on
+	// subsequent publish.
+	app.kickEmbedIfPublished(article)
 	return r.SendEnvelope(article)
 }
 
@@ -224,6 +228,8 @@ func handleUpdateKnowledgeArticle(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// F12: revision bumped by UPDATE; embed if currently published.
+	app.kickEmbedIfPublished(article)
 	return r.SendEnvelope(article)
 }
 
@@ -237,6 +243,8 @@ func handlePublishKnowledgeArticle(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// F12: publish flips status + bumps revision; embed the new state.
+	app.kickEmbedIfPublished(article)
 	return r.SendEnvelope(article)
 }
 
@@ -250,6 +258,10 @@ func handleUnpublishKnowledgeArticle(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// F12: article is no longer queryable — drop its vectors so the
+	// hybrid search stops surfacing it. Folder move (below) deliberately
+	// does NOT trigger this; folder_id is metadata, not embedded content.
+	app.unembedArticle(article.ID)
 	return r.SendEnvelope(article)
 }
 
@@ -284,6 +296,10 @@ func handleDeleteKnowledgeArticle(r *fastglue.Request) error {
 	if err := app.knowledge.DeleteArticle(id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// F12: drop orphan vectors. articles_index_state.article_id has
+	// ON DELETE CASCADE; embeddings rows are content_type-agnostic
+	// (no FK) so the unembed sweep cleans them up explicitly.
+	app.unembedArticle(id)
 	return r.SendEnvelope(true)
 }
 

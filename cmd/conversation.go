@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
+	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	itemporal "github.com/abhinavxd/libredesk/internal/temporal"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	vmodels "github.com/abhinavxd/libredesk/internal/view/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
@@ -19,6 +23,30 @@ import (
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
+
+// looksLikeUUID is a cheap structural check used to distinguish conversation
+// UUIDs from operator-facing reference numbers like "#1234".
+func looksLikeUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i, r := range s {
+		switch i {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			isHex := (r >= '0' && r <= '9') ||
+				(r >= 'a' && r <= 'f') ||
+				(r >= 'A' && r <= 'F')
+			if !isHex {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 type assigneeChangeReq struct {
 	AssigneeID int `json:"assignee_id"`
@@ -325,6 +353,194 @@ func handleGetConversation(r *fastglue.Request) error {
 	prev, _ := app.conversation.GetContactPreviousConversations(conv.ContactID, 10)
 	conv.PreviousConversations = filterCurrentPreviousConv(prev, conv.UUID)
 	return r.SendEnvelope(conv)
+}
+
+func handleGetConversationVariables(r *fastglue.Request) error {
+	var (
+		app        = r.Context.(*App)
+		identifier = strings.TrimSpace(r.RequestCtx.UserValue("uuid").(string))
+		auser      = r.RequestCtx.UserValue("user").(amodels.User)
+	)
+	if identifier == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "conversation identifier required", nil, envelope.InputError)
+	}
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	conv, err := enforceConversationIdentifierAccess(app, identifier, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	ticketJSON, err := detection.BuildTicketJSON(*conv)
+	if err != nil {
+		app.lo.Error("error building detection ticket variables", "identifier", identifier, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+	contactJSON, err := detection.BuildContactJSON(conv.Contact)
+	if err != nil {
+		app.lo.Error("error building detection contact variables", "identifier", identifier, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+
+	return r.SendEnvelope(map[string]any{
+		"ticket":  ticketJSON,
+		"contact": contactJSON,
+		"tags":    extractTagSlugsFromConv(*conv),
+	})
+}
+
+func handleEvaluateDetection(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	var body struct {
+		Detection        json.RawMessage `json:"detection"`
+		ConversationUUID string          `json:"conversation_uuid"`
+	}
+	if err := json.Unmarshal(r.RequestCtx.PostBody(), &body); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if body.ConversationUUID == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "conversation_uuid required", nil, envelope.InputError)
+	}
+	if app.detectionMgr == nil {
+		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "detection manager unavailable", nil, envelope.GeneralError)
+	}
+
+	var det detection.Detection
+	if err := json.Unmarshal(body.Detection, &det); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid detection JSON", nil, envelope.InputError)
+	}
+
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	conv, err := enforceConversationAccess(app, body.ConversationUUID, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	result, err := app.detectionMgr.Evaluate(app.ctx, det, detection.EvaluationContext{
+		Conversation: *conv,
+		Tags:         extractTagSlugsFromConv(*conv),
+	})
+	if err != nil {
+		app.lo.Error("error evaluating detection", "conversation_uuid", body.ConversationUUID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, envelope.GeneralError)
+	}
+	return r.SendEnvelope(result)
+}
+
+// handleClassifyConversationTags starts an AI tag-classification workflow.
+func handleClassifyConversationTags(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	uuid := r.RequestCtx.UserValue("uuid").(string)
+	if uuid == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "uuid required", nil, envelope.InputError)
+	}
+	if app.temporal == nil {
+		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "Tag classification is not available; Temporal is not configured.", nil, envelope.GeneralError)
+	}
+
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	workflowID, err := app.conversation.ClassifyConversation(uuid, "manual", int64(user.ID))
+	if err != nil {
+		if itemporal.IsAlreadyStarted(err) {
+			return r.SendErrorEnvelope(fasthttp.StatusConflict, "Classification already in progress. Please wait.", nil, envelope.GeneralError)
+		}
+		app.lo.Error("error starting tag classification workflow", "conversation_uuid", uuid, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Failed to start classification.", nil, envelope.GeneralError)
+	}
+
+	return r.SendEnvelope(map[string]any{
+		"workflow_id": workflowID,
+		"message":     "Classification started.",
+	})
+}
+
+// handleValidateConversationAgents starts an agent-validation workflow.
+func handleValidateConversationAgents(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	uuid := r.RequestCtx.UserValue("uuid").(string)
+	if uuid == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "uuid required", nil, envelope.InputError)
+	}
+	if app.temporal == nil {
+		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "Agent validation is not available; Temporal is not configured.", nil, envelope.GeneralError)
+	}
+
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	workflowID, err := app.conversation.ValidateConversationAgents(r.RequestCtx, uuid, "manual", int64(user.ID))
+	if err != nil {
+		if itemporal.IsAlreadyStarted(err) {
+			return r.SendErrorEnvelope(fasthttp.StatusConflict, "Validation already in progress. Please wait.", nil, envelope.GeneralError)
+		}
+		app.lo.Error("error starting agent validation workflow", "conversation_uuid", uuid, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Failed to start validation.", nil, envelope.GeneralError)
+	}
+
+	return r.SendEnvelope(map[string]any{
+		"workflow_id": workflowID,
+		"message":     "Validation started.",
+	})
+}
+
+// handleGetLatestAgentValidation returns the latest agent-validation operation
+// for a conversation, or 404 when validation has never run.
+func handleGetLatestAgentValidation(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	uuid := r.RequestCtx.UserValue("uuid").(string)
+	if uuid == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "uuid required", nil, envelope.InputError)
+	}
+
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	conv, err := app.conversation.GetConversation(0, uuid, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	ops, err := app.aiOperations.ListByTypeForConversation(r.RequestCtx, int64(conv.ID), aiopmodels.TypeAgentValidation, 1)
+	if err != nil {
+		app.lo.Error("fetch latest agent validation", "conversation_uuid", uuid, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "failed to fetch validation", nil, envelope.GeneralError)
+	}
+	if len(ops) == 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, "no validation found", nil, envelope.GeneralError)
+	}
+
+	return r.SendEnvelope(ops[0])
+}
+
+func extractTagSlugsFromConv(conv cmodels.Conversation) []string {
+	return conv.TagSlugs()
 }
 
 // handleGetContactPageVisits returns the recent page visits for the contact of a conversation.
@@ -694,6 +910,30 @@ func enforceConversationAccess(app *App, uuid string, user umodels.User) (*cmode
 		return nil, envelope.NewError(envelope.PermissionError, "Permission denied", nil)
 	}
 	return &conversation, nil
+}
+
+func enforceConversationIdentifierAccess(app *App, identifier string, user umodels.User) (*cmodels.Conversation, error) {
+	conversation, err := getConversationByIdentifier(app, identifier)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := app.authz.EnforceConversationAccess(user, conversation)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, envelope.NewError(envelope.PermissionError, "Permission denied", nil)
+	}
+	return &conversation, nil
+}
+
+func getConversationByIdentifier(app *App, identifier string) (cmodels.Conversation, error) {
+	identifier = strings.TrimSpace(identifier)
+	if looksLikeUUID(identifier) {
+		return app.conversation.GetConversation(0, identifier, "")
+	}
+	refNum := strings.TrimPrefix(identifier, "#")
+	return app.conversation.GetConversation(0, "", refNum)
 }
 
 // handleRemoveUserAssignee removes the user assigned to a conversation.
