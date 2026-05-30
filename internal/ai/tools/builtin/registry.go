@@ -47,14 +47,8 @@ type InternalCapability interface {
 	// Read capabilities are eligible for parallel dispatch within a
 	// single agent turn. Write capabilities execute sequentially after
 	// all reads complete. This affects only runtime dispatch — not LLM
-	// behavior, not tool schema, and not legitimation.
+	// behavior and not tool schema.
 	Category() string
-
-	// MinLegitimation is the minimum legitimation level a caller must
-	// have to invoke this capability. 0 means "anyone." Higher values
-	// gate write/PII operations; the unified dispatcher checks
-	// rt.LegitimationLevel >= MinLegitimation before calling Execute.
-	MinLegitimation() int
 
 	// Execute runs the capability against the supplied parameters and
 	// runtime context. Returns whatever output makes sense for the

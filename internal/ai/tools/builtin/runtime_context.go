@@ -67,10 +67,10 @@ type KBScope struct {
 //   - AgentID == 0 means "outside agent context" (rewrite, Copilot, etc.).
 //   - ResolutionAttemptID == 0 means "not in the inbound pipeline yet"
 //     (foundation isn't here; placeholder for F3).
-//   - LegitimationLevel == 0 is the default-public bucket.
+//   - VerificationLevel == 0 is the default-public bucket.
 //
 // Capabilities are invoked through the unified dispatcher (chunk 10) which
-// validates parameters and applies legitimation gating before calling
+// validates parameters and applies verification gating before calling
 // Execute. They MAY assume those checks have already happened, but should
 // still be robust to bad input — defensive checks are cheap.
 type ToolRuntimeContext struct {
@@ -79,7 +79,7 @@ type ToolRuntimeContext struct {
 	AgentID             int
 	ResolutionAttemptID int
 	TraceID             string
-	LegitimationLevel   int
+	VerificationLevel   int
 
 	// KBScope is the agent's whitelist over knowledge-base content. The
 	// runner decodes ai_agents.kb_scope JSONB once per Run() and stuffs

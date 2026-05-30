@@ -12,8 +12,10 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	execModels "github.com/abhinavxd/libredesk/internal/exec/runner/models"
+	fnmodels "github.com/abhinavxd/libredesk/internal/function/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
 )
 
@@ -58,33 +60,55 @@ func handleGetAITool(r *fastglue.Request) error {
 	return r.SendEnvelope(out)
 }
 
-// handleCreateAITool creates an ai tool. Validates slug,
-// and the implementation JSONB shape per type.
+// handleCreateAITool creates an ai tool. The request body carries the same
+// shape as before the Unified Executor Framework batch — including
+// implementation:{code,language,packages} — but storage is now split: the
+// code lands in a functions row (domain='ai_tool', name=slug) and the
+// ai_tools row links to it via function_id. The split is invisible to the
+// frontend.
 func handleCreateAITool(r *fastglue.Request) error {
 	var (
 		app  = r.Context.(*App)
 		tool = toolmodels.Tool{}
 	)
+	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
 	if err := r.Decode(&tool, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 	if err := validateAITool(&tool); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	out, err := app.aiTools.Create(tool)
+
+	// 1. Create the functions row (the code blob). name = slug; the
+	//    dispatcher runs the tool by slug.
+	code, lang, pkgs := splitImplementation(tool.Implementation)
+	svc := aitools.NewService(app.db, app.aiTools, app.function)
+	out, err := svc.CreateToolWithFunction(r.RequestCtx, tool, fnmodels.Function{
+		Name:            tool.Slug,
+		Domain:          fnmodels.DomainAITool,
+		Code:            code,
+		Language:        lang,
+		Packages:        pkgs,
+		TimeoutMS:       tool.TimeoutMS,
+		UpdatedByUserID: nullIntFromUser(user.ID),
+	})
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// Reconstruct the implementation view for the response.
+	out.Implementation = buildImplementationJSON(code, lang, pkgs)
 	return r.SendEnvelope(out)
 }
 
-// handleUpdateAITool updates an ai tool. Same validation as Create.
+// handleUpdateAITool updates an ai tool. Same validation as Create; updates
+// both the functions row (code) and the ai_tools row (metadata).
 func handleUpdateAITool(r *fastglue.Request) error {
 	var (
 		app     = r.Context.(*App)
 		tool    = toolmodels.Tool{}
 		id, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
+	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
@@ -93,7 +117,7 @@ func handleUpdateAITool(r *fastglue.Request) error {
 	}
 	// Reject slug mutations — slug is a stable code reference (the
 	// dispatcher resolves tools by slug; agents reference tools by it
-	// inside their tools[] JSONB).
+	// inside their tools[] JSONB; the linked function's name == slug).
 	existing, fetchErr := app.aiTools.Get(id)
 	if fetchErr != nil {
 		return sendErrorEnvelope(r, fetchErr)
@@ -105,14 +129,27 @@ func handleUpdateAITool(r *fastglue.Request) error {
 	if vErr := validateAITool(&tool); vErr != nil {
 		return sendErrorEnvelope(r, vErr)
 	}
-	out, updErr := app.aiTools.Update(id, tool)
+
+	// 1. Update the linked functions row (name is immutable == slug).
+	code, lang, pkgs := splitImplementation(tool.Implementation)
+	tool.FunctionID = existing.FunctionID
+	svc := aitools.NewService(app.db, app.aiTools, app.function)
+	out, updErr := svc.UpdateToolWithFunction(r.RequestCtx, id, existing.Slug, tool, fnmodels.Function{
+		Code:            code,
+		Language:        lang,
+		Packages:        pkgs,
+		TimeoutMS:       tool.TimeoutMS,
+		UpdatedByUserID: nullIntFromUser(user.ID),
+	})
 	if updErr != nil {
 		return sendErrorEnvelope(r, updErr)
 	}
+	out.Implementation = buildImplementationJSON(code, lang, pkgs)
 	return r.SendEnvelope(out)
 }
 
-// handleDeleteAITool hard-deletes an ai tool by ID.
+// handleDeleteAITool hard-deletes an ai tool by ID, then its linked
+// functions row (the FK is RESTRICT, so the tool must go first).
 func handleDeleteAITool(r *fastglue.Request) error {
 	var (
 		app     = r.Context.(*App)
@@ -121,7 +158,12 @@ func handleDeleteAITool(r *fastglue.Request) error {
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
-	if delErr := app.aiTools.Delete(id); delErr != nil {
+	existing, fetchErr := app.aiTools.Get(id)
+	if fetchErr != nil {
+		return sendErrorEnvelope(r, fetchErr)
+	}
+	svc := aitools.NewService(app.db, app.aiTools, app.function)
+	if delErr := svc.DeleteToolWithFunction(r.RequestCtx, id, existing.Slug); delErr != nil {
 		return sendErrorEnvelope(r, delErr)
 	}
 	return r.SendEnvelope(true)
@@ -132,14 +174,14 @@ func handleDeleteAITool(r *fastglue.Request) error {
 // Manual invocation: the caller fills `parameters` directly (no source
 // resolution); `conversation_id` is plumbed to the runner / runtime
 // context so SDK callbacks and capabilities reading conversation scope
-// get default-scoping. `legitimation_level` is the F5 manual-test
-// affordance (the agent runtime computes it from the conversation
-// state). `kind` defaults to "custom" for back-compat with F9 callers.
+// get default-scoping. `verification_level` is a manual-test affordance
+// for internal capabilities that shape PII by conversation verification
+// state. `kind` defaults to "custom" for back-compat with F9 callers.
 type invokeAIToolReq struct {
 	Kind              string         `json:"kind"`
 	Parameters        map[string]any `json:"parameters"`
 	ConversationID    int            `json:"conversation_id"`
-	LegitimationLevel int            `json:"legitimation_level"`
+	VerificationLevel int            `json:"verification_level"`
 }
 
 // handleInvokeAITool dispatches a python_script tool through the F6
@@ -149,7 +191,7 @@ type invokeAIToolReq struct {
 // HTTP status mapping:
 //   - 200: tool ran (kind in body distinguishes success/failure/noop/error)
 //   - 400: parameter validation failed, malformed body, malformed tool impl
-//   - 403: tool disabled, wrong type (go_builtin), insufficient legitimation
+//   - 403: tool disabled, wrong type (go_builtin), agent verification insufficient
 //   - 404: tool slug not found
 //   - 422: script raised an uncaught exception (sandbox returned KindError)
 //   - 503: sandbox circuit breaker open
@@ -198,14 +240,14 @@ func handleInvokeAITool(r *fastglue.Request) error {
 		Kind:              kind,
 		Slug:              slug,
 		InvokerUserID:     user.ID,
-		LegitimationLevel: body.LegitimationLevel,
+		VerificationLevel: body.VerificationLevel,
 		Parameters:        body.Parameters,
 		ConversationID:    body.ConversationID,
 	}
 	if kind == agentmodels.ToolRefKindInternal {
 		dispatchReq.RuntimeCtx = &builtin.ToolRuntimeContext{
 			ConversationID:    body.ConversationID,
-			LegitimationLevel: body.LegitimationLevel,
+			VerificationLevel: body.VerificationLevel,
 			Logf:              app.lo,
 			Knowledge:         app.knowledge,
 			Conversation:      app.conversation,
@@ -264,11 +306,10 @@ func validateAITool(t *toolmodels.Tool) error {
 		return envelope.NewError(envelope.InputError, "slug must match ^[a-z0-9-]+$ with no leading/trailing/double dashes", nil)
 	}
 
-	if t.MinLegitimation < 0 {
-		return envelope.NewError(envelope.InputError, "min_legitimation must be >= 0", nil)
-	}
-	if t.TimeoutMS <= 0 || t.TimeoutMS > 600000 {
-		return envelope.NewError(envelope.InputError, "timeout_ms must be between 1 and 600000", nil)
+	// Cap matches the functions table's check_functions_timeout (the code
+	// now lives in a functions row, which is the binding constraint).
+	if t.TimeoutMS <= 0 || t.TimeoutMS > 120000 {
+		return envelope.NewError(envelope.InputError, "timeout_ms must be between 1 and 120000", nil)
 	}
 	t.Category = strings.ToLower(strings.TrimSpace(t.Category))
 	if t.Category == "" {
@@ -311,4 +352,39 @@ func validateAITool(t *toolmodels.Tool) error {
 	}
 
 	return nil
+}
+
+// splitImplementation parses the implementation JSONB ({code,language,
+// packages}) into its parts for the linked functions row. validateAITool
+// has already normalized language to "python"/"javascript" when an
+// implementation is present; an absent implementation yields empty code
+// with the default language so the functions language CHECK is satisfied.
+func splitImplementation(raw json.RawMessage) (code, language, packages string) {
+	language = "python"
+	if len(raw) == 0 || string(raw) == "{}" || string(raw) == "null" {
+		return "", language, ""
+	}
+	var impl toolmodels.PythonScriptImpl
+	if err := json.Unmarshal(raw, &impl); err != nil {
+		return "", language, ""
+	}
+	if l := strings.ToLower(strings.TrimSpace(impl.Language)); l != "" {
+		language = l
+	}
+	return impl.Code, language, impl.Packages
+}
+
+// buildImplementationJSON reconstructs the implementation view for the
+// admin API response so the frontend sees the same shape as before.
+func buildImplementationJSON(code, language, packages string) json.RawMessage {
+	b, _ := json.Marshal(toolmodels.PythonScriptImpl{Code: code, Language: language, Packages: packages})
+	return b
+}
+
+// nullIntFromUser returns a null.Int for a real user id, NULL for 0/system.
+func nullIntFromUser(id int) null.Int {
+	if id <= 0 {
+		return null.Int{}
+	}
+	return null.IntFrom(id)
 }

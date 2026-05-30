@@ -7,14 +7,13 @@ import (
 
 // internalCapabilityView is the public shape of one InternalCapability
 // in list responses. Kept minimal — the agent edit form needs id,
-// description, schema, and the legitimation gate; nothing else.
+// description, and schema; nothing else.
 type internalCapabilityView struct {
-	ID              string         `json:"id"`
-	Name            string         `json:"name"`
-	Description     string         `json:"description"`
-	InputSchema     map[string]any `json:"input_schema"`
-	OutputSchema    map[string]any `json:"output_schema,omitempty"`
-	MinLegitimation int            `json:"min_legitimation"`
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	InputSchema  map[string]any `json:"input_schema"`
+	OutputSchema map[string]any `json:"output_schema,omitempty"`
 }
 
 // handleListAIInternalCapabilities returns every registered internal
@@ -30,12 +29,11 @@ func handleListAIInternalCapabilities(r *fastglue.Request) error {
 	out := make([]internalCapabilityView, 0, len(caps))
 	for _, c := range caps {
 		out = append(out, internalCapabilityView{
-			ID:              c.ID(),
-			Name:            c.Name(),
-			Description:     c.Description(),
-			InputSchema:     c.InputSchema(),
-			OutputSchema:    c.OutputSchema(),
-			MinLegitimation: c.MinLegitimation(),
+			ID:           c.ID(),
+			Name:         c.Name(),
+			Description:  c.Description(),
+			InputSchema:  c.InputSchema(),
+			OutputSchema: c.OutputSchema(),
 		})
 	}
 	return r.SendEnvelope(out)

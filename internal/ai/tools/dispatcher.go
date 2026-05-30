@@ -6,7 +6,7 @@
 //
 // Both paths run through the same parameter validator (internal/ai/tools/validate)
 // so manual-invoke and the agent runtime see identical error messages on
-// malformed input. Both paths write an audit row to tool_executions via
+// malformed input. Both paths write an audit row to function_executions via
 // the F6 runner's audit machinery (custom tools through the runner's
 // Execute path; internal capabilities through dispatchInternal which
 // builds a Result envelope and writes the same row shape).
@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
@@ -31,6 +30,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ai/tools/validate"
 	execRunner "github.com/abhinavxd/libredesk/internal/exec/runner"
 	execModels "github.com/abhinavxd/libredesk/internal/exec/runner/models"
+	"github.com/abhinavxd/libredesk/internal/function"
 )
 
 // DispatchRequest is the input to Dispatch — the manual-invocation API
@@ -52,11 +52,12 @@ type DispatchRequest struct {
 	// Caller identity for audit + sandbox callbacks.
 	InvokerUserID int
 
-	// LegitimationLevel is the caller's effective level for the
-	// min_legitimation gate. Manual-invocation v1 takes this from an
-	// optional body field defaulting to 0; the agent runtime will source
-	// it from the conversation's legitimation state.
-	LegitimationLevel int
+	// VerificationLevel is the caller's effective verification level.
+	// Manual invocation takes this from an optional body field defaulting
+	// to 0; the agent runtime sources it from the conversation state.
+	// The dispatcher forwards it to internal capabilities that need it
+	// for their own data-shaping decisions.
+	VerificationLevel int
 
 	// Parameters maps directly to req.Input — what the SDK exposes as
 	// sdk.input for custom tools and the params map for internal
@@ -74,7 +75,7 @@ type DispatchRequest struct {
 	// that need manager handles (knowledge / conversation / user). Nil
 	// is acceptable for capabilities that don't read managers and for
 	// custom-kind requests. For convenience the dispatcher fills in
-	// ConversationID / LegitimationLevel from the request fields when
+	// ConversationID / VerificationLevel from the request fields when
 	// they're zero on the supplied context.
 	RuntimeCtx *builtin.ToolRuntimeContext
 }
@@ -88,18 +89,18 @@ type DispatchResult struct {
 
 // Sentinel errors so the HTTP handler can map to the right status code.
 var (
-	ErrToolNotFound      = errors.New("dispatcher: tool not found")
-	ErrToolDisabled      = errors.New("dispatcher: tool disabled")
-	ErrInsufficientLegit = errors.New("dispatcher: caller legitimation below tool's min_legitimation")
-	ErrParamsInvalid     = errors.New("dispatcher: parameters failed schema validation")
-	ErrImplInvalid       = errors.New("dispatcher: tool implementation is malformed")
-	ErrCapabilityFailed  = errors.New("dispatcher: internal capability returned an error")
+	ErrToolNotFound                  = errors.New("dispatcher: tool not found")
+	ErrToolDisabled                  = errors.New("dispatcher: tool disabled")
+	ErrAgentVerificationInsufficient = errors.New("dispatcher: conversation verification below agent requirement")
+	ErrParamsInvalid                 = errors.New("dispatcher: parameters failed schema validation")
+	ErrImplInvalid                   = errors.New("dispatcher: tool implementation is malformed")
+	ErrCapabilityFailed              = errors.New("dispatcher: internal capability returned an error")
 )
 
 // runnerExecutor is the slice of execRunner.Manager the dispatcher needs.
 // Defined as an interface so callers can substitute fakes in tests.
 //
-// RecordInternalAudit writes a tool_executions row for in-process
+// RecordInternalAudit writes a function_executions row for in-process
 // internal-capability calls (custom tools get their audit row via
 // Execute itself). Best-effort — failures are logged at the runner level.
 type runnerExecutor interface {
@@ -107,36 +108,45 @@ type runnerExecutor interface {
 	RecordInternalAudit(ctx context.Context, row execModels.InternalAuditRow)
 }
 
+// functionRunner is the slice of function.Manager the dispatcher needs to
+// run a custom tool's code (which now lives in the functions table). An
+// interface so tests can substitute a fake.
+type functionRunner interface {
+	Run(ctx context.Context, req function.RunRequest) (*execModels.Result, error)
+}
+
 // Dispatcher executes both kinds of tool invocation through one path.
-// Custom tools go through the F6 runner; internal capabilities run
-// in-process via builtin.Default(). Both write an audit row to
-// tool_executions with the same shape so ops gets a unified trail.
+// Custom tools run their linked functions row through the F6 runner (via
+// functionRunner); internal capabilities run in-process via
+// builtin.Default(). Both write an audit row to function_executions with
+// the same shape so ops gets a unified trail.
 type Dispatcher struct {
-	tools    *Manager
-	runner   runnerExecutor
-	registry *builtin.Registry
+	tools     *Manager
+	runner    runnerExecutor
+	functions functionRunner
+	registry  *builtin.Registry
 }
 
 // NewDispatcher wires up the dispatcher. The internal-capability
 // registry defaults to builtin.Default() when not supplied; tests pass
 // an isolated registry to avoid global-state pollution.
-func NewDispatcher(tools *Manager, runner runnerExecutor) *Dispatcher {
-	return &Dispatcher{tools: tools, runner: runner, registry: builtin.Default()}
+func NewDispatcher(tools *Manager, runner runnerExecutor, functions functionRunner) *Dispatcher {
+	return &Dispatcher{tools: tools, runner: runner, functions: functions, registry: builtin.Default()}
 }
 
 // NewDispatcherWithRegistry is the test-friendly constructor.
-func NewDispatcherWithRegistry(tools *Manager, runner runnerExecutor, registry *builtin.Registry) *Dispatcher {
+func NewDispatcherWithRegistry(tools *Manager, runner runnerExecutor, functions functionRunner, registry *builtin.Registry) *Dispatcher {
 	if registry == nil {
 		registry = builtin.Default()
 	}
-	return &Dispatcher{tools: tools, runner: runner, registry: registry}
+	return &Dispatcher{tools: tools, runner: runner, functions: functions, registry: registry}
 }
 
 // Dispatch resolves the tool, validates the request, and invokes through
 // the right path (F6 sandbox for custom, in-process for internal).
 // Returns an execModels.Result envelope in both cases so callers don't
-// branch on kind. Non-dispatch failures (not found, disabled, validation,
-// legitimation) come back as one of the Err* sentinels.
+// branch on kind. Non-dispatch failures (not found, disabled, validation)
+// come back as one of the Err* sentinels.
 func (d *Dispatcher) Dispatch(ctx context.Context, req DispatchRequest) (*execModels.Result, error) {
 	// Default Kind for back-compat with F9 callers that didn't carry it.
 	if req.Kind == "" {
@@ -162,60 +172,50 @@ func (d *Dispatcher) dispatchCustom(ctx context.Context, req DispatchRequest) (*
 	if !tool.Enabled {
 		return nil, ErrToolDisabled
 	}
-	if req.LegitimationLevel < tool.MinLegitimation {
-		return nil, ErrInsufficientLegit
-	}
 	if err := validate.Schema(tool.InputParameters, req.Parameters); err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrParamsInvalid, err.Error())
 	}
 
-	var impl models.PythonScriptImpl
-	if err := json.Unmarshal(tool.Implementation, &impl); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrImplInvalid, err.Error())
-	}
-	if strings.TrimSpace(impl.Code) == "" {
-		return nil, fmt.Errorf("%w: implementation.code is empty", ErrImplInvalid)
-	}
-
-	timeoutSec := tool.TimeoutMS / 1000
-	if timeoutSec <= 0 && tool.TimeoutMS > 0 {
-		timeoutSec = 1
-	}
-
-	// Language is locked to "python" or "javascript" at save time (see
-	// cmd/ai_tools.go validateAITool). Empty / legacy rows (created
-	// before the lock) default to python — that's the safe choice since
-	// every legacy row used the python SDK preamble.
-	lang := strings.ToLower(strings.TrimSpace(impl.Language))
-	if lang != "python" && lang != "javascript" {
-		lang = "python"
-	}
-
-	rReq := execModels.Request{
-		InvokerUserID:  req.InvokerUserID,
-		Code:           impl.Code,
-		Language:       lang,
-		Packages:       splitPackages(impl.Packages),
-		TimeoutSeconds: timeoutSec,
+	// Code/language/packages live on the linked functions row. Run it by
+	// the tool's slug (== the function's name) so custom-tool dispatch and
+	// the customer-identification workflow share one execution path. The
+	// runner writes the function_executions audit row (ToolName = slug).
+	result, err := d.functions.Run(ctx, function.RunRequest{
+		Name:           tool.Slug,
 		Input:          req.Parameters,
-		ToolName:       tool.Slug,
-		ToolDepth:      0,
+		InvokerUserID:  req.InvokerUserID,
+		ConversationID: req.ConversationID,
+	})
+	if err != nil {
+		return nil, translateFunctionErr(err)
 	}
-	if req.ConversationID > 0 {
-		rReq.ConversationID = &req.ConversationID
+	return result, nil
+}
+
+// translateFunctionErr maps function-package sentinels onto the dispatcher
+// sentinels so MapDispatchErrorToHTTP keeps producing the same status codes
+// it did before code moved to the functions table. Infra errors (sandbox
+// unavailable, invalid request) pass through untouched.
+func translateFunctionErr(err error) error {
+	switch {
+	case errors.Is(err, function.ErrFunctionNotFound):
+		return fmt.Errorf("%w: linked function not found", ErrImplInvalid)
+	case errors.Is(err, function.ErrFunctionCodeEmpty):
+		return fmt.Errorf("%w: function code is empty", ErrImplInvalid)
+	default:
+		return err
 	}
-	return d.runner.Execute(ctx, rReq)
 }
 
 // dispatchInternal is the in-process path — runs the InternalCapability,
 // builds an execModels.Result envelope so callers see the same shape as
-// custom-tool calls, and writes a tool_executions audit row through the
+// custom-tool calls, and writes a function_executions audit row through the
 // runner's audit machinery.
 //
 // Parallel runner dispatch reuses one ToolRuntimeContext across same-turn
 // read calls. To preserve that shared-state invariant, this method clones
 // req.RuntimeCtx before filling request-local defaults like ConversationID
-// and LegitimationLevel; it must never mutate the caller's shared pointer.
+// and VerificationLevel; it must never mutate the caller's shared pointer.
 func (d *Dispatcher) dispatchInternal(ctx context.Context, req DispatchRequest) (*execModels.Result, error) {
 	if d.registry == nil {
 		d.registry = builtin.Default()
@@ -223,9 +223,6 @@ func (d *Dispatcher) dispatchInternal(ctx context.Context, req DispatchRequest) 
 	cap, found := d.registry.Get(req.Slug)
 	if !found {
 		return nil, ErrToolNotFound
-	}
-	if req.LegitimationLevel < cap.MinLegitimation() {
-		return nil, ErrInsufficientLegit
 	}
 
 	// Run the capability's input schema (a JSON Schema) through the
@@ -241,8 +238,8 @@ func (d *Dispatcher) dispatchInternal(ctx context.Context, req DispatchRequest) 
 	if rt.ConversationID == 0 {
 		rt.ConversationID = req.ConversationID
 	}
-	if rt.LegitimationLevel == 0 {
-		rt.LegitimationLevel = req.LegitimationLevel
+	if rt.VerificationLevel == 0 {
+		rt.VerificationLevel = req.VerificationLevel
 	}
 
 	startedAt := time.Now()
@@ -271,17 +268,14 @@ func (d *Dispatcher) dispatchInternal(ctx context.Context, req DispatchRequest) 
 	}
 
 	// Wrap successful output in the runner's Result envelope so the HTTP
-	// handler's response shape stays uniform across kinds. Result.Data is
-	// typed map[string]any to match the sandbox's wire shape — round-trip
-	// the capability's output through JSON to coerce.
+	// handler's response shape stays uniform across kinds. Internal
+	// capabilities return objects today, so round-trip through JSON to coerce.
 	dataJSON, _ := json.Marshal(out)
-	dataMap := map[string]any{}
-	_ = json.Unmarshal(dataJSON, &dataMap)
 	result := &execModels.Result{
 		ExecutionID: executionID,
 		Kind:        execModels.KindSuccess,
 		Code:        execModels.CodeExecutionSuccess,
-		Data:        dataMap,
+		Data:        dataJSON,
 		StartedAt:   startedAt,
 		DurationMs:  durationMs,
 	}
@@ -388,26 +382,6 @@ func (d *Dispatcher) loadTool(req DispatchRequest) (models.Tool, error) {
 		return t, ErrToolNotFound
 	}
 	return t, nil
-}
-
-// splitPackages breaks impl.Packages (a string holding pip requirements,
-// possibly newline- or whitespace-separated) into a slice the runner accepts.
-// Empty strings are dropped. Mirrors how Enneo authors typically wrote it.
-func splitPackages(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return r == '\n' || r == '\r' || r == ' ' || r == '\t' || r == ','
-	})
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 // IsRunnerErrSandboxUnavailable / IsRunnerErrInvalidRequest are exposed so

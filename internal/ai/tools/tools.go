@@ -5,6 +5,7 @@
 package aitools
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -55,12 +56,16 @@ func New(opt Opts) (*Manager, error) {
 	return &Manager{q: q, lo: opt.Lo, i18n: opt.I18n}, nil
 }
 
-// List returns tools with optional enabled filter and pagination.
+// List returns tools with optional enabled filter and pagination. Each
+// row's Implementation is reconstructed from its linked functions row.
 func (m *Manager) List(enabled *bool, limit, offset int) ([]models.Tool, int, error) {
 	out := make([]models.Tool, 0)
 	if err := m.q.GetAll.Select(&out, enabled, limit, offset); err != nil {
 		m.lo.Error("error listing ai tools", "error", err)
 		return out, 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	for i := range out {
+		buildImplementation(&out[i])
 	}
 	var total int
 	if err := m.q.CountAll.Get(&total, enabled); err != nil {
@@ -70,7 +75,8 @@ func (m *Manager) List(enabled *bool, limit, offset int) ([]models.Tool, int, er
 	return out, total, nil
 }
 
-// Get returns one tool by ID.
+// Get returns one tool by ID, with Implementation reconstructed from its
+// linked functions row.
 func (m *Manager) Get(id int) (models.Tool, error) {
 	var t models.Tool
 	if err := m.q.GetByID.Get(&t, id); err != nil {
@@ -80,6 +86,7 @@ func (m *Manager) Get(id int) (models.Tool, error) {
 		m.lo.Error("error fetching ai tool", "id", id, "error", err)
 		return t, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	buildImplementation(&t)
 	return t, nil
 }
 
@@ -95,6 +102,7 @@ func (m *Manager) getBySlug(slug string) (models.Tool, error) {
 		m.lo.Error("error fetching ai tool by slug", "slug", slug, "error", err)
 		return t, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	buildImplementation(&t)
 	return t, nil
 }
 
@@ -114,17 +122,41 @@ func (m *Manager) GetByIDs(ids []int) ([]models.Tool, error) {
 		m.lo.Error("error fetching ai tools by ids", "error", err)
 		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	for i := range out {
+		buildImplementation(&out[i])
+	}
 	return out, nil
 }
 
-// Create inserts a new tool. Caller validates JSONB shapes and slug.
+// Create inserts a new tool row pointing at an already-created functions
+// row (t.FunctionID). Caller validates JSONB shapes/slug and owns the
+// functions row. Implementation is not stored here — it lives on functions.
 func (m *Manager) Create(t models.Tool) (models.Tool, error) {
 	defaults(&t)
 	var out models.Tool
 	if err := m.q.Insert.Get(&out,
 		t.Name, t.Slug, t.Description,
-		t.InputParameters, t.OutputSchema, t.Implementation, t.Category,
-		t.MinLegitimation, t.TimeoutMS, t.Async, t.Enabled,
+		t.InputParameters, t.OutputSchema, t.Category,
+		t.TimeoutMS, t.Async, t.Enabled, t.FunctionID,
+	); err != nil {
+		if isUniqueViolation(err) {
+			return out, envelope.NewError(envelope.InputError, "AI tool with this name or slug already exists", nil)
+		}
+		m.lo.Error("error creating ai tool", "error", err)
+		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return out, nil
+}
+
+// CreateTx inserts a tool row inside tx.
+func (m *Manager) CreateTx(ctx context.Context, tx *sqlx.Tx, t models.Tool) (models.Tool, error) {
+	defaults(&t)
+	var out models.Tool
+	stmt := tx.StmtxContext(ctx, m.q.Insert)
+	if err := stmt.GetContext(ctx, &out,
+		t.Name, t.Slug, t.Description,
+		t.InputParameters, t.OutputSchema, t.Category,
+		t.TimeoutMS, t.Async, t.Enabled, t.FunctionID,
 	); err != nil {
 		if isUniqueViolation(err) {
 			return out, envelope.NewError(envelope.InputError, "AI tool with this name or slug already exists", nil)
@@ -141,8 +173,30 @@ func (m *Manager) Update(id int, t models.Tool) (models.Tool, error) {
 	var out models.Tool
 	if err := m.q.Update.Get(&out, id,
 		t.Name, t.Slug, t.Description,
-		t.InputParameters, t.OutputSchema, t.Implementation, t.Category,
-		t.MinLegitimation, t.TimeoutMS, t.Async, t.Enabled,
+		t.InputParameters, t.OutputSchema, t.Category,
+		t.TimeoutMS, t.Async, t.Enabled, t.FunctionID,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return out, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		if isUniqueViolation(err) {
+			return out, envelope.NewError(envelope.InputError, "AI tool with this name or slug already exists", nil)
+		}
+		m.lo.Error("error updating ai tool", "id", id, "error", err)
+		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return out, nil
+}
+
+// UpdateTx overwrites a tool row inside tx.
+func (m *Manager) UpdateTx(ctx context.Context, tx *sqlx.Tx, id int, t models.Tool) (models.Tool, error) {
+	defaults(&t)
+	var out models.Tool
+	stmt := tx.StmtxContext(ctx, m.q.Update)
+	if err := stmt.GetContext(ctx, &out, id,
+		t.Name, t.Slug, t.Description,
+		t.InputParameters, t.OutputSchema, t.Category,
+		t.TimeoutMS, t.Async, t.Enabled, t.FunctionID,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return out, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)
@@ -170,6 +224,21 @@ func (m *Manager) Delete(id int) error {
 	return nil
 }
 
+// DeleteTx hard-deletes a tool row inside tx.
+func (m *Manager) DeleteTx(ctx context.Context, tx *sqlx.Tx, id int) error {
+	stmt := tx.StmtxContext(ctx, m.q.Delete)
+	res, err := stmt.ExecContext(ctx, id)
+	if err != nil {
+		m.lo.Error("error deleting ai tool", "id", id, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)
+	}
+	return nil
+}
+
 // defaults fills NULL-equivalent fields with their canonical zero values
 // so the INSERT/UPDATE never sends Postgres NULL for JSONB NOT NULL
 // columns.
@@ -180,15 +249,25 @@ func defaults(t *models.Tool) {
 	if len(t.OutputSchema) == 0 {
 		t.OutputSchema = json.RawMessage(`{}`)
 	}
-	if len(t.Implementation) == 0 {
-		t.Implementation = json.RawMessage(`{}`)
-	}
 	if t.TimeoutMS == 0 {
 		t.TimeoutMS = 30000
 	}
 	if t.Category == "" {
 		t.Category = "write"
 	}
+}
+
+// buildImplementation reconstructs the {code, language, packages} JSON view
+// from the JOINed functions columns so the admin API response carries the
+// same `implementation` shape it did before code moved to the functions
+// table.
+func buildImplementation(t *models.Tool) {
+	b, _ := json.Marshal(models.PythonScriptImpl{
+		Code:     t.FnCode,
+		Language: t.FnLanguage,
+		Packages: t.FnPackages,
+	})
+	t.Implementation = b
 }
 
 // isUniqueViolation reports whether err is a Postgres unique-constraint

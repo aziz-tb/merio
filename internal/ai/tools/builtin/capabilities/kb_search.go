@@ -124,8 +124,6 @@ func (k *kbSearchCapability) OutputSchema() map[string]any {
 
 func (k *kbSearchCapability) Category() string { return "read" }
 
-func (k *kbSearchCapability) MinLegitimation() int { return 0 }
-
 // Execute runs the four-way scope dispatch and delegates to the hybrid
 // searcher. The semantics are deliberately identical to the legacy
 // title-ILIKE implementation; only the underlying ranking method has

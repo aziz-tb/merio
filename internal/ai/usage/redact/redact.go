@@ -4,16 +4,16 @@
 //
 // Strategy — two layers:
 //
-//   1. **Pattern-based redaction** over every string value in the
-//      payload, regardless of nesting. Catches emails, German IBANs,
-//      phone numbers, contract numbers, customer IDs, Zählernummer,
-//      and any extra patterns the deployment configures.
+//  1. **Pattern-based redaction** over every string value in the
+//     payload, regardless of nesting. Catches emails, German IBANs,
+//     phone numbers, contract numbers, customer IDs, Zählernummer,
+//     and any extra patterns the deployment configures.
 //
-//   2. **Field-aware redaction** for known structured shapes — the
-//      `get_customer_data` tool result holds first_name / last_name /
-//      address fields that aren't shaped like generic PII. These are
-//      replaced by sentinel placeholders when the field name matches
-//      a known PII key.
+//  2. **Field-aware redaction** for known structured shapes — the
+//     `get_customer_data` tool result holds first_name / last_name /
+//     address fields that aren't shaped like generic PII. These are
+//     replaced by sentinel placeholders when the field name matches
+//     a known PII key.
 //
 // **Default bias: aggressive.** Over-redaction hurts debuggability but
 // not compliance. Under-redaction (PII leaks through to stored audit
@@ -31,33 +31,35 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 // Sentinel replacements. Kept short — the audit row needs to be
 // human-readable when an operator pulls it for debugging.
 const (
-	SentinelEmail      = "[EMAIL]"
-	SentinelIBAN       = "[IBAN]"
-	SentinelPhone      = "[PHONE]"
-	SentinelContract   = "[CONTRACT_ID]"
-	SentinelCustomer   = "[CUSTOMER_ID]"
-	SentinelMeter      = "[METER_ID]"
-	SentinelName       = "[NAME]"
-	SentinelAddress    = "[ADDRESS]"
-	SentinelCustom     = "[REDACTED]"
+	SentinelEmail    = "[EMAIL]"
+	SentinelIBAN     = "[IBAN]"
+	SentinelPhone    = "[PHONE]"
+	SentinelContract = "[CONTRACT_ID]"
+	SentinelCustomer = "[CUSTOMER_ID]"
+	SentinelMeter    = "[METER_ID]"
+	SentinelName     = "[NAME]"
+	SentinelAddress  = "[ADDRESS]"
+	SentinelCustom   = "[REDACTED]"
 )
 
 // Field names (case-insensitive) we treat as PII when they appear as
 // JSON object keys. Values under these keys get replaced with the
 // matching sentinel regardless of their literal shape.
 //
-//   first_name / last_name / full_name → [NAME]
-//   address / street / postal_code / zip / city → [ADDRESS]
-//   email → [EMAIL]
-//   phone / phone_number → [PHONE]
-//   iban → [IBAN]
+//	first_name / last_name / full_name → [NAME]
+//	address / street / postal_code / zip / city → [ADDRESS]
+//	email → [EMAIL]
+//	phone / phone_number → [PHONE]
+//	iban → [IBAN]
 //
-// The map is lower-cased for O(1) lookup; rewriter normalizes keys.
+// The map uses canonical snake_case keys for O(1) lookup; rewriter
+// normalizes incoming snake_case, camelCase, and PascalCase keys.
 var piiFields = map[string]string{
 	"first_name":     SentinelName,
 	"last_name":      SentinelName,
@@ -188,21 +190,19 @@ func String(s string) string {
 // walk recurses through a parsed JSON value, applying field-aware
 // rules at object keys and pattern rules at leaf strings.
 //
-// parentKey is the lower-cased key under which the current value sits
-// in its parent object. It's empty at the root + on array elements.
+// parentKey is the normalized key under which the current value sits in
+// its parent object. It's empty at the root + on array elements.
 func walk(v *interface{}, parentKey string) {
+	if sentinel, ok := piiFields[parentKey]; ok && isRedactableFieldValue(*v) {
+		*v = sentinel
+		return
+	}
 	switch x := (*v).(type) {
 	case string:
-		// Field-aware override: if our parent key is a known PII key,
-		// replace the value with the matching sentinel wholesale.
-		if sentinel, ok := piiFields[parentKey]; ok && x != "" {
-			*v = sentinel
-			return
-		}
 		*v = applyPatterns(x)
 	case map[string]interface{}:
 		for k, child := range x {
-			lk := strings.ToLower(k)
+			lk := normalizeFieldName(k)
 			walk(&child, lk)
 			x[k] = child
 		}
@@ -211,6 +211,71 @@ func walk(v *interface{}, parentKey string) {
 			walk(&x[i], "") // array elements have no parent key context
 		}
 	}
+}
+
+func isRedactableFieldValue(v interface{}) bool {
+	switch x := v.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(x) != ""
+	case []interface{}:
+		return len(x) > 0
+	case map[string]interface{}:
+		return len(x) > 0
+	default:
+		return true
+	}
+}
+
+func normalizeFieldName(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	runes := []rune(key)
+	var b strings.Builder
+	lastWasUnderscore := false
+	for i, r := range runes {
+		if r == '_' || r == '-' || unicode.IsSpace(r) {
+			if b.Len() > 0 && !lastWasUnderscore {
+				b.WriteByte('_')
+				lastWasUnderscore = true
+			}
+			continue
+		}
+		if unicode.IsUpper(r) {
+			if b.Len() > 0 && !lastWasUnderscore && shouldInsertFieldUnderscore(runes, i) {
+				b.WriteByte('_')
+			}
+			b.WriteRune(unicode.ToLower(r))
+		} else {
+			b.WriteRune(unicode.ToLower(r))
+		}
+		lastWasUnderscore = false
+	}
+	return strings.Trim(b.String(), "_")
+}
+
+func shouldInsertFieldUnderscore(runes []rune, i int) bool {
+	if i == 0 {
+		return false
+	}
+	prev := runes[i-1]
+	if prev == '_' || prev == '-' || unicode.IsSpace(prev) {
+		return false
+	}
+	if unicode.IsLower(prev) || unicode.IsDigit(prev) {
+		return true
+	}
+	if unicode.IsUpper(prev) && i+1 < len(runes) {
+		next := runes[i+1]
+		if next == 's' && i+2 == len(runes) {
+			return false
+		}
+		return unicode.IsLower(next)
+	}
+	return false
 }
 
 // applyPatterns runs every precompiled regex (built-in + custom) over

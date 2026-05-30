@@ -4,8 +4,8 @@
 //
 // The resolver doesn't dispatch — that's the dispatcher's job (chunk 10).
 // It doesn't translate to provider format — that's the translator's job
-// (chunk 11). It just resolves slugs/ids into a single typed list,
-// applies the legitimation filter, and reports anything that won't fit.
+// (chunk 11). It just resolves slugs/ids into a single typed list and
+// reports anything that won't fit.
 package resolver
 
 import (
@@ -70,22 +70,6 @@ func (r ResolvedTool) Name() string {
 	return ""
 }
 
-// MinLegitimation returns the legitimation level required to invoke
-// this tool, regardless of kind.
-func (r ResolvedTool) MinLegitimation() int {
-	switch r.Kind {
-	case agentmodels.ToolRefKindInternal:
-		if r.Internal != nil {
-			return r.Internal.MinLegitimation()
-		}
-	case agentmodels.ToolRefKindCustom:
-		if r.Custom != nil {
-			return r.Custom.MinLegitimation
-		}
-	}
-	return 0
-}
-
 // Category returns the dispatch category for this resolved tool.
 // Built-ins declare their category in code; custom tools read the
 // persisted ai_tools.category value with a safe default of "write".
@@ -123,16 +107,17 @@ func isKBScopeEmpty(s builtin.KBScope) bool {
 	return len(s.FolderIDs) == 0 && len(s.ArticleIDs) == 0
 }
 
-// Resolve turns agent.Tools (raw JSONB) into a list of ResolvedTool,
-// applying the legitimation filter (drops tools whose MinLegitimation
-// exceeds callerLegitLevel). Disabled custom tools are silently dropped
-// — operators don't want them firing.
+// Resolve turns agent.Tools (raw JSONB) into a list of ResolvedTool.
+// Tool-level verification gating was dropped (agents gate their tools), so
+// the only drops here are unregistered/missing internal capabilities,
+// empty kb_scope for kb_search, and missing/disabled custom tools —
+// operators don't want disabled tools firing.
 //
 // Returns the resolved list plus a "drops" map keyed by the source
 // element's index for diagnostics. Errors only on malformed agent.Tools
 // shape (which the agent handler validates at save time, so this should
 // be unreachable from the runtime path).
-func (r *Resolver) Resolve(rawTools json.RawMessage, callerLegitLevel int, kbScope builtin.KBScope) ([]ResolvedTool, map[int]string, error) {
+func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([]ResolvedTool, map[int]string, error) {
 	if len(rawTools) == 0 || string(rawTools) == "null" || string(rawTools) == "[]" {
 		return nil, nil, nil
 	}
@@ -182,15 +167,11 @@ func (r *Resolver) Resolve(rawTools json.RawMessage, callerLegitLevel int, kbSco
 				drops[i] = "internal capability not registered: " + cid
 				continue
 			}
-			if callerLegitLevel < cap.MinLegitimation() {
-				drops[i] = fmt.Sprintf("internal/%s requires legitimation %d (caller=%d)", cid, cap.MinLegitimation(), callerLegitLevel)
-				continue
-			}
 			// This is the first scope/runtime-conditional resolver drop.
 			// The builtin registry currently exposes only static metadata
-			// (id, name, schemas, legitimation). When a second case lands,
-			// add an availability hook on the capability interface instead
-			// of growing more hardcoded tool-id checks here.
+			// (id, name, schemas). When a second case lands, add an
+			// availability hook on the capability interface instead of
+			// growing more hardcoded tool-id checks here.
 			if cid == "kb_search" && isKBScopeEmpty(kbScope) {
 				drops[i] = "kb_scope is empty"
 				continue
@@ -216,10 +197,8 @@ func (r *Resolver) Resolve(rawTools json.RawMessage, callerLegitLevel int, kbSco
 				drops[i] = fmt.Sprintf("ai_tools.id=%d disabled", id)
 				continue
 			}
-			if callerLegitLevel < t.MinLegitimation {
-				drops[i] = fmt.Sprintf("custom/%s requires legitimation %d (caller=%d)", t.Slug, t.MinLegitimation, callerLegitLevel)
-				continue
-			}
+			// Custom tools are no longer gated per tool; agent-level
+			// verification covers the data-access decision upstream.
 			out = append(out, ResolvedTool{
 				Kind:           agentmodels.ToolRefKindCustom,
 				Custom:         t,

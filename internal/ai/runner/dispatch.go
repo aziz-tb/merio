@@ -11,6 +11,7 @@ import (
 	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
 	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
 	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
+	convmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -42,7 +43,7 @@ func (r *Runner) dispatchAllTools(
 	rt *builtin.ToolRuntimeContext,
 	invokerUserID int,
 	conversationID int,
-	legitimationLevel int,
+	verificationLevel int,
 	traceID string,
 	turnIndex int,
 	pub EventPublisher,
@@ -84,7 +85,7 @@ func (r *Runner) dispatchAllTools(
 				defer sem.Release(1)
 				logs[plan.idx] = r.dispatchOneTool(
 					gctx, plan.tu, resolvedByName, rt,
-					invokerUserID, conversationID, legitimationLevel,
+					invokerUserID, conversationID, verificationLevel,
 					traceID, turnIndex, pub,
 				)
 				return nil
@@ -96,7 +97,7 @@ func (r *Runner) dispatchAllTools(
 	for _, plan := range writes {
 		logs[plan.idx] = r.dispatchOneTool(
 			ctx, plan.tu, resolvedByName, rt,
-			invokerUserID, conversationID, legitimationLevel,
+			invokerUserID, conversationID, verificationLevel,
 			traceID, turnIndex, pub,
 		)
 	}
@@ -119,7 +120,7 @@ func (r *Runner) dispatchOneTool(
 	rt *builtin.ToolRuntimeContext,
 	invokerUserID int,
 	conversationID int,
-	legitimationLevel int,
+	verificationLevel int,
 	traceID string,
 	turnIndex int,
 	pub EventPublisher,
@@ -210,7 +211,7 @@ func (r *Runner) dispatchOneTool(
 		Kind:              found.Kind,
 		Slug:              found.ID(),
 		InvokerUserID:     invokerUserID,
-		LegitimationLevel: legitimationLevel,
+		VerificationLevel: verificationLevel,
 		Parameters:        tu.ToolInput,
 		ConversationID:    conversationID,
 	}
@@ -235,6 +236,9 @@ func (r *Runner) dispatchOneTool(
 	if result.Kind == "success" {
 		logEntry.Status = "success"
 		logEntry.Data = result.Data
+		if found.Category() == "write" {
+			r.invalidateLinkedCaches(conversationID, traceID, tu.ToolName)
+		}
 	} else {
 		logEntry.Status = "execution_error"
 		if result.Message != "" {
@@ -244,6 +248,48 @@ func (r *Runner) dispatchOneTool(
 		}
 	}
 	return logEntry
+}
+
+func (r *Runner) invalidateLinkedCaches(conversationID int, traceID, toolID string) {
+	if r == nil || conversationID <= 0 || r.opts.Conversation == nil {
+		return
+	}
+	conv, err := r.opts.Conversation.GetConversation(conversationID, "", "")
+	if err != nil {
+		r.opts.Lo.Warn("runner.cache_invalidation.load_conversation_failed",
+			"trace_id", traceID,
+			"conversation_id", conversationID,
+			"tool_id", toolID,
+			"error", err)
+		return
+	}
+	r.invalidateCachesForConversation(conv, traceID, toolID)
+}
+
+func (r *Runner) invalidateCachesForConversation(conv convmodels.Conversation, traceID, toolID string) {
+	if r == nil {
+		return
+	}
+	if conv.ContractID.Valid && r.opts.Contract != nil {
+		if err := r.opts.Contract.InvalidateCache(conv.ContractID.String); err != nil {
+			r.opts.Lo.Warn("runner.cache_invalidation.contract_failed",
+				"trace_id", traceID,
+				"conversation_id", conv.ID,
+				"contract_id", conv.ContractID.String,
+				"tool_id", toolID,
+				"error", err)
+		}
+	}
+	if conv.CustomerID.Valid && r.opts.Customer != nil {
+		if err := r.opts.Customer.InvalidateCache(conv.CustomerID.String); err != nil {
+			r.opts.Lo.Warn("runner.cache_invalidation.customer_failed",
+				"trace_id", traceID,
+				"conversation_id", conv.ID,
+				"customer_id", conv.CustomerID.String,
+				"tool_id", toolID,
+				"error", err)
+		}
+	}
 }
 
 func unavailableToolLog(tu llm.ContentBlock, err error) ToolCallLog {
@@ -271,7 +317,7 @@ func classifyDispatcherError(err error) string {
 		return "unavailable"
 	case errors.Is(err, aitools.ErrToolDisabled):
 		return "unavailable"
-	case errors.Is(err, aitools.ErrInsufficientLegit):
+	case errors.Is(err, aitools.ErrAgentVerificationInsufficient):
 		return "unavailable"
 	case errors.Is(err, aitools.ErrParamsInvalid):
 		return "validation_error"
