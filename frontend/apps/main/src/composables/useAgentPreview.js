@@ -14,7 +14,7 @@
 // options with no state to track until Phase 2.
 //
 // Run payload uses the existing /ai/agents/:id/run shape:
-//   { inbound_message, conversation_id, legitimation_level, ... }
+//   { inbound_message, conversation_id, verification_level, ... }
 // Per the fork resolution, `safe_mode` is sent through (backend
 // accepts but doesn't yet enforce — separate batch).
 
@@ -56,9 +56,9 @@ export function useAgentPreview(agentId) {
   // split ships.
   const safeMode = ref(false)
 
-  // Per-run legitimation override. Defaults to whatever was set when
+  // Per-run verification override. Defaults to whatever was set when
   // the ticket was loaded; 0 (public) otherwise.
-  const legitimationOverride = ref(0)
+  const verificationOverride = ref(0)
 
   const lastRun = ref(null)
   const running = ref(false)
@@ -85,14 +85,14 @@ export function useAgentPreview(agentId) {
     linkedTicket.value = ticket
     subject.value = ticket.subject ?? ''
     composeBody.value = ticket.last_message_text ?? ticket.body ?? ''
-    legitimationOverride.value = ticket.legitimation ?? 0
+    verificationOverride.value = ticket.verification ?? 0
   }
 
   function reset() {
     linkedTicket.value = null
     subject.value = ''
     composeBody.value = ''
-    legitimationOverride.value = 0
+    verificationOverride.value = 0
   }
 
   function resetSession() {
@@ -113,7 +113,7 @@ export function useAgentPreview(agentId) {
       const body = {
         inbound_message: composeBody.value,
         conversation_id: linkedTicket.value?.id ?? 0,
-        legitimation_level: legitimationOverride.value,
+        verification_level: verificationOverride.value,
         safe_mode: safeMode.value,
       }
       const resp = await api.runAIAgent(id, body)
@@ -163,7 +163,7 @@ export function useAgentPreview(agentId) {
     subject,
     composeBody,
     safeMode,
-    legitimationOverride,
+    verificationOverride,
     lastRun,
     running,
     streamEvents,

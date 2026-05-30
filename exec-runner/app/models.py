@@ -29,6 +29,7 @@ class ExecuteRequest(BaseModel):
     conversation_data: dict[str, Any] | None = None
     contract_data: dict[str, Any] | None = None
     customer_data: dict[str, Any] | None = None
+    secrets: dict[str, str] = Field(default_factory=dict)
 
     # SDK callback configuration
     callback_token: str = Field(..., min_length=1)
@@ -57,7 +58,7 @@ class ExecuteResultEnvelope(BaseModel):
     """The script's structured result, parsed from __RESULT__ sentinel."""
 
     kind: Literal["success", "failure", "error", "noop"]
-    data: dict[str, Any] = Field(default_factory=dict)
+    data: Any = None
     message: str | None = None
     code: str | None = None
     retryable: bool = False
@@ -89,6 +90,15 @@ class ExecuteErrorResponse(BaseModel):
     ]
     message: str
     retryable: bool
+
+
+class ExecuteRuntimeErrorResponse(BaseModel):
+    """POST /v1/execute response body — runtime-layer (HTTP 500) failures."""
+
+    kind: Literal["runtime_error"] = "runtime_error"
+    code: str
+    message: str
+    traceback: str | None = None
 
 
 class PrewarmRequest(BaseModel):

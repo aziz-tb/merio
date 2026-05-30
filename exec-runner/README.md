@@ -29,6 +29,20 @@ SERVICE_TOKEN=secret123 uv run uvicorn app.main:app --host 0.0.0.0 --port 8090
 
 All endpoints except `/v1/health/*` and `/metrics` require `Authorization: Bearer <SERVICE_TOKEN>`.
 
+`POST /v1/execute` returns script-level outcomes as a normal 200 response.
+The `result.data` field is any JSON-serializable value emitted by the SDK
+(object, array, scalar, or null). Runtime-layer failures, where the service
+itself cannot produce a script result, return HTTP 500 with:
+
+```json
+{
+  "kind": "runtime_error",
+  "code": "UNCAUGHT",
+  "message": "human-readable error",
+  "traceback": "optional stack trace"
+}
+```
+
 ## Design boundaries
 
 - This service runs code; it does NOT know about phases, tools, hooks, agents, or pipelines.

@@ -12,16 +12,11 @@ export const createToolFormSchema = (t) =>
     slug: z.string().optional().default(''),
     description: z.string().optional().default(''),
     category: z.enum(['read', 'write']).default('write'),
-    min_legitimation: z
-      .number({ invalid_type_error: t('globals.messages.required') })
-      .int()
-      .min(0)
-      .default(0),
     timeout_ms: z
       .number({ invalid_type_error: t('globals.messages.required') })
       .int()
       .min(1)
-      .max(600000)
+      .max(120000)
       .default(30000),
     async: z.boolean().default(false),
     enabled: z.boolean().default(true)

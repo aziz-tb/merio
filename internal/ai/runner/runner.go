@@ -18,6 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
 	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
 	"github.com/abhinavxd/libredesk/internal/ai/tools/translator"
+	"github.com/abhinavxd/libredesk/internal/ai/usage/redact"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/knowledge"
 	"github.com/abhinavxd/libredesk/internal/user"
@@ -42,8 +43,10 @@ const (
 // Sentinel errors returned alongside RunResponse{Status: StatusFailed}.
 // Callers errors.Is against these for HTTP status mapping.
 var (
-	ErrAgentNotFound = errors.New("runner: agent not found")
-	ErrAgentDisabled = errors.New("runner: agent is disabled")
+	ErrAgentNotFound                    = errors.New("runner: agent not found")
+	ErrAgentDisabled                    = errors.New("runner: agent is disabled")
+	ErrAgentVerificationInsufficient    = aitools.ErrAgentVerificationInsufficient
+	agentVerificationInsufficientReason = "agent requires a verified customer; conversation is not sufficiently verified"
 )
 
 // UsageRecorder is the runner's view of the ai_usage write surface.
@@ -55,15 +58,18 @@ type UsageRecorder interface {
 	Record(ctx context.Context, row UsageRow) error
 }
 
+type CacheInvalidator interface {
+	InvalidateCache(id string) error
+}
+
 // UsageRow is the runner's projection of usage.Row — the subset of
 // fields the runner can populate from inside its loop, before handing
 // off to the persistence layer. The handler layer fills in
 // ConversationID / AgentExecutionID / UserID via the same Row shape
 // when it calls Record() itself (chunk 8 — rewrite manager wrapper).
 //
-// Kept here so the runner doesn't import internal/ai/usage; the
-// adapter in cmd/ai_run.go translates this to usage.Row at the
-// boundary.
+// Kept here so the runner doesn't import internal/ai/usage; the app
+// and worker adapters translate this to usage.Row at the boundary.
 type UsageRow struct {
 	TraceID             string
 	CallSequenceInTrace int
@@ -91,6 +97,9 @@ type UsageRow struct {
 
 	ProviderRequestID *string
 	ProviderMetadata  []byte
+
+	RequestPayload  []byte
+	ResponsePayload []byte
 }
 
 // Opts wires every dependency the runner needs. All required except
@@ -107,6 +116,8 @@ type Opts struct {
 	Knowledge    *knowledge.Manager
 	Conversation *conversation.Manager
 	User         *user.Manager
+	Customer     CacheInvalidator
+	Contract     CacheInvalidator
 	Usage        UsageRecorder
 }
 
@@ -177,6 +188,13 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 			Status: StatusFailed, PartialReason: "agent is disabled", AgentSlug: agent.Slug,
 		}, ErrAgentDisabled
 	}
+	if err := verifyAgentVerification(req, agent); err != nil {
+		return RunResponse{
+			Status:        StatusFailed,
+			PartialReason: agentVerificationInsufficientReason,
+			AgentSlug:     agent.Slug,
+		}, err
+	}
 	r.emit(runCtx, req.TraceID, EventTypeRunStarted, RunStartedPayload{
 		AgentID:        agent.ID,
 		AgentSlug:      agent.Slug,
@@ -187,8 +205,8 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 
 	// Resolve agent.tools to ResolvedTool. Drops are surfaced into
 	// RunResponse so the operator can see why a declared tool wasn't
-	// available (legitimation, missing capability, disabled custom tool).
-	resolved, drops, err := r.opts.Resolver.Resolve(agent.Tools, req.LegitimationLevel, kbScope)
+	// available (missing capability, empty kb_scope, disabled custom tool).
+	resolved, drops, err := r.opts.Resolver.Resolve(agent.Tools, kbScope)
 	if err != nil {
 		return RunResponse{
 			Status: StatusFailed, PartialReason: "tool resolution failed", AgentSlug: agent.Slug,
@@ -235,7 +253,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		AgentID:             agent.ID,
 		ResolutionAttemptID: 0, // populated by F3 when it lands
 		TraceID:             req.TraceID,
-		LegitimationLevel:   req.LegitimationLevel,
+		VerificationLevel:   req.VerificationLevel,
 		KBScope:             kbScope,
 		KBSearchCache:       kbCache,
 		Logf:                r.opts.Lo,
@@ -324,7 +342,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 			// Record a failure row anyway — ops needs to see the call
 			// happened even when it failed. Outcome maps from the
 			// error class.
-			r.recordUsage(runCtx, req, agent, pres, iter+1, resp, turnLatencyMs, outcomeForError(err), err)
+			r.recordUsage(runCtx, req, compReq, agent, pres, iter+1, resp, turnLatencyMs, outcomeForError(err), err)
 			out := r.buildResponse(agent, nil, trace, toolCallLog, totalUsage, llmLatency, toolLatency, cacheHits, cacheMgr.Count(), iterations, drops)
 			out.Status = StatusFailed
 			out.PartialReason = "provider error: " + err.Error()
@@ -335,7 +353,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		// Successful call — record one ai_usage row per turn. Best-
 		// effort: persistence failures are logged inside recordUsage
 		// and never abort the run.
-		r.recordUsage(runCtx, req, agent, pres, iter+1, resp, turnLatencyMs, "success", nil)
+		r.recordUsage(runCtx, req, compReq, agent, pres, iter+1, resp, turnLatencyMs, "success", nil)
 
 		// Update tracking. Anthropic returns CachedTokens separately
 		// from InputTokens (we surface both).
@@ -442,7 +460,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 				rt,
 				req.InvokerUserID,
 				req.ConversationID,
-				req.LegitimationLevel,
+				req.VerificationLevel,
 				req.TraceID,
 				iter,
 				pub,
@@ -509,6 +527,13 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	out.PartialReason = incompleteWithoutProduceDraft(fmt.Sprintf("hit max_iterations=%d", maxIters))
 	_ = startedAt
 	return out, nil
+}
+
+func verifyAgentVerification(req RunRequest, agent agentmodels.Agent) error {
+	if req.VerificationLevel < agent.MinVerification {
+		return ErrAgentVerificationInsufficient
+	}
+	return nil
 }
 
 // applyDefaults fills zero-value knobs with their canonical defaults and
@@ -693,6 +718,11 @@ func encodeToolResult(log ToolCallLog) string {
 			return ""
 		case string:
 			return v
+		case json.RawMessage:
+			if len(v) == 0 || string(v) == "null" {
+				return ""
+			}
+			return string(v)
 		default:
 			b, err := json.Marshal(v)
 			if err != nil {
@@ -780,6 +810,7 @@ func (r *Runner) emitRunLog(traceID string, agent agentmodels.Agent, iterations 
 func (r *Runner) recordUsage(
 	ctx context.Context,
 	req RunRequest,
+	compReq llm.CompletionRequest,
 	agent agentmodels.Agent,
 	pres preset.Preset,
 	callSeq int,
@@ -815,6 +846,10 @@ func (r *Runner) recordUsage(
 		RetryCount:          resp.Observability.RetryCount,
 		Outcome:             outcome,
 		ProviderMetadata:    []byte(resp.Observability.ProviderMetadata),
+		RequestPayload:      redactedJSON(compReq),
+	}
+	if hasCompletionResponsePayload(resp) {
+		row.ResponsePayload = redactedJSON(resp)
 	}
 	if resp.Observability.ProviderRequestID != "" {
 		id := resp.Observability.ProviderRequestID
@@ -841,6 +876,26 @@ func (r *Runner) recordUsage(
 			"error", err)
 	}
 	_ = callErr // accepted for future error-class enrichment; not used yet
+}
+
+func redactedJSON(v any) []byte {
+	raw, err := json.Marshal(v)
+	if err != nil || len(raw) == 0 {
+		return nil
+	}
+	return redact.Bytes(raw)
+}
+
+func hasCompletionResponsePayload(resp llm.CompletionResponse) bool {
+	return resp.StopReason != "" ||
+		len(resp.Content) > 0 ||
+		resp.Usage.InputTokens != 0 ||
+		resp.Usage.OutputTokens != 0 ||
+		resp.Usage.CachedTokens != 0 ||
+		resp.PresetUsed != "" ||
+		resp.Model != "" ||
+		resp.Observability.ProviderRequestID != "" ||
+		len(resp.Observability.ProviderMetadata) > 0
 }
 
 func coalesceString(primary, fallback string) string {

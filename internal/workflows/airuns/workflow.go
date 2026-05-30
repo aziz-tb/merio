@@ -33,7 +33,7 @@ type AgentRunWorkflowParams struct {
 	InboundMessage      string                `json:"inbound_message"`
 	Context             map[string]any        `json:"context,omitempty"`
 	InboxID             int                   `json:"inbox_id"`
-	LegitimationLevel   int                   `json:"legitimation_level"`
+	VerificationLevel   int                   `json:"verification_level"`
 	MaxIterations       int                   `json:"max_iterations"`
 	TotalTokenBudget    int                   `json:"total_token_budget"`
 	DeadlineMs          int                   `json:"deadline_ms"`

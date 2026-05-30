@@ -50,6 +50,23 @@ sdk.customer_data  # dict of the resolved customer, or None
 These are plain dicts. Use `.get("key")` for safe access — fields can be
 absent or null depending on what the platform was able to resolve.
 
+## Secrets
+
+```python
+api_key = sdk.secret.get("rabot_erp_api_key")
+if api_key is None:
+    sdk.error("rabot_erp_api_key not configured", retryable=False)
+    raise SystemExit
+```
+
+Secrets are configured by admins in Libredesk and are write-only after
+creation. `sdk.secret.get(name)` returns the plaintext string for this
+execution or `None` when the secret does not exist. There is no SDK write API.
+
+If a script accidentally prints a secret value to stdout, stderr, or a result
+message/data field, Libredesk replaces the value before storage with
+`[REDACTED:<secret_name>]`.
+
 ## Outputs
 
 Call exactly one of these per execution. The last call wins if you call
@@ -63,8 +80,9 @@ sdk.error(message, retryable=False)   # Unexpected error (upstream 5xx, etc.)
 sdk.noop()                            # I ran, nothing to report (typical for hooks)
 ```
 
-`success` carries data the platform consumes. `failure` and `error` carry
-human-readable messages. The distinction:
+`success` carries data the platform consumes. `data` may be any
+JSON-serializable value: dict, list, scalar, or null. `failure` and `error`
+carry human-readable messages. The distinction:
 
 - **failure** — the script worked correctly, but the answer was no/can't
 - **error** — something unexpected went wrong; setting `retryable=True`

@@ -157,6 +157,16 @@ const updateOIDC = (id, data) =>
     }
   })
 const deleteOIDC = (id) => http.delete(`/api/v1/oidc/${id}`)
+const getSecrets = () => http.get('/api/v1/secrets')
+const createSecret = (data) =>
+  http.post('/api/v1/secrets', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const updateSecret = (name, data) =>
+  http.put(`/api/v1/secrets/${encodeURIComponent(name)}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteSecret = (name) => http.delete(`/api/v1/secrets/${encodeURIComponent(name)}`)
 const updateSettings = (key, data) =>
   http.put(`/api/v1/settings/${key}`, data, {
     headers: {
@@ -234,6 +244,28 @@ const invokeAITool = (slug, body) =>
     headers: { 'Content-Type': 'application/json' }
   })
 
+// Unified functions — sandbox-backed executable rows shared by AI tools,
+// customer identification, and future executor-backed features.
+const listFunctions = (domain = null) =>
+  http.get('/api/v1/functions', domain ? { params: { domain } } : undefined)
+const getFunction = (name) => http.get(`/api/v1/functions/${encodeURIComponent(name)}`)
+const updateFunction = (name, body) =>
+  http.put(`/api/v1/functions/${encodeURIComponent(name)}`, body, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const previewFunction = (name, body) =>
+  http.post('/api/v1/function/preview', body, {
+    params: { name },
+    headers: { 'Content-Type': 'application/json' }
+  })
+
+const getCustomerIdentificationSettings = () =>
+  http.get('/api/v1/settings/customer-identification')
+const updateCustomerIdentificationSettings = (body) =>
+  http.put('/api/v1/settings/customer-identification', body, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+
 // Manual agent run — POST /api/v1/ai/agents/:id/run. Returns 202
 // Accepted with { trace_id, status }. The caller then follows the SSE
 // stream until run.completed / run.failed.
@@ -270,6 +302,39 @@ const validateConversationAgents = (uuid) =>
 const getLatestAgentValidation = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/agents/validation/latest`)
 
+const getConversationCustomer = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/customer`)
+
+const getConversationContract = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/contract`)
+
+const assignCustomerToConversation = (uuid, contractId, verificationLevel = undefined) =>
+  http.post(
+    `/api/v1/conversations/${uuid}/customer`,
+    {
+      contract_id: contractId,
+      ...(verificationLevel == null ? {} : { verification_level: verificationLevel })
+    },
+    { headers: { 'Content-Type': 'application/json' } }
+  )
+
+const removeCustomerFromConversation = (uuid) =>
+  http.delete(`/api/v1/conversations/${uuid}/customer`)
+
+const identifyCustomer = (uuid) =>
+  http.post(`/api/v1/conversations/${uuid}/customer/identify`)
+
+const searchCustomers = (q, config = {}) =>
+  http.get('/api/v1/customers/search', { params: { q }, ...config })
+
+const getCustomer = (customerId) =>
+  http.get(`/api/v1/customers/${encodeURIComponent(customerId)}`)
+
+const getLatestCustomerIdentification = (uuid) =>
+  http.get(`/api/v1/conversations/${uuid}/ai-operations`, {
+    params: { operation_type: 'customer_identification', limit: 1 }
+  })
+
 const getAgentExecution = (id) =>
   http.get(`/api/v1/ai/executions/${id}`)
 
@@ -302,10 +367,20 @@ const updateRole = (id, data) =>
 const deleteRole = (id) => http.delete(`/api/v1/roles/${id}`)
 const getContacts = (params) => http.get('/api/v1/contacts', { params })
 const getContact = (id) => http.get(`/api/v1/contacts/${id}`)
-const updateContact = (id, data) =>
-  http.put(`/api/v1/contacts/${id}`, data, {
+const getContactConversations = (id, params = {}) =>
+  http.get(`/api/v1/contacts/${id}/conversations`, { params })
+const updateContact = (id, data) => {
+  const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+  return http.put(`/api/v1/contacts/${id}`, data, {
     headers: {
-      'Content-Type': 'multipart/form-data'
+      'Content-Type': isFormData ? 'multipart/form-data' : 'application/json'
+    }
+  })
+}
+const updateContactLinkedCustomer = (id, customerId) =>
+  http.put(`/api/v1/contacts/${id}/linked-customer`, { customer_id: customerId }, {
+    headers: {
+      'Content-Type': 'application/json'
     }
   })
 const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data, {
@@ -313,6 +388,10 @@ const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data
     'Content-Type': 'application/json'
   }
 })
+const getCustomerLinkedContacts = (customerId, excludeContactId = null) =>
+  http.get(`/api/v1/customers/${encodeURIComponent(customerId)}/linked-contacts`, {
+    params: excludeContactId ? { exclude_contact_id: excludeContactId } : {}
+  })
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
 const updateTeam = (id, data) => http.put(`/api/v1/teams/${id}`, data, {
@@ -591,22 +670,6 @@ const deleteWebhook = (id) => http.delete(`/api/v1/webhooks/${id}`)
 const toggleWebhook = (id) => http.put(`/api/v1/webhooks/${id}/toggle`)
 const testWebhook = (id) => http.post(`/api/v1/webhooks/${id}/test`)
 
-const getContextLinks = () => http.get('/api/v1/context-links')
-const getContextLink = (id) => http.get(`/api/v1/context-links/${id}`)
-const createContextLink = (data) =>
-  http.post('/api/v1/context-links', data, {
-    headers: { 'Content-Type': 'application/json' }
-  })
-const updateContextLink = (id, data) =>
-  http.put(`/api/v1/context-links/${id}`, data, {
-    headers: { 'Content-Type': 'application/json' }
-  })
-const deleteContextLink = (id) => http.delete(`/api/v1/context-links/${id}`)
-const toggleContextLink = (id) => http.put(`/api/v1/context-links/${id}/toggle`)
-const getActiveContextLinks = () => http.get('/api/v1/context-links/active')
-const getContextLinkURL = (id, conversationUUID) =>
-  http.get(`/api/v1/context-links/${id}/url`, { params: { conversation_uuid: conversationUUID } })
-
 const generateAPIKey = (id) => 
   http.post(`/api/v1/agents/${id}/api-key`, {}, {
     headers: {
@@ -756,6 +819,10 @@ export default {
   updateSettings,
   createOIDC,
   getAllOIDC,
+  getSecrets,
+  createSecret,
+  updateSecret,
+  deleteSecret,
   getConfig,
   getOIDC,
   updateOIDC,
@@ -802,8 +869,11 @@ export default {
   removeAssignee,
   getContacts,
   getContact,
+  getContactConversations,
   updateContact,
+  updateContactLinkedCustomer,
   blockContact,
+  getCustomerLinkedContacts,
   getCustomAttributes,
   createCustomAttribute,
   updateCustomAttribute,
@@ -820,14 +890,6 @@ export default {
   deleteWebhook,
   toggleWebhook,
   testWebhook,
-  getContextLinks,
-  getContextLink,
-  createContextLink,
-  updateContextLink,
-  deleteContextLink,
-  toggleContextLink,
-  getActiveContextLinks,
-  getContextLinkURL,
   generateAPIKey,
   revokeAPIKey,
   initiateOAuthFlow,
@@ -853,10 +915,24 @@ export default {
   getConversationAgentRunState,
   validateConversationAgents,
   getLatestAgentValidation,
+  getConversationCustomer,
+  getConversationContract,
+  assignCustomerToConversation,
+  removeCustomerFromConversation,
+  identifyCustomer,
+  searchCustomers,
+  getCustomer,
+  getLatestCustomerIdentification,
   getAgentExecution,
   sendAgentExecution,
   createAITool,
   updateAITool,
   deleteAITool,
-  invokeAITool
+  invokeAITool,
+  listFunctions,
+  getFunction,
+  updateFunction,
+  previewFunction,
+  getCustomerIdentificationSettings,
+  updateCustomerIdentificationSettings
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="grid gap-2 rounded border border-border p-3 md:grid-cols-[1fr_11rem_1fr_auto]">
+  <div class="grid gap-2 rounded md:grid-cols-[1fr_11rem_1fr_auto]">
     <div class="relative">
       <Input
         v-model="displayPathValue"
@@ -57,7 +57,7 @@
     </div>
 
     <Button type="button" variant="ghost" size="icon" @click="$emit('remove')">
-      <X class="h-4 w-4" />
+      <TrashCan class="h-4 w-4" />
     </Button>
 
     <PathPickerPanel
@@ -72,7 +72,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ListTree, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import {
@@ -92,6 +91,7 @@ import {
 } from '@shared-ui/components/ui/tags-input'
 import { useTagStore } from '@/stores/tag'
 import PathPickerPanel from './PathPickerPanel.vue'
+import { TrashCan, ListTree, X } from '@qall/icons'
 
 const condition = defineModel({ required: true })
 defineEmits(['remove'])

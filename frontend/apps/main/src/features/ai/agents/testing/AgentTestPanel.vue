@@ -62,14 +62,15 @@
         </div>
         <div class="space-y-1.5">
           <Label class="text-muted-foreground">
-            {{ $t('admin.ai.agent.testPanel.legitimationLevel') }}
+            {{ $t('admin.ai.agent.testPanel.verificationLevel') }}
           </Label>
           <Input
             type="number"
             min="0"
+            max="3"
             step="1"
-            :model-value="legitimationLevel"
-            @input="(e) => (legitimationLevel = e.target.value === '' ? 0 : parseInt(e.target.value, 10))"
+            :model-value="verificationLevel"
+            @input="(e) => (verificationLevel = e.target.value === '' ? 0 : parseInt(e.target.value, 10))"
           />
         </div>
       </div>
@@ -185,7 +186,7 @@ const pickedConversationId = ref(null)
 watch(pickedConversationId, (v) => {
   conversationId.value = v || 0
 })
-const legitimationLevel = ref(0)
+const verificationLevel = ref(0)
 const maxIterations = ref(0)
 const totalTokenBudget = ref(0)
 const deadlineMs = ref(0)
@@ -214,7 +215,7 @@ async function runAgent() {
     const body = {
       inbound_message: inboundMessage.value,
       conversation_id: conversationId.value || 0,
-      legitimation_level: legitimationLevel.value || 0
+      verification_level: verificationLevel.value || 0
     }
     if (maxIterations.value > 0) body.max_iterations = maxIterations.value
     if (totalTokenBudget.value > 0) body.total_token_budget = totalTokenBudget.value

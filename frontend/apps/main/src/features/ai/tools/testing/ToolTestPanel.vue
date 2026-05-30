@@ -80,21 +80,6 @@
         <JsonField v-model="rawParamsJson" height-class="h-40" @parse-error="rawParamsParseError = $event" />
       </div>
 
-      <!-- Optional legitimation_level (only when tool requires it) -->
-      <div v-if="(tool.min_legitimation || 0) > 0" class="space-y-1.5">
-        <Label class="text-muted-foreground">{{ $t('admin.ai.tool.testPanel.legitimationLevel') }}</Label>
-        <Input
-          type="number"
-          step="1"
-          min="0"
-          :model-value="legitimationLevel"
-          @input="(e) => (legitimationLevel = e.target.value === '' ? 0 : parseInt(e.target.value, 10))"
-        />
-        <p class="text-xs text-muted-foreground">
-          {{ $t('admin.ai.tool.testPanel.legitimationHelp') }}
-        </p>
-      </div>
-
       <!-- Optional conversation_id -->
       <div class="space-y-1.5">
         <Label class="text-muted-foreground">{{ $t('admin.ai.tool.testPanel.conversationId') }}</Label>
@@ -217,7 +202,6 @@ function paramJson(key) {
 const rawParamsJson = ref('{}')
 const rawParamsParseError = ref('')
 
-const legitimationLevel = ref(0)
 const conversationId = ref(0)
 
 const typedParams = computed(() => Array.isArray(props.inputParameters) ? props.inputParameters : [])
@@ -263,7 +247,6 @@ async function runTool() {
   try {
     payload = {
       parameters: buildParameters(),
-      legitimation_level: legitimationLevel.value || 0,
       conversation_id: conversationId.value || 0
     }
   } catch (e) {

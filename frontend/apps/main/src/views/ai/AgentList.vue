@@ -4,7 +4,7 @@
       <!-- Sub-header strip: description + primary action -->
       <div class="flex items-center justify-between px-6 pt-4 pb-3">
         <p class="text-sm text-muted-foreground">{{ $t('admin.ai.agent.help') }}</p>
-        <RouterLink :to="{ name: 'new-ai-agent' }">
+        <RouterLink :to="{ name: 'agent-create-identity' }">
           <Button>{{ $t('aiAgent.new') }}</Button>
         </RouterLink>
       </div>

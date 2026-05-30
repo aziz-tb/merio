@@ -1,7 +1,7 @@
 {
   "_comment": "AI preset definitions, per-purpose default mappings, and platform-level provider API keys. Loaded once at app startup into the in-memory preset registry. Edits require a restart (v1 limitation; revisit when ops surfaces a real need for live reload). Every preset's `model` field is validated against config/anthropic_models.json at startup; references to unknown models fail loudly. Slugs referenced from ai_agents.preset_overrides are validated at agent save time once the registry is loaded (chunk 2). `provider_keys.anthropic` is read at boot — leave empty to disable the agent runner; the run endpoint returns 503 in that case.",
   "provider_keys": {
-    "anthropic": "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",
+    "anthropic": "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",
     "voyage": "pa-0-UL9dbV32AwQQ4vOpso-lxX4I7midnSnteaKAb-nzB"
   },
   "presets": [
@@ -59,6 +59,6 @@
     "synthesize": "default-sonnet",
     "redact_pii": "fast-haiku",
     "brief": "default-sonnet",
-    "extract_parameters": "default-sonnet"
+    "extract_parameters": "fast-haiku"
   }
 }

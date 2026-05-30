@@ -3,8 +3,8 @@
   Server-side validation does the real work; this component only catches
   obviously malformed input client-side so users get fast feedback.
 
-  Used by both CreateOrEditAgent and CreateOrEditTool for: detection,
-  tools, autonomy, input_parameters, output_schema.
+  Used by AI agent/tool forms for detection, tools, autonomy,
+  input_parameters, output_schema.
 -->
 <template>
   <div>
@@ -15,7 +15,7 @@
       :title="title"
       :show-language-label="showLanguageLabel"
       :expandable="expandable"
-      @blur.native.capture="validate"
+      @blur.capture="validate"
     />
     <p v-if="parseError" class="text-sm text-destructive mt-1">
       {{ $t('admin.ai.invalidJson') }}: {{ parseError }}

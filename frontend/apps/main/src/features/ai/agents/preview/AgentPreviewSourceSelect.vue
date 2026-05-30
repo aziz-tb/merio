@@ -192,7 +192,7 @@ async function onPickResult(e, r) {
       last_message_text: c.last_message?.text || '',
       contact_name: c.contact?.name || c.contact?.email || '',
       contact: c.contact || null,
-      legitimation: c.legitimation_level ?? 0,
+      verification: c.verification_level ?? 0,
     }
     preview.loadFromTicket(ticket)
     open.value = false

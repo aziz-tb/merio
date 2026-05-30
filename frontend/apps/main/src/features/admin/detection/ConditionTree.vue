@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-3 rounded border border-border p-3">
+  <div class="space-y-3 rounded border-l border-border p-3">
     <div class="flex items-center justify-between gap-3">
       <Select v-model="tree.op">
         <SelectTrigger class="w-32">
@@ -60,7 +60,7 @@
 
 <script setup>
 import { computed, watch } from 'vue'
-import { FolderPlus, Plus, X } from 'lucide-vue-next'
+import { FolderPlus, Plus, X } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   Select,

@@ -84,7 +84,7 @@ export default defineConfig(({ mode, command }) => {
           manualChunks: {
             'vue-vendor': ['vue', 'vue-router', 'pinia'],
             'radix': ['radix-vue', 'reka-ui'],
-            'icons': ['lucide-vue-next', '@radix-icons/vue'],
+            'icons': ['lucide-vue-next', '@radix-icons/vue', '@qall/icons'],
             'utils': ['@vueuse/core', 'clsx', 'tailwind-merge', 'class-variance-authority'],
             'forms': ['vee-validate', '@vee-validate/zod', 'zod'],
             'misc': ['axios', 'date-fns', 'mitt', 'qs', 'vue-i18n'],

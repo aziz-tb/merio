@@ -57,23 +57,7 @@
         </FormItem>
       </FormField>
 
-      <div class="grid grid-cols-3 gap-5">
-        <FormField v-slot="{ field }" name="min_legitimation">
-          <FormItem>
-            <FormLabel>{{ $t('globals.terms.minLegitimation') || 'Min legitimation' }}</FormLabel>
-            <FormControl>
-              <Input
-                type="number"
-                step="1"
-                min="0"
-                v-bind="field"
-                @input="(e) => form.setFieldValue('min_legitimation', Number(e.target.value))"
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
+      <div class="grid grid-cols-2 gap-5">
         <FormField v-slot="{ field }" name="timeout_ms">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.timeoutMs') || 'Timeout (ms)' }}</FormLabel>
@@ -209,8 +193,7 @@
         class="mt-8"
         :tool="{
           slug: form.values.slug,
-          type: form.values.type,
-          min_legitimation: form.values.min_legitimation
+          type: form.values.type
         }"
         :input-parameters="parsedInputParameters"
       />
@@ -287,7 +270,6 @@ const form = useForm({
     slug: '',
     description: '',
     category: 'write',
-    min_legitimation: 0,
     timeout_ms: 30000,
     async: false,
     enabled: true
@@ -370,7 +352,6 @@ onMounted(async () => {
         slug: tool.slug,
         description: tool.description || '',
         category: tool.category || 'write',
-        min_legitimation: tool.min_legitimation ?? 0,
         timeout_ms: tool.timeout_ms ?? 30000,
         async: !!tool.async,
         enabled: tool.enabled

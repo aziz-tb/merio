@@ -180,7 +180,7 @@ const permissions = ref([
       { name: perms.ACTIVITY_LOGS_MANAGE, label: t('admin.role.activityLog.manage') },
       { name: perms.WEBHOOKS_MANAGE, label: t('admin.role.webhooks.manage') },
       { name: perms.SHARED_VIEWS_MANAGE, label: t('admin.role.sharedViews.manage') },
-      { name: perms.CONTEXT_LINKS_MANAGE, label: t('admin.role.contextLinks.manage') }
+      { name: perms.SECRETS_MANAGE, label: t('admin.role.secrets.manage') }
     ]
   },
   {
