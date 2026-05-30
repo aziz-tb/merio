@@ -76,7 +76,7 @@
                         type="text"
                         placeholder=""
                         v-bind="componentField"
-                        :disabled="!!selectedContact"
+                        :disabled="lockContactNameFields"
                         required
                       />
                     </FormControl>
@@ -92,7 +92,7 @@
                         type="text"
                         placeholder=""
                         v-bind="componentField"
-                        :disabled="!!selectedContact"
+                        :disabled="lockContactNameFields"
                       />
                     </FormControl>
                     <FormMessage />
@@ -308,6 +308,10 @@ const dialogOpen = defineModel({
   default: () => false
 })
 
+const props = defineProps({
+  initialContact: { type: Object, default: null }
+})
+
 const inboxStore = useInboxStore()
 const { t } = useI18n()
 const uStore = useUsersStore()
@@ -347,6 +351,8 @@ const isDisabled = computed(() => {
   return false
 })
 
+const lockContactNameFields = computed(() => !!selectedContact.value?.first_name)
+
 const formSchema = z.object({
   subject: z.string().min(1, t('validation.subjectCannotBeEmpty')),
   content: z.string().min(1, t('validation.messageCannotBeEmpty')),
@@ -378,6 +384,7 @@ onMounted(() => {
     command: 'apply-macro-to-new-conversation',
     open: false
   })
+  applyInitialContact()
   nextTick(() => {
     emailInputRef.value?.$el?.focus()
   })
@@ -404,6 +411,14 @@ watch(emailQuery, (newVal) => {
     form.setFieldValue('first_name', '')
     form.setFieldValue('last_name', '')
   }
+})
+
+watch(() => props.initialContact, () => {
+  if (dialogOpen.value) applyInitialContact()
+})
+
+watch(dialogOpen, (open) => {
+  if (open) applyInitialContact()
 })
 
 const handleSearchContacts = async () => {
@@ -458,6 +473,18 @@ const selectContact = (contact) => {
   highlightedIndex.value = -1
 }
 
+const applyInitialContact = () => {
+  const contact = props.initialContact
+  if (!contact?.email) return
+  selectedContact.value = contact
+  emailQuery.value = contact.email
+  form.setFieldValue('contact_email', contact.email)
+  form.setFieldValue('first_name', contact.first_name || '')
+  form.setFieldValue('last_name', contact.last_name || '')
+  searchResults.value.splice(0)
+  highlightedIndex.value = -1
+}
+
 const createConversation = form.handleSubmit(async (values) => {
   loading.value = true
   try {
@@ -486,6 +513,8 @@ const createConversation = form.handleSubmit(async (values) => {
     }
     dialogOpen.value = false
     form.resetForm()
+    emailQuery.value = ''
+    selectedContact.value = null
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
