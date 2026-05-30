@@ -7,7 +7,9 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ai/llm"
 	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
 	"github.com/abhinavxd/libredesk/internal/ai/usage"
+	"github.com/abhinavxd/libredesk/internal/contract"
 	"github.com/abhinavxd/libredesk/internal/conversation"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/realtime"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -24,6 +26,8 @@ type Activities struct {
 	AIOperationsMgr *aioperations.Manager
 	TagMgr          *tag.Manager
 	ConversationMgr *conversation.Manager
+	CustomerMgr     *customer.Manager
+	ContractMgr     *contract.Manager
 	Realtime        realtime.Publisher
 	SystemInboxID   int
 	SystemUser      umodels.User
@@ -75,6 +79,8 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 		AIOperationsMgr: deps.AIOperations,
 		TagMgr:          deps.Tags,
 		ConversationMgr: deps.Conversation,
+		CustomerMgr:     deps.Customers,
+		ContractMgr:     deps.Contracts,
 		Realtime:        deps.Realtime,
 		SystemInboxID:   deps.SystemInboxID,
 		SystemUser:      deps.SystemUser,

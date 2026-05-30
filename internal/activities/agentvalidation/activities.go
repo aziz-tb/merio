@@ -6,7 +6,9 @@ import (
 	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
 	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
+	"github.com/abhinavxd/libredesk/internal/contract"
 	"github.com/abhinavxd/libredesk/internal/conversation"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/abhinavxd/libredesk/internal/realtime"
 	"github.com/jmoiron/sqlx"
@@ -18,6 +20,8 @@ type Activities struct {
 	Lo              *logf.Logger
 	AgentsMgr       *aiagents.Manager
 	ConversationMgr *conversation.Manager
+	CustomerMgr     *customer.Manager
+	ContractMgr     *contract.Manager
 	DetectionMgr    *detection.Manager
 	AIOperationsMgr *aioperations.Manager
 	Realtime        realtime.Publisher
@@ -57,6 +61,8 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 		Lo:              deps.Logger("agent-validation"),
 		AgentsMgr:       deps.Agents,
 		ConversationMgr: deps.Conversation,
+		CustomerMgr:     deps.Customers,
+		ContractMgr:     deps.Contracts,
 		DetectionMgr:    deps.Detection,
 		AIOperationsMgr: deps.AIOperations,
 		Realtime:        deps.Realtime,

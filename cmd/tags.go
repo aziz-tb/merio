@@ -8,7 +8,6 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
-	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	tmodels "github.com/abhinavxd/libredesk/internal/tag/models"
 	"github.com/valyala/fasthttp"
@@ -137,10 +136,7 @@ func handleTestTagDetection(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	result, err := app.detectionMgr.Evaluate(r.RequestCtx, tag.Detection, detection.EvaluationContext{
-		Conversation: *conv,
-		Tags:         conv.TagSlugs(),
-	})
+	result, err := app.detectionMgr.Evaluate(r.RequestCtx, tag.Detection, buildDetectionEvaluationContext(r.RequestCtx, app, *conv, conv.TagSlugs(), ""))
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, envelope.GeneralError)
 	}

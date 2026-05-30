@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
 	"strconv"
@@ -11,7 +12,11 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/automation/models"
+	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
+	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
+	"github.com/abhinavxd/libredesk/internal/customerdata"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -379,16 +384,47 @@ func handleGetConversationVariables(r *fastglue.Request) error {
 		app.lo.Error("error building detection ticket variables", "identifier", identifier, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
-	contactJSON, err := detection.BuildContactJSON(conv.Contact)
-	if err != nil {
-		app.lo.Error("error building detection contact variables", "identifier", identifier, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+
+	var customerJSON map[string]any
+	if conv.CustomerID.Valid && app.customer != nil {
+		customer, err := app.customer.GetFreshByCustomerID(r.RequestCtx, conv.CustomerID.String, customerpkg.FreshOptions{})
+		if err != nil {
+			app.lo.Warn("error building detection customer variables", "identifier", identifier, "customer_id", conv.CustomerID.String, "error", err)
+		} else if customer != nil {
+			var contracts []contractmodels.Contract
+			if app.contract != nil {
+				contracts, err = loadContractsForCustomer(r.RequestCtx, app.lo, app.contract, customer)
+				if err != nil {
+					app.lo.Warn("error hydrating contracts for detection customer variables", "identifier", identifier, "customer_id", conv.CustomerID.String, "error", err)
+				}
+			}
+			if m, err := customerdata.CustomerToMap(*customer, contracts); err == nil {
+				customerJSON = m
+			} else {
+				app.lo.Warn("error serializing detection customer variables", "identifier", identifier, "customer_id", conv.CustomerID.String, "error", err)
+			}
+		}
+	}
+
+	var contractJSON map[string]any
+	if conv.ContractID.Valid && app.contract != nil {
+		contract, err := app.contract.GetFreshByContractID(r.RequestCtx, conv.ContractID.String, contractpkg.FreshOptions{})
+		if err != nil {
+			app.lo.Warn("error building detection contract variables", "identifier", identifier, "contract_id", conv.ContractID.String, "error", err)
+		} else if contract != nil {
+			if m, err := customerdata.ContractToMap(*contract); err == nil {
+				contractJSON = m
+			} else {
+				app.lo.Warn("error serializing detection contract variables", "identifier", identifier, "contract_id", conv.ContractID.String, "error", err)
+			}
+		}
 	}
 
 	return r.SendEnvelope(map[string]any{
-		"ticket":  ticketJSON,
-		"contact": contactJSON,
-		"tags":    extractTagSlugsFromConv(*conv),
+		"ticket":   ticketJSON,
+		"customer": customerJSON,
+		"contract": contractJSON,
+		"tags":     extractTagSlugsFromConv(*conv),
 	})
 }
 
@@ -424,15 +460,43 @@ func handleEvaluateDetection(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	result, err := app.detectionMgr.Evaluate(app.ctx, det, detection.EvaluationContext{
-		Conversation: *conv,
-		Tags:         extractTagSlugsFromConv(*conv),
-	})
+	result, err := app.detectionMgr.Evaluate(app.ctx, det, buildDetectionEvaluationContext(app.ctx, app, *conv, extractTagSlugsFromConv(*conv), ""))
 	if err != nil {
 		app.lo.Error("error evaluating detection", "conversation_uuid", body.ConversationUUID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope(result)
+}
+
+func buildDetectionEvaluationContext(ctx context.Context, app *App, conv cmodels.Conversation, tags []string, traceID string) detection.EvaluationContext {
+	ec := detection.EvaluationContext{
+		Conversation: conv,
+		Tags:         tags,
+		TraceID:      traceID,
+	}
+	if conv.CustomerID.Valid && app.customer != nil {
+		customer, err := app.customer.GetFreshByCustomerID(ctx, conv.CustomerID.String, customerpkg.FreshOptions{})
+		if err != nil {
+			app.lo.Warn("failed to hydrate customer for detection evaluation",
+				"conversation_id", conv.ID,
+				"customer_id", conv.CustomerID.String,
+				"error", err)
+		} else {
+			ec.Customer = customer
+		}
+	}
+	if conv.ContractID.Valid && app.contract != nil {
+		contract, err := app.contract.GetFreshByContractID(ctx, conv.ContractID.String, contractpkg.FreshOptions{})
+		if err != nil {
+			app.lo.Warn("failed to hydrate contract for detection evaluation",
+				"conversation_id", conv.ID,
+				"contract_id", conv.ContractID.String,
+				"error", err)
+		} else {
+			ec.Contract = contract
+		}
+	}
+	return ec
 }
 
 // handleClassifyConversationTags starts an AI tag-classification workflow.

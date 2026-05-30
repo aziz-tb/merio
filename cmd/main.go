@@ -341,11 +341,11 @@ func main() {
 		systemInboxIDInst = initSystemInboxID(db)
 		detectionMgrInst  = initDetectionManager(aiProviderInst, aiUsageInst, systemInboxIDInst)
 		temporalClient    = initTemporal()
-		automation        = initAutomationEngine(db, i18n, detectionMgrInst)
-		conversation      = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher, temporalClient)
 		functionMgr       = initFunction(db, execRunnerMgr, i18n)
 		customerMgr       = initCustomer(db, i18n, settings, functionMgr)
 		contractMgr       = initContract(db, i18n, settings, functionMgr, customerMgr)
+		automation        = initAutomationEngine(db, i18n, detectionMgrInst, customerMgr, contractMgr)
+		conversation      = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher, temporalClient)
 		autoassigner      = initAutoAssigner(team, user, conversation)
 		// F12: hybrid-search subsystem. Each piece is independently
 		// nil-safe — if Voyage key is absent or Redis is down, kb_search

@@ -8,6 +8,8 @@ import (
 
 	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
 	"github.com/abhinavxd/libredesk/internal/ai/operations/payloads"
+	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
+	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/volatiletech/null/v9"
 )
@@ -58,6 +60,22 @@ func (a *Activities) ValidateAgentsActivity(ctx context.Context, input Input) (O
 		Conversation: conv,
 		Tags:         conv.TagSlugs(),
 		TraceID:      traceID,
+	}
+	if conv.CustomerID.Valid && a.CustomerMgr != nil {
+		customer, err := a.CustomerMgr.GetFreshByCustomerID(ctx, conv.CustomerID.String, customerpkg.FreshOptions{})
+		if err != nil {
+			a.Lo.Warn("agentvalidation: failed to hydrate customer for detection", "conversation_uuid", conv.UUID, "customer_id", conv.CustomerID.String, "error", err)
+		} else {
+			ec.Customer = customer
+		}
+	}
+	if conv.ContractID.Valid && a.ContractMgr != nil {
+		contract, err := a.ContractMgr.GetFreshByContractID(ctx, conv.ContractID.String, contractpkg.FreshOptions{})
+		if err != nil {
+			a.Lo.Warn("agentvalidation: failed to hydrate contract for detection", "conversation_uuid", conv.UUID, "contract_id", conv.ContractID.String, "error", err)
+		} else {
+			ec.Contract = contract
+		}
 	}
 
 	matchingIDs := make([]int, 0)

@@ -1079,13 +1079,15 @@ func initDetectionManager(provider llm.LLMProvider, usageMgr *aiusage.Manager, s
 }
 
 // initAutomationEngine initializes the automation engine.
-func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n, detectionMgr *detection.Manager) *automation.Engine {
+func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n, detectionMgr *detection.Manager, customerMgr *customer.Manager, contractMgr *contract.Manager) *automation.Engine {
 	var lo = initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
 		DB:           db,
 		Lo:           lo,
 		I18n:         i18n,
 		DetectionMgr: detectionMgr,
+		Customer:     customerMgr,
+		Contract:     contractMgr,
 	})
 	if err != nil {
 		log.Fatalf("error initializing automation engine: %v", err)
