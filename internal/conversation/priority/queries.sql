@@ -1,5 +1,5 @@
 -- name: get-all
-SELECT created_at, id, name from conversation_priorities;
+SELECT created_at, id, name from conversation_priorities ORDER BY id ASC;
 
 -- name: get
 SELECT created_at, id, name from conversation_priorities WHERE id = $1;

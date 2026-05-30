@@ -12,6 +12,7 @@ import MessageCache from '../utils/conversation-message-cache'
 import { getI18n } from '../i18n'
 import { useThrottleFn } from '@vueuse/core'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '@/constants/conversation'
+import { getPriorityVisual } from '@/utils/priorityVisuals'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -36,7 +37,14 @@ export const useConversationStore = defineStore('conversation', () => {
 
   // Options for select fields
   const priorityOptions = computed(() => {
-    return priorities.value.map(p => ({ label: p.name, value: p.id }))
+    return priorities.value.map(p => {
+      const visual = getPriorityVisual(p.name)
+      return {
+        label: p.name,
+        value: p.id,
+        icon: visual.icon
+      }
+    })
   })
   const statusOptions = computed(() => {
     return statuses.value.map(s => ({ label: s.name, value: s.id }))
@@ -765,21 +773,12 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function mergeConversationUpdate (update) {
-    const classificationUpdate = update?.tag_classification
-    const fields = classificationUpdate ? { ...update } : update
-    if (classificationUpdate) {
-      delete fields.tag_classification
-    }
-
     if (conversation.data?.uuid === update.uuid) {
-      deepMerge(conversation.data, fields)
+      deepMerge(conversation.data, update)
     }
     const existing = conversations?.data?.find(c => c.uuid === update.uuid)
     if (existing) {
-      deepMerge(existing, fields)
-    }
-    if (classificationUpdate) {
-      emitter.emit(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, update)
+      deepMerge(existing, update)
     }
   }
 
@@ -799,6 +798,14 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function emitAgentValidationCompleted (payload) {
     emitter.emit(EMITTER_EVENTS.AGENT_VALIDATION_COMPLETED, payload)
+  }
+
+  function emitTagClassificationCompleted (payload) {
+    emitter.emit(EMITTER_EVENTS.TAG_CLASSIFICATION_COMPLETED, payload)
+  }
+
+  function emitCustomerIdentificationCompleted (payload) {
+    emitter.emit(EMITTER_EVENTS.CUSTOMER_IDENTIFICATION_COMPLETED, payload)
   }
 
   // Clears the list and pagination state so the next fetch starts fresh (removes stale rows).
@@ -937,6 +944,8 @@ export const useConversationStore = defineStore('conversation', () => {
     addPendingNotification,
     mergeConversationUpdate,
     emitAgentValidationCompleted,
+    emitTagClassificationCompleted,
+    emitCustomerIdentificationCompleted,
     mergeContactUpdate,
     addNewConversation,
     getContactFullName,

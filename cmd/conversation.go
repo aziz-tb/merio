@@ -539,6 +539,46 @@ func handleGetLatestAgentValidation(r *fastglue.Request) error {
 	return r.SendEnvelope(ops[0])
 }
 
+func handleListConversationAIOperations(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	uuid := r.RequestCtx.UserValue("uuid").(string)
+	if uuid == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "uuid required", nil, envelope.InputError)
+	}
+
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	conv, err := enforceConversationAccess(app, uuid, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	limit := 50
+	if raw := strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("limit"))); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid limit", nil, envelope.InputError)
+		}
+		limit = parsed
+	}
+
+	opType := strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("operation_type")))
+	var ops []aiopmodels.Operation
+	if opType != "" {
+		ops, err = app.aiOperations.ListByTypeForConversation(r.RequestCtx, int64(conv.ID), opType, limit)
+	} else {
+		ops, err = app.aiOperations.ListForConversation(r.RequestCtx, int64(conv.ID), limit)
+	}
+	if err != nil {
+		app.lo.Error("fetch conversation ai operations", "conversation_uuid", uuid, "operation_type", opType, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "failed to fetch ai operations", nil, envelope.GeneralError)
+	}
+	return r.SendEnvelope(ops)
+}
+
 func extractTagSlugsFromConv(conv cmodels.Conversation) []string {
 	return conv.TagSlugs()
 }
@@ -723,9 +763,23 @@ func handleUpdateConversationPriority(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
-	priority := req.Priority
+	priority := strings.TrimSpace(req.Priority)
 	if priority == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`priority`"), nil, envelope.InputError)
+	}
+	priorities, err := app.priority.GetAll()
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	validPriority := false
+	for _, p := range priorities {
+		if p.Name == priority {
+			validPriority = true
+			break
+		}
+	}
+	if !validPriority {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidValue"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgent(auser.ID, "")
@@ -787,6 +841,9 @@ func handleUpdateConversationStatus(r *fastglue.Request) error {
 	// Update conversation status.
 	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	if conversation.ContractID.Valid {
+		invalidateLinkedConversationCaches(app, conversation, "conversation_status_change")
 	}
 
 	// If status is `Resolved`, send CSAT survey if enabled on inbox.
