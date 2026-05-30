@@ -99,7 +99,7 @@
 
     <section class="space-y-4 border-t border-border pt-4">
       <h3 class="text-sm font-semibold">{{ t('admin.tags.detection') }}</h3>
-      <DetectionBuilder v-model="tag.detection" :available-sources="['ticket', 'contact', 'tags']" />
+      <DetectionBuilder v-model="tag.detection" :available-sources="['ticket', 'customer', 'contract', 'tags']" />
     </section>
 
     <TagTestRunner v-if="isEditing && tag.id" :tag-id="tag.id" />

@@ -76,7 +76,7 @@ defineOptions({ name: 'ConditionTree' })
 const tree = defineModel({ required: true })
 defineEmits(['remove'])
 defineProps({
-  availableSources: { type: Array, default: () => ['ticket', 'contact', 'tags'] },
+  availableSources: { type: Array, default: () => ['ticket', 'customer', 'contract', 'tags'] },
   removable: { type: Boolean, default: false }
 })
 

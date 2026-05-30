@@ -80,7 +80,7 @@
         <DetectionBuilder
           v-if="form.values.type"
           v-model="rule.detection"
-          :available-sources="['ticket', 'contact', 'tags']"
+          :available-sources="['ticket', 'customer', 'contract', 'tags']"
         />
 
         <p class="font-semibold pt-2">{{ $t('admin.automation.performTheseActions') }}</p>

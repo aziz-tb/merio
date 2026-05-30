@@ -24,6 +24,7 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'
 import { useAgentRunStream } from '@/composables/useAgentRunStream'
+import { useAgentRightRail } from '@/composables/useAgentRightRail'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 
@@ -32,13 +33,14 @@ export const AGENT_PREVIEW_KEY = Symbol('AgentPreview')
 export function useAgentPreview(agentId) {
   const emitter = useEmitter()
   const { t } = useI18n()
+  const rail = useAgentRightRail()
   const resolveAgentID = () => Number(toValue(agentId))
 
-  // Preview rail open/closed — persisted across page loads so the
-  // operator's choice survives refresh. Default open on first visit;
-  // useStorage reads the existing value when present. Per-key so it
-  // doesn't collide with other localStorage values.
-  const isOpen = useStorage('libredesk:agent-preview-open', true)
+  // Persisted preference: whether the preview should claim the rail on page
+  // load. The actual open state is coordinated by useAgentRightRail so other
+  // panels, such as the path picker, can temporarily claim the same slot.
+  const preferOpen = useStorage('libredesk:agent-preview-prefer-open', true)
+  const isOpen = computed(() => rail.isActive('preview'))
 
   // Channel — 'chat' | 'email'. Email is the v1 Libredesk default;
   // Chat is rendered but the run payload doesn't distinguish today.
@@ -104,6 +106,21 @@ export function useAgentPreview(agentId) {
     reset()
   }
 
+  function open() {
+    rail.open('preview')
+    preferOpen.value = true
+  }
+
+  function close() {
+    rail.close()
+    preferOpen.value = false
+  }
+
+  function toggle() {
+    if (isOpen.value) close()
+    else open()
+  }
+
   async function run() {
     const id = resolveAgentID()
     if (!composeBody.value.trim() || running.value || !Number.isFinite(id) || id <= 0) return
@@ -158,6 +175,7 @@ export function useAgentPreview(agentId) {
 
   return {
     isOpen,
+    preferOpen,
     channel,
     linkedTicket,
     subject,
@@ -169,6 +187,9 @@ export function useAgentPreview(agentId) {
     streamEvents,
     streamStatus,
     streamError,
+    open,
+    close,
+    toggle,
     run,
     loadFromTicket,
     reset,

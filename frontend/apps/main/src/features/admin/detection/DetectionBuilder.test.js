@@ -40,7 +40,6 @@ const messages = {
 	    'admin.detection.pathPicker': 'Path picker',
 	    'admin.detection.selectMode': 'Select mode',
     'admin.detection.selectSource': 'Select source',
-    'admin.detection.source.contact': 'Contact',
     'admin.detection.source.tags': 'Tags',
     'admin.detection.source.ticket': 'Ticket',
     'admin.detection.value': 'Value',

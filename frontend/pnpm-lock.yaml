@@ -48,8 +48,8 @@ importers:
         specifier: ^3.5.5
         version: 3.6.0
       '@qall/icons':
-        specifier: ^0.1.4
-        version: 0.1.4(vue@3.5.13(typescript@5.7.3))
+        specifier: ^0.1.5
+        version: 0.1.5(vue@3.5.13(typescript@5.7.3))
       '@radix-icons/vue':
         specifier: ^1.0.0
         version: 1.0.0(vue@3.5.13(typescript@5.7.3))
@@ -1030,8 +1030,8 @@ packages:
   '@popperjs/core@2.11.8':
     resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
 
-  '@qall/icons@0.1.4':
-    resolution: {integrity: sha512-CDdm10QIxmaS1LMrIq48eE67Cl4zeYudCo8JjD/xGD+wpGf6cjW2/hk6K5eXPBnPJe1ywN+a2T1IwjlvUF7ELQ==}
+  '@qall/icons@0.1.5':
+    resolution: {integrity: sha512-afYaeDQDchvfyeH0dvBx/TWhaXq6SI/HIz1ZofeQr3rxdqMpTZVkmZ2SphEnI8BqdIHk7scXmoizTwdt60NjYw==}
     peerDependencies:
       vue: ^3.3.0 || ^3.4.0 || ^3.5.0
 
@@ -4787,7 +4787,7 @@ snapshots:
 
   '@popperjs/core@2.11.8': {}
 
-  '@qall/icons@0.1.4(vue@3.5.13(typescript@5.7.3))':
+  '@qall/icons@0.1.5(vue@3.5.13(typescript@5.7.3))':
     dependencies:
       vue: 3.5.13(typescript@5.7.3)
 

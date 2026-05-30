@@ -12,7 +12,7 @@
     <DetectionBuilder
       v-else
       v-model="agent.detection"
-      :available-sources="['ticket', 'contact', 'tags']"
+      :available-sources="['ticket', 'customer', 'contract', 'tags']"
     />
   </div>
 </template>

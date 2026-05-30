@@ -66,7 +66,7 @@ const updateCustomAttribute = (id, data) =>
     }
   })
 const deleteCustomAttribute = (id) => http.delete(`/api/v1/custom-attributes/${id}`)
-const searchConversations = (params) => http.get('/api/v1/conversations/search', { params })
+const searchConversations = (params, config = {}) => http.get('/api/v1/conversations/search', { ...config, params })
 const searchMessages = (params) => http.get('/api/v1/messages/search', { params })
 const searchContacts = (params) => http.get('/api/v1/contacts/search', { params })
 const getConversationVariables = (identifier) => http.get(`/api/v1/conversations/${encodeURIComponent(identifier)}/variables`)
