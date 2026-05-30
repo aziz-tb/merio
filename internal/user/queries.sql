@@ -44,6 +44,8 @@ SELECT
     u.api_key,
     u.api_key_last_used_at,
     u.external_user_id,
+    u.linked_customer_id,
+    u.linked_customer_id_at,
     u.api_secret,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
@@ -226,6 +228,22 @@ SET first_name = COALESCE($2, first_name),
     updated_at = now()
 WHERE id = $1 and type in ('contact', 'visitor');
 
+-- name: update-contact-linked-customer
+UPDATE users
+SET linked_customer_id = $2,
+    linked_customer_id_at = CASE WHEN $2::text IS NULL THEN NULL ELSE NOW() END,
+    updated_at = now()
+WHERE id = $1 AND type IN ('contact', 'visitor');
+
+-- name: get-contacts-linked-to-customer
+SELECT id, email, first_name, last_name
+FROM users
+WHERE linked_customer_id = $1
+  AND type = 'contact'
+  AND deleted_at IS NULL
+  AND ($2 = 0 OR id != $2)
+ORDER BY id ASC;
+
 -- name: update-contact-basic-info
 UPDATE users
 SET first_name = COALESCE(NULLIF($2, ''), first_name),
@@ -296,6 +314,8 @@ SELECT
     u.api_key_last_used_at,
     u.api_secret,
     u.external_user_id,
+    u.linked_customer_id,
+    u.linked_customer_id_at,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -346,6 +366,8 @@ SELECT
     u.phone_number,
     u.country,
     u.external_user_id,
+    u.linked_customer_id,
+    u.linked_customer_id_at,
     u.custom_attributes,
     u.api_key,
     u.api_key_last_used_at,

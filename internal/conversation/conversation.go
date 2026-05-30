@@ -282,6 +282,8 @@ type queries struct {
 	GetContactChatConversations        *sqlx.Stmt `query:"get-contact-chat-conversations"`
 	GetChatConversation                *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations    *sqlx.Stmt `query:"get-contact-previous-conversations"`
+	GetConversationsByContact          *sqlx.Stmt `query:"get-conversations-by-contact"`
+	CountConversationsByContact        *sqlx.Stmt `query:"count-conversations-by-contact"`
 	GetConversationParticipants        *sqlx.Stmt `query:"get-conversation-participants"`
 	GetUserActiveConversationsCount    *sqlx.Stmt `query:"get-user-active-conversations-count"`
 	UpdateConversationWaitingSince     *sqlx.Stmt `query:"update-conversation-waiting-since"`
@@ -419,6 +421,34 @@ func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]m
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return conversations, nil
+}
+
+// GetConversationsByContact retrieves paginated conversation history for a contact.
+func (c *Manager) GetConversationsByContact(ctx context.Context, contactID, page, pageSize int, excludeUUID string) ([]models.ContactConversationHistoryItem, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > conversationsListMaxPageSize {
+		pageSize = conversationsListMaxPageSize
+	}
+
+	var conversations = make([]models.ContactConversationHistoryItem, 0)
+	offset := (page - 1) * pageSize
+	if err := c.q.GetConversationsByContact.SelectContext(ctx, &conversations, contactID, strings.TrimSpace(excludeUUID), pageSize, offset); err != nil {
+		c.lo.Error("error fetching contact conversation history", "contact_id", contactID, "error", err)
+		return conversations, 0, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	var total int
+	if err := c.q.CountConversationsByContact.GetContext(ctx, &total, contactID, strings.TrimSpace(excludeUUID)); err != nil {
+		c.lo.Error("error counting contact conversation history", "contact_id", contactID, "error", err)
+		return conversations, 0, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	return conversations, total, nil
 }
 
 // GetContactChatConversations retrieves chat conversations for a contact in a specific inbox.

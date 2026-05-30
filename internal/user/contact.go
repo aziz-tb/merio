@@ -92,6 +92,28 @@ func (u *Manager) UpdateContact(id int, user models.User) error {
 	return nil
 }
 
+func (u *Manager) UpdateContactLinkedCustomer(id int, customerID null.String) error {
+	var value any
+	if customerID.Valid {
+		value = strings.TrimSpace(customerID.String)
+	}
+	if _, err := u.q.UpdateContactLinkedCustomer.Exec(id, value); err != nil {
+		u.lo.Error("error updating contact linked customer", "contact_id", id, "customer_id", value, "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+// GetContactsLinkedToCustomer returns contacts that share the same linked customer ID.
+func (u *Manager) GetContactsLinkedToCustomer(customerID string, excludeContactID int) ([]models.LinkedContact, error) {
+	var contacts = make([]models.LinkedContact, 0)
+	if err := u.q.GetContactsLinkedToCustomer.Select(&contacts, strings.TrimSpace(customerID), excludeContactID); err != nil {
+		u.lo.Error("error fetching contacts linked to customer", "customer_id", customerID, "error", err)
+		return contacts, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return contacts, nil
+}
+
 // GetAllContacts returns a list of all contacts.
 func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
 	if pageSize > maxListPageSize {
