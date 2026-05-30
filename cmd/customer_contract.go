@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -20,6 +19,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/customer"
 	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
+	"github.com/abhinavxd/libredesk/internal/customerdata"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	execmodels "github.com/abhinavxd/libredesk/internal/exec/runner/models"
 	"github.com/abhinavxd/libredesk/internal/function"
@@ -421,117 +421,11 @@ func ciValueString(v any) string {
 }
 
 func customerToAPIResponse(c customermodels.Customer, contracts []contractmodels.Contract) json.RawMessage {
-	var out bytes.Buffer
-	out.WriteByte('{')
-	writeJSONField(&out, "customer_id", c.CustomerID, true)
-	writeJSONField(&out, "business", c.Business, false)
-	writeJSONField(&out, "firstname", nullStringValue(c.Firstname), false)
-	writeJSONField(&out, "lastname", nullStringValue(c.Lastname), false)
-	writeJSONField(&out, "company", nullStringValue(c.Company), false)
-	writeJSONField(&out, "email", nullStringValue(c.Email), false)
-	writeJSONField(&out, "phone", nullStringValue(c.Phone), false)
-	writeJSONField(&out, "zip", nullStringValue(c.Zip), false)
-	writeJSONField(&out, "delivery_address", nullStringValue(c.DeliveryAddress), false)
-	writeJSONField(&out, "billing_address", nullStringValue(c.BillingAddress), false)
-	writeJSONFieldRaw(&out, "contract_ids", c.ContractIDs, false)
-	writeJSONField(&out, "created_at", c.CreatedAt, false)
-	writeJSONField(&out, "updated_at", c.UpdatedAt, false)
-	writeJSONField(&out, "last_synced_at", c.LastSyncedAt, false)
-	appendZone2Fields(&out, c.ExtraData)
-	if contracts != nil {
-		out.WriteString(`,"contracts":[`)
-		for i, ct := range contracts {
-			if i > 0 {
-				out.WriteByte(',')
-			}
-			out.Write(contractToAPIResponse(ct))
-		}
-		out.WriteByte(']')
-	}
-	out.WriteByte('}')
-	return out.Bytes()
+	return customerdata.CustomerToAPIResponse(c, contracts)
 }
 
 func contractToAPIResponse(c contractmodels.Contract) json.RawMessage {
-	var out bytes.Buffer
-	out.WriteByte('{')
-	writeJSONField(&out, "contract_id", c.ContractID, true)
-	writeJSONField(&out, "customer_id", c.CustomerID, false)
-	writeJSONField(&out, "business", c.Business, false)
-	writeJSONField(&out, "firstname", nullStringValue(c.Firstname), false)
-	writeJSONField(&out, "lastname", nullStringValue(c.Lastname), false)
-	writeJSONField(&out, "company", nullStringValue(c.Company), false)
-	writeJSONField(&out, "email", nullStringValue(c.Email), false)
-	writeJSONField(&out, "phone", nullStringValue(c.Phone), false)
-	writeJSONField(&out, "zip", nullStringValue(c.Zip), false)
-	writeJSONField(&out, "delivery_address", nullStringValue(c.DeliveryAddress), false)
-	writeJSONField(&out, "billing_address", nullStringValue(c.BillingAddress), false)
-	writeJSONFieldRaw(&out, "agent_preview", c.AgentPreview, false)
-	writeJSONFieldRaw(&out, "erp_urls", c.ErpURLs, false)
-	writeJSONField(&out, "created_at", c.CreatedAt, false)
-	writeJSONField(&out, "updated_at", c.UpdatedAt, false)
-	writeJSONField(&out, "last_synced_at", c.LastSyncedAt, false)
-	appendZone2Fields(&out, c.ExtraData)
-	out.WriteByte('}')
-	return out.Bytes()
-}
-
-func writeJSONField(out *bytes.Buffer, key string, value any, first bool) {
-	if !first {
-		out.WriteByte(',')
-	}
-	keyJSON, _ := json.Marshal(key)
-	valueJSON, _ := json.Marshal(value)
-	out.Write(keyJSON)
-	out.WriteByte(':')
-	out.Write(valueJSON)
-}
-
-func writeJSONFieldRaw(out *bytes.Buffer, key string, raw json.RawMessage, first bool) {
-	if len(raw) == 0 || string(raw) == "null" {
-		raw = json.RawMessage(`null`)
-	}
-	if !first {
-		out.WriteByte(',')
-	}
-	keyJSON, _ := json.Marshal(key)
-	out.Write(keyJSON)
-	out.WriteByte(':')
-	out.Write(raw)
-}
-
-func appendZone2Fields(out *bytes.Buffer, extraData json.RawMessage) {
-	if len(extraData) == 0 {
-		return
-	}
-	trimmed := strings.TrimSpace(string(extraData))
-	if trimmed == "" || trimmed == "{}" || trimmed == "null" {
-		return
-	}
-	dec := json.NewDecoder(bytes.NewReader(extraData))
-	tok, err := dec.Token()
-	if err != nil || tok != json.Delim('{') {
-		return
-	}
-	for dec.More() {
-		keyTok, err := dec.Token()
-		if err != nil {
-			return
-		}
-		key, ok := keyTok.(string)
-		if !ok {
-			return
-		}
-		var value json.RawMessage
-		if err := dec.Decode(&value); err != nil {
-			return
-		}
-		out.WriteByte(',')
-		keyJSON, _ := json.Marshal(key)
-		out.Write(keyJSON)
-		out.WriteByte(':')
-		out.Write(value)
-	}
+	return customerdata.ContractToAPIResponse(c)
 }
 
 func persistManualCustomerLink(ctx context.Context, app *App, conv *cmodels.Conversation, contractRow contractmodels.Contract, operatorID int, verificationLevel int) error {
