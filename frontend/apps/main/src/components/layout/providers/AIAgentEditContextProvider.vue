@@ -9,7 +9,10 @@ import { AGENT_EDIT_KEY, useAgentEdit } from '@/composables/useAgentEdit.js'
 import { AGENT_PREVIEW_KEY, useAgentPreview } from '@/composables/useAgentPreview.js'
 
 const route = useRoute()
-const agentId = computed(() => Number(route.params.id))
+const agentId = computed(() => {
+  const id = Number(route.params.id)
+  return Number.isFinite(id) && id > 0 ? id : null
+})
 
 // Build the edit/preview state once above both the shared sidebar and the
 // route content so either side can inject the same live instance.
@@ -22,12 +25,10 @@ provide(AGENT_PREVIEW_KEY, preview)
 watch(
   agentId,
   (next, prev) => {
-    if (!Number.isFinite(next) || next <= 0) return
-
     // Reset per-agent preview session state when deep-linking between
     // records, but keep the persisted rail open/closed preference.
     if (next !== prev) {
-      preview.resetSession()
+      if (next) preview.resetSession()
       edit.load()
     }
   },

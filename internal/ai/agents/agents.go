@@ -113,7 +113,7 @@ func (m *Manager) Create(a models.Agent) (models.Agent, error) {
 		a.Name, a.Slug, a.Description, a.Prompt,
 		a.Detection, a.Tools, a.KBScope,
 		a.PresetOverrides, a.ConfidenceThreshold, a.MaxIterations, a.ExtendedThinkingEnabled,
-		a.MinLegitimation, a.Autonomy, a.Enabled,
+		a.MinVerification, a.Autonomy, a.Enabled,
 	); err != nil {
 		if isUniqueViolation(err) {
 			return out, envelope.NewError(envelope.InputError, "AI agent with this name or slug already exists", nil)
@@ -133,7 +133,7 @@ func (m *Manager) Update(id int, a models.Agent) (models.Agent, error) {
 		a.Name, a.Slug, a.Description, a.Prompt,
 		a.Detection, a.Tools, a.KBScope,
 		a.PresetOverrides, a.ConfidenceThreshold, a.MaxIterations, a.ExtendedThinkingEnabled,
-		a.MinLegitimation, a.Autonomy, a.Enabled,
+		a.MinVerification, a.Autonomy, a.Enabled,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return out, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)

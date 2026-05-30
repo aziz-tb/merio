@@ -1,5 +1,5 @@
 <!--
-  AgentEditHeader — top strip of the Edit Agent layout.
+  AgentEditHeader — top strip of the Agent editor layout.
 
   Layout: [collapse  section title ..........  Save  Preview]
 
@@ -7,7 +7,9 @@
     ConversationList / PageHeader convention (PanelLeft icon +
     useLayoutSidebar.toggle). Toggles the global icon rail, not the
     editor's own left rail.
-  - Section title derived from the active child route name
+  - In create mode, the title is the new-agent label and the preview
+    toggle is hidden.
+  - In edit mode, the section title is derived from the active child route name
     (edit-ai-agent-{section} → admin.ai.agent.tab.{section}). Kept
     self-contained here so the router doesn't need a per-route
     meta.titleKey for this layout.
@@ -48,7 +50,7 @@
       <!-- Preview reopen button. Plain text, no icon. Hidden when
            the panel is open; the X inside the panel closes it. -->
       <button
-        v-if="!previewOpen"
+        v-if="!isCreateMode && !previewOpen"
         type="button"
         class="text-sm text-muted-foreground hover:text-foreground transition-colors"
         @click="$emit('toggle-preview')"
@@ -68,8 +70,9 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
 import { AGENT_EDIT_KEY } from '@/composables/useAgentEdit.js'
 
-defineProps({
+const props = defineProps({
   previewOpen: { type: Boolean, default: false },
+  isCreateMode: { type: Boolean, default: false },
 })
 
 defineEmits(['toggle-preview'])
@@ -87,6 +90,7 @@ const edit = inject(AGENT_EDIT_KEY)
 // route.meta) avoids touching the router and keeps the header
 // self-contained.
 const sectionTitle = computed(() => {
+  if (props.isCreateMode) return t('admin.ai.agent.newAgent')
   const name = route.name?.toString() || ''
   const m = name.match(/^edit-ai-agent-(.+)$/)
   if (!m) return ''

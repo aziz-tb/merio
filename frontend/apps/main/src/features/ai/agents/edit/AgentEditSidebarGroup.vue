@@ -17,7 +17,7 @@
     <ul class="space-y-0.5">
       <li v-for="item in items" :key="item.key">
         <router-link
-          :to="{ name: item.routeName, params: { id: agentId } }"
+          :to="routeTarget(item)"
           :class="[
             'flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors',
             isActive(item) ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
@@ -35,10 +35,10 @@
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
-defineProps({
+const props = defineProps({
   label:   { type: String, required: true },
   items:   { type: Array,  required: true },
-  agentId: { type: Number, required: true },
+  agentId: { type: Number, default: null },
 })
 
 const route = useRoute()
@@ -46,5 +46,10 @@ const { t } = useI18n()
 
 function isActive(item) {
   return route.name === item.routeName
+}
+
+function routeTarget(item) {
+  if (!props.agentId) return { name: item.routeName }
+  return { name: item.routeName, params: { id: props.agentId } }
 }
 </script>

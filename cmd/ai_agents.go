@@ -10,6 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -18,10 +19,10 @@ import (
 // pagination (page, page_size).
 func handleListAIAgents(r *fastglue.Request) error {
 	var (
-		app                = r.Context.(*App)
-		enabledQ           = r.RequestCtx.QueryArgs().Peek("enabled")
-		page, pageSize     = getPagination(r)
-		enabled    *bool   = nil
+		app                  = r.Context.(*App)
+		enabledQ             = r.RequestCtx.QueryArgs().Peek("enabled")
+		page, pageSize       = getPagination(r)
+		enabled        *bool = nil
 	)
 	if len(enabledQ) > 0 {
 		v := strings.EqualFold(string(enabledQ), "true")
@@ -57,7 +58,7 @@ func handleGetAIAgent(r *fastglue.Request) error {
 
 // handleCreateAIAgent creates an ai agent. Runs the full validation pass
 // (slug shape, prompt-required-when-enabled, kb_scope folder/article refs
-// and tool refs exist, autonomy keys, tools[] shape, min_legitimation
+// and tool refs exist, autonomy keys, tools[] shape, min_verification
 // non-negative).
 func handleCreateAIAgent(r *fastglue.Request) error {
 	var (
@@ -249,9 +250,10 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 		}
 	}
 
-	// min_legitimation: non-negative floor on conversation trust level.
-	if a.MinLegitimation < 0 {
-		return envelope.NewError(envelope.InputError, "min_legitimation must be non-negative", nil)
+	// min_verification: floor on the conversation verification level.
+	if a.MinVerification < int(verificationmodels.VerificationLevelUnverified) ||
+		a.MinVerification > int(verificationmodels.VerificationLevelManual) {
+		return envelope.NewError(envelope.InputError, "min_verification must be between 0 and 3", nil)
 	}
 
 	// Autonomy: validate keys when non-empty (anything other than {} or null).
