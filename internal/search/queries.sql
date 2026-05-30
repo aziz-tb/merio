@@ -1,27 +1,21 @@
--- name: search-conversations-by-reference-number
+-- name: search-conversations
 SELECT
-    conversations.created_at,
-    conversations.uuid,
-    conversations.reference_number,
-    conversations.subject,
+    c.created_at,
+    c.uuid,
+    c.reference_number,
+    c.subject,
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), '') AS contact_name,
+    COALESCE(u.email, '') AS contact_email,
+    LEFT(COALESCE(c.last_message, ''), 80) AS last_message_snippet,
     cs.name AS status
-FROM conversations
-LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
-WHERE reference_number::text = $1;
-
--- name: search-conversations-by-contact-email
-SELECT
-    conversations.created_at,
-    conversations.uuid,
-    conversations.reference_number,
-    conversations.subject,
-    cs.name AS status
-FROM conversations
-JOIN users ON conversations.contact_id = users.id
-LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
-WHERE users.email = $1
-ORDER BY conversations.created_at DESC
-LIMIT 1000;
+FROM conversations c
+JOIN users u ON c.contact_id = u.id
+LEFT JOIN conversation_statuses cs ON c.status_id = cs.id
+WHERE c.reference_number::text ILIKE '%' || $1 || '%'
+   OR TRIM(CONCAT_WS(' ', u.first_name, u.last_name)) ILIKE '%' || $1 || '%'
+   OR u.email ILIKE '%' || $1 || '%'
+ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+LIMIT 10;
 
 -- name: search-messages
 SELECT

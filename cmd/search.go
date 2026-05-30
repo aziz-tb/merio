@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	minSearchQueryLength = 3
+	minConversationSearchQueryLength = 2
+	minSearchQueryLength             = 3
 )
 
 // handleSearchConversations searches conversations based on the query.
@@ -17,7 +18,7 @@ func handleSearchConversations(r *fastglue.Request) error {
 	wrapper := func(query string) (interface{}, error) {
 		return app.search.Conversations(query)
 	}
-	return handleSearch(r, wrapper)
+	return handleSearchWithMinLength(r, wrapper, minConversationSearchQueryLength)
 }
 
 // handleSearchMessages searches messages based on the query.
@@ -40,13 +41,17 @@ func handleSearchContacts(r *fastglue.Request) error {
 
 // handleSearch searches for the given query using the provided search function.
 func handleSearch(r *fastglue.Request, searchFunc func(string) (interface{}, error)) error {
+	return handleSearchWithMinLength(r, searchFunc, minSearchQueryLength)
+}
+
+func handleSearchWithMinLength(r *fastglue.Request, searchFunc func(string) (interface{}, error), minLength int) error {
 	var (
 		app = r.Context.(*App)
 		q   = string(r.RequestCtx.QueryArgs().Peek("query"))
 	)
 
-	if len(q) < minSearchQueryLength {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil))
+	if len(q) < minLength {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minLength)), nil))
 	}
 
 	results, err := searchFunc(q)
