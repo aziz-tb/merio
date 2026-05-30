@@ -3,6 +3,7 @@ package tagclassification
 import (
 	"fmt"
 
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	"github.com/abhinavxd/libredesk/internal/ai/llm"
 	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
 	"github.com/abhinavxd/libredesk/internal/ai/usage"
@@ -63,4 +64,19 @@ func New(a *Activities) (*Activities, error) {
 		return nil, fmt.Errorf("tagclassification: SystemUser required")
 	}
 	return a, nil
+}
+
+func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
+	return New(&Activities{
+		DB:              deps.DB,
+		Lo:              deps.Logger("tag-classification"),
+		LLMProvider:     deps.LLMProvider,
+		UsageMgr:        deps.Usage,
+		AIOperationsMgr: deps.AIOperations,
+		TagMgr:          deps.Tags,
+		ConversationMgr: deps.Conversation,
+		Realtime:        deps.Realtime,
+		SystemInboxID:   deps.SystemInboxID,
+		SystemUser:      deps.SystemUser,
+	})
 }

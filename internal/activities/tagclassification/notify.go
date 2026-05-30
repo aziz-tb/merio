@@ -14,7 +14,7 @@ func (a *Activities) NotifyClassificationFailureActivity(ctx context.Context, in
 	if input.ConversationUUID == "" {
 		return fmt.Errorf("conversation uuid required")
 	}
-	if err := a.publishClassificationFailure(ctx, input.ConversationUUID); err != nil {
+	if err := a.publishClassificationFailure(ctx, input.ConversationUUID, input.ErrorMessage); err != nil {
 		return fmt.Errorf("publish failure update: %w", err)
 	}
 	return nil

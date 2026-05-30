@@ -14,8 +14,10 @@ import (
 const (
 	DefaultChannel = "libredesk:realtime"
 
-	EventConversationUpdate       = "conversation_update"
-	EventAgentValidationCompleted = "agent_validation_completed"
+	EventConversationUpdate              = "conversation_update"
+	EventAgentValidationCompleted        = "agent_validation_completed"
+	EventTagClassificationCompleted      = "tag_classification_completed"
+	EventCustomerIdentificationCompleted = "customer_identification_completed"
 )
 
 type Event struct {
@@ -28,6 +30,15 @@ type Publisher interface {
 }
 
 type Handler func(context.Context, Event) error
+
+type WorkflowCompletedEvent struct {
+	Type                     string  `json:"type"`
+	ConversationUUID         string  `json:"conversation_uuid"`
+	Status                   string  `json:"status"`
+	TraceID                  string  `json:"trace_id"`
+	Error                    string  `json:"error"`
+	PreviousLinkedCustomerID *string `json:"previous_linked_customer_id,omitempty"`
+}
 
 func NewEvent(eventType string, data any) (Event, error) {
 	b, err := json.Marshal(data)

@@ -2,17 +2,19 @@ package models
 
 // Action constants for WebSocket messages.
 const (
-	MessageTypeMessageUpdate          = "message_update"
-	MessageTypeConversationUpdate     = "conversation_update"
-	MessageTypeNewMessage             = "new_message"
-	MessageTypeNewConversation        = "new_conversation"
-	MessageTypeNewNotification        = "new_notification"
-	MessageTypeError                  = "error"
-	MessageTypeConversationSubscribe  = "conversation_subscribe"
-	MessageTypeConversationSubscribed = "conversation_subscribed"
-	MessageTypeConversationViewers    = "conversation_viewers"
-	MessageTypeTyping                 = "typing"
-	MessageTypeAgentValidationDone    = "agent_validation_completed"
+	MessageTypeMessageUpdate              = "message_update"
+	MessageTypeConversationUpdate         = "conversation_update"
+	MessageTypeNewMessage                 = "new_message"
+	MessageTypeNewConversation            = "new_conversation"
+	MessageTypeNewNotification            = "new_notification"
+	MessageTypeError                      = "error"
+	MessageTypeConversationSubscribe      = "conversation_subscribe"
+	MessageTypeConversationSubscribed     = "conversation_subscribed"
+	MessageTypeConversationViewers        = "conversation_viewers"
+	MessageTypeTyping                     = "typing"
+	MessageTypeAgentValidationDone        = "agent_validation_completed"
+	MessageTypeTagClassificationDone      = "tag_classification_completed"
+	MessageTypeCustomerIdentificationDone = "customer_identification_completed"
 )
 
 // WSMessage represents a WS message.

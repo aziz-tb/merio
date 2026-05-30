@@ -56,15 +56,41 @@ func realtimeWebSocketPayload(event realtime.Event) ([]byte, bool, error) {
 		})
 		return payload, true, err
 	case realtime.EventAgentValidationCompleted:
-		var data map[string]any
+		var data realtime.WorkflowCompletedEvent
 		if err := json.Unmarshal(event.Data, &data); err != nil {
 			return nil, false, fmt.Errorf("decode agent validation event: %w", err)
 		}
-		if data["conversation_uuid"] == nil {
+		if data.ConversationUUID == "" {
 			return nil, false, fmt.Errorf("agent validation event missing conversation_uuid")
 		}
 		payload, err := json.Marshal(wsmodels.Message{
 			Type: wsmodels.MessageTypeAgentValidationDone,
+			Data: data,
+		})
+		return payload, true, err
+	case realtime.EventTagClassificationCompleted:
+		var data realtime.WorkflowCompletedEvent
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			return nil, false, fmt.Errorf("decode tag classification event: %w", err)
+		}
+		if data.ConversationUUID == "" {
+			return nil, false, fmt.Errorf("tag classification event missing conversation_uuid")
+		}
+		payload, err := json.Marshal(wsmodels.Message{
+			Type: wsmodels.MessageTypeTagClassificationDone,
+			Data: data,
+		})
+		return payload, true, err
+	case realtime.EventCustomerIdentificationCompleted:
+		var data realtime.WorkflowCompletedEvent
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			return nil, false, fmt.Errorf("decode customer identification event: %w", err)
+		}
+		if data.ConversationUUID == "" {
+			return nil, false, fmt.Errorf("customer identification event missing conversation_uuid")
+		}
+		payload, err := json.Marshal(wsmodels.Message{
+			Type: wsmodels.MessageTypeCustomerIdentificationDone,
 			Data: data,
 		})
 		return payload, true, err

@@ -33,7 +33,13 @@ const (
 	maxMessagesPerPage = 500
 	// Only allow visitor-to-contact upgrade within this window after the last continuity email.
 	upgradeWindowTTL = 7 * 24 * time.Hour
+
+	uniqueMessageSourceIDIndex = "index_unique_conversation_messages_on_source_id"
 )
+
+// ErrDuplicateMessageSourceID is returned when the DB-level inbound Message-ID
+// dedup guard catches a concurrent insert of the same source_id.
+var ErrDuplicateMessageSourceID = errors.New("duplicate message source_id")
 
 // Run starts a pool of worker goroutines to handle message dispatching via inbox's channel and processes incoming messages. It scans for
 // pending outgoing messages at the specified read interval and pushes them to the outgoing queue to be sent.
@@ -563,7 +569,12 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	// Insert Message.
 	if err := m.q.InsertMessage.Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
-		m.lo.Error("error inserting message in db", "error", err)
+		if isDuplicateMessageSourceIDError(err) {
+			return fmt.Errorf("%w: %s", ErrDuplicateMessageSourceID, message.SourceID.String)
+		}
+		if m.lo != nil {
+			m.lo.Error("error inserting message in db", "error", err)
+		}
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -610,6 +621,38 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	}
 
 	return nil
+}
+
+func isDuplicateMessageSourceIDError(err error) bool {
+	var pgErr *pq.Error
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return string(pgErr.Code) == "23505" && pgErr.Constraint == uniqueMessageSourceIDIndex
+}
+
+func (m *Manager) handleDuplicateIncomingMessage(in models.IncomingMessage, conversationID int, conversationUUID string, isNewConversation bool) {
+	sourceID := in.SourceID.String
+	if m.lo != nil {
+		m.lo.Info("duplicate message source_id detected; skipping inbound message", "source_id", sourceID, "conversation_id", conversationID)
+	}
+	if !isNewConversation || conversationUUID == "" {
+		return
+	}
+	if m.lo != nil {
+		m.lo.Info("deleting newly-created conversation after duplicate message source_id", "conversation_uuid", conversationUUID, "message_source_id", sourceID)
+	}
+	if err := m.cleanupOrphanedConversation(conversationUUID); err != nil && m.lo != nil {
+		m.lo.Warn("failed to clean up orphaned conversation after duplicate message source_id", "conversation_uuid", conversationUUID, "message_source_id", sourceID, "error", err)
+	}
+}
+
+// cleanupOrphanedConversation removes a conversation created for an inbound
+// message that could not be inserted. The conversations FKs cascade dependent
+// rows, matching the existing attachment-upload failure cleanup path.
+func (m *Manager) cleanupOrphanedConversation(conversationUUID string) error {
+	_, err := m.q.DeleteConversation.Exec(conversationUUID)
+	return err
 }
 
 // RecordAssigneeUserChange records an activity for a user assignee change.
@@ -797,6 +840,10 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Insert message.
 	if err = m.InsertMessage(&msg); err != nil {
+		if errors.Is(err, ErrDuplicateMessageSourceID) {
+			m.handleDuplicateIncomingMessage(in, conversationID, conversationUUID, isNewConversation)
+			return models.Message{}, nil
+		}
 		return models.Message{}, err
 	}
 

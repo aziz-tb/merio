@@ -9,6 +9,8 @@ export const WS_EVENT = {
     TYPING: 'typing',
     NEW_NOTIFICATION: 'new_notification',
     AGENT_VALIDATION_COMPLETED: 'agent_validation_completed',
+    TAG_CLASSIFICATION_COMPLETED: 'tag_classification_completed',
+    CUSTOMER_IDENTIFICATION_COMPLETED: 'customer_identification_completed',
 }
 
 // Message types that should not be queued because they become stale quickly

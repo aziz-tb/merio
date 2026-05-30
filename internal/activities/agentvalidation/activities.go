@@ -3,6 +3,7 @@ package agentvalidation
 import (
 	"fmt"
 
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
 	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
 	"github.com/abhinavxd/libredesk/internal/conversation"
@@ -48,4 +49,16 @@ func New(a *Activities) (*Activities, error) {
 		a.Realtime = realtime.NoopPublisher{}
 	}
 	return a, nil
+}
+
+func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
+	return New(&Activities{
+		DB:              deps.DB,
+		Lo:              deps.Logger("agent-validation"),
+		AgentsMgr:       deps.Agents,
+		ConversationMgr: deps.Conversation,
+		DetectionMgr:    deps.Detection,
+		AIOperationsMgr: deps.AIOperations,
+		Realtime:        deps.Realtime,
+	})
 }

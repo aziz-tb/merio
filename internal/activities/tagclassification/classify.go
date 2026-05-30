@@ -65,8 +65,8 @@ func (a *Activities) ClassifyTagsActivity(ctx context.Context, input Input) (Out
 		if err != nil {
 			return Output{}, fmt.Errorf("persist skipped classification: %w", err)
 		}
-		if err := a.publishTagsUpdate(ctx, conv.UUID, classificationStatusSkipped, id); err != nil {
-			a.Lo.Warn("publish skipped tag classification update failed", "conversation_uuid", conv.UUID, "error", err)
+		if err := a.publishTagsCompleted(ctx, conv.UUID, classificationStatusSkipped, traceID, ""); err != nil {
+			a.Lo.Warn("publish skipped tag classification completed failed", "conversation_uuid", conv.UUID, "error", err)
 		}
 		return Output{AIOperationID: id, Status: classificationStatusSkipped}, nil
 	}
@@ -134,8 +134,8 @@ func (a *Activities) ClassifyTagsActivity(ctx context.Context, input Input) (Out
 	}
 
 	a.applyTagSideEffects(conv, toApply, tags)
-	if err := a.publishTagsUpdate(ctx, conv.UUID, classificationStatusSuccess, aiOperationID); err != nil {
-		a.Lo.Warn("publish tag classification update failed", "conversation_uuid", conv.UUID, "error", err)
+	if err := a.publishTagsCompleted(ctx, conv.UUID, classificationStatusSuccess, traceID, ""); err != nil {
+		a.Lo.Warn("publish tag classification completed failed", "conversation_uuid", conv.UUID, "error", err)
 	}
 	if len(aiCandidates) > 0 && aiResult.Model != "" {
 		a.recordAIUsage(ctx, conv.ID, traceID, aiResult, aiLatencyMs)

@@ -120,7 +120,7 @@ func (a *Activities) ValidateAgentsActivity(ctx context.Context, input Input) (O
 		return Output{}, fmt.Errorf("insert ai_operation: %w", err)
 	}
 
-	if err := a.publishValidationCompleted(ctx, conv.UUID, opID, matchingIDs); err != nil {
+	if err := a.publishValidationCompleted(ctx, conv.UUID, statusSuccess, traceID, ""); err != nil {
 		a.Lo.Warn("publish agent validation update failed", "conversation_uuid", conv.UUID, "error", err)
 	}
 
@@ -169,7 +169,7 @@ func (a *Activities) persistSkipped(ctx context.Context, convID int, convUUID st
 	if err != nil {
 		return 0, fmt.Errorf("insert skipped ai_operation: %w", err)
 	}
-	if err := a.publishValidationCompleted(ctx, convUUID, opID, []int{}); err != nil {
+	if err := a.publishValidationCompleted(ctx, convUUID, statusSkipped, traceID, ""); err != nil {
 		a.Lo.Warn("publish skipped agent validation update failed", "conversation_uuid", convUUID, "error", err)
 	}
 	return opID, nil
