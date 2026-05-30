@@ -32,7 +32,7 @@ import { python } from '@codemirror/lang-python'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useColorMode } from '@vueuse/core'
 import { Maximize2, X } from 'lucide-vue-next'
-import { TextCursor } from 'lucide-vue-next'
+import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -58,8 +58,6 @@ const isFullscreen = ref(false)
 const hasHeader = computed(
     () => !!props.title || props.showLanguageLabel || props.expandable
 )
-
-
 
 const wrapperClasses = computed(() => {
     if (isFullscreen.value) {
