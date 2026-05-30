@@ -223,7 +223,7 @@
   :root {
     --ld-sidebar-collapsed-width: 45px;
     /* Responsive sidebar width: 15% of viewport, with sane bounds for tiny / huge screens. */
-    --ld-sidebar-width: clamp(220px, 15vw, 300px);
+    --ld-sidebar-width: clamp(230px, 15vw, 300px);
     --aside-width: 50px;
     --page-space: 5px;
   }
@@ -258,7 +258,7 @@
 }
 
 .sidebar-label {
-  @apply text-sm text-muted-foreground;
+  @apply text-xs text-muted-foreground;
 }
 
 .sidebar-value {

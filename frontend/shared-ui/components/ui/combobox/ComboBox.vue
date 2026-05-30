@@ -2,6 +2,7 @@
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
       <Button
+        v-if="triggerVariant === 'pill'"
         variant="outline"
         role="combobox"
         :aria-expanded="open"
@@ -12,6 +13,19 @@
         </span>
         <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
       </Button>
+      <button
+        v-else
+        type="button"
+        role="combobox"
+        :aria-expanded="open"
+        :class="cn(
+          'inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-sm transition-colors',
+          'hover:bg-muted/60 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
+          buttonClass
+        )"
+      >
+        <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
+      </button>
     </PopoverTrigger>
     <PopoverContent class="p-0">
       <Command v-model:search-term="searchTerm" :filter-function="passThroughFilter">
@@ -28,7 +42,7 @@
               <slot name="item" :item="item">{{ item.label }}</slot>
               <CheckIcon
                 :class="
-                  cn('ml-auto h-4 w-4', String(value) === item.value ? 'opacity-100' : 'opacity-0')
+                  cn('ml-auto h-4 w-4', String(value) === String(item.value) ? 'opacity-100' : 'opacity-0')
                 "
               />
             </CommandItem>
@@ -66,6 +80,11 @@ const props = defineProps({
   buttonClass: {
     type: String,
     default: ''
+  },
+  triggerVariant: {
+    type: String,
+    default: 'pill',
+    validator: (v) => ['pill', 'inline'].includes(v)
   }
 })
 
@@ -84,7 +103,7 @@ const filteredItems = computed(() => {
 
 const visibleItems = computed(() => filteredItems.value.slice(0, RENDER_CAP))
 
-const selectedItem = computed(() => props.items.find((i) => i.value === value.value))
+const selectedItem = computed(() => props.items.find((i) => String(i.value) === String(value.value)))
 const selectedLabel = computed(() => selectedItem.value?.label || props.defaultLabel)
 
 const handleSelect = (ev) => {

@@ -40,6 +40,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/settings/general", perm(handleUpdateGeneralSettings, "general_settings:manage"))
 	g.GET("/api/v1/settings/notifications/email", perm(handleGetEmailNotificationSettings, "notification_settings:manage"))
 	g.PUT("/api/v1/settings/notifications/email", perm(handleUpdateEmailNotificationSettings, "notification_settings:manage"))
+	g.GET("/api/v1/settings/customer-identification", auth(handleGetCustomerIdentificationSettings))
+	g.PUT("/api/v1/settings/customer-identification", perm(handleUpdateCustomerIdentificationSettings, "customers:manage"))
 
 	// OpenID connect single sign-on.
 	g.GET("/api/v1/oidc", perm(handleGetAllOIDC, "oidc:manage"))
@@ -47,6 +49,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/oidc/{id}", perm(handleGetOIDC, "oidc:manage"))
 	g.PUT("/api/v1/oidc/{id}", perm(handleUpdateOIDC, "oidc:manage"))
 	g.DELETE("/api/v1/oidc/{id}", perm(handleDeleteOIDC, "oidc:manage"))
+
+	// Operator-managed secrets.
+	g.GET("/api/v1/secrets", perm(handleListSecrets, "secrets:manage"))
+	g.POST("/api/v1/secrets", perm(handleCreateSecret, "secrets:manage"))
+	g.PUT("/api/v1/secrets/{name}", perm(handleUpdateSecret, "secrets:manage"))
+	g.DELETE("/api/v1/secrets/{name}", perm(handleDeleteSecret, "secrets:manage"))
 
 	// Conversations.
 	g.GET("/api/v1/conversations/all", perm(handleGetAllConversations, "conversations:read_all"))
@@ -71,6 +79,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/conversations/{uuid}/tags/classify", perm(handleClassifyConversationTags, "conversations:update_tags"))
 	g.POST("/api/v1/conversations/{uuid}/agents/validate", perm(handleValidateConversationAgents, "ai_agents:run"))
 	g.GET("/api/v1/conversations/{uuid}/agents/validation/latest", perm(handleGetLatestAgentValidation, "conversations:read"))
+	g.GET("/api/v1/conversations/{uuid}/ai-operations", perm(handleListConversationAIOperations, "conversations:read"))
+	g.GET("/api/v1/conversations/{uuid}/customer", perm(handleGetConversationCustomer, "conversations:read"))
+	g.GET("/api/v1/conversations/{uuid}/contract", perm(handleGetConversationContract, "conversations:read"))
+	g.POST("/api/v1/conversations/{uuid}/customer/identify", perm(handleIdentifyConversationCustomer, "conversations:read"))
+	g.POST("/api/v1/conversations/{uuid}/customer", perm(handleAssignConversationCustomer, "customers:assign"))
+	g.DELETE("/api/v1/conversations/{uuid}/customer", perm(handleRemoveConversationCustomer, "customers:assign"))
 	g.GET("/api/v1/conversations/{uuid}/page-visits", perm(handleGetContactPageVisits, "conversations:read"))
 	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleGetMessage, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/messages", perm(handleGetMessages, "messages:read"))
@@ -173,9 +187,17 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Contacts.
 	g.GET("/api/v1/contacts", perm(handleGetContacts, "contacts:read_all"))
+	g.GET("/api/v1/contacts/{id}/conversations", perm(handleGetContactConversations, "conversations:read"))
 	g.GET("/api/v1/contacts/{id}", perm(handleGetContact, "contacts:read"))
 	g.PUT("/api/v1/contacts/{id}", perm(handleUpdateContact, "contacts:write"))
+	g.PUT("/api/v1/contacts/{id}/linked-customer", perm(handleUpdateContactLinkedCustomer, "conversations:write"))
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
+
+	// Customer / contract identification resources.
+	g.GET("/api/v1/customers/search", perm(handleSearchCustomers, "customers:search"))
+	g.GET("/api/v1/customers/{customer_id}/linked-contacts", perm(handleGetCustomerLinkedContacts, "conversations:read"))
+	g.GET("/api/v1/customers/{customer_id}", auth(handleGetCustomer))
+	g.GET("/api/v1/contracts/{contract_id}", auth(handleGetContract))
 
 	// Contact notes.
 	g.GET("/api/v1/contacts/{id}/notes", perm(handleGetContactNotes, "contact_notes:read"))
@@ -228,16 +250,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/webhooks/{id}/toggle", perm(handleToggleWebhook, "webhooks:manage"))
 	g.POST("/api/v1/webhooks/{id}/test", perm(handleTestWebhook, "webhooks:manage"))
 
-	// Context Links.
-	g.GET("/api/v1/context-links", perm(handleGetContextLinks, "context_links:manage"))
-	g.GET("/api/v1/context-links/active", auth(handleGetActiveContextLinks))
-	g.GET("/api/v1/context-links/{id}", perm(handleGetContextLink, "context_links:manage"))
-	g.POST("/api/v1/context-links", perm(handleCreateContextLink, "context_links:manage"))
-	g.PUT("/api/v1/context-links/{id}", perm(handleUpdateContextLink, "context_links:manage"))
-	g.DELETE("/api/v1/context-links/{id}", perm(handleDeleteContextLink, "context_links:manage"))
-	g.PUT("/api/v1/context-links/{id}/toggle", perm(handleToggleContextLink, "context_links:manage"))
-	g.GET("/api/v1/context-links/{id}/url", auth(handleGetContextLinkURL))
-
 	// Reports.
 	g.GET("/api/v1/reports/overview/sla", perm(handleOverviewSLA, "reports:manage"))
 	g.GET("/api/v1/reports/overview/counts", perm(handleOverviewCounts, "reports:manage"))
@@ -289,6 +301,16 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// After the F5 dispatcher unification, this endpoint accepts both
 	// custom (Python) tools and internal capabilities; see handleInvokeAITool.
 	g.POST("/api/v1/ai/tools/{slug}/invoke", perm(handleInvokeAITool, "ai_tools:invoke"))
+
+	// Unified functions (Unified Executor Framework batch). The HTTP surface
+	// is deliberately narrow — list/get/update + preview. Create and Delete
+	// have no HTTP route in this batch (the ai_tools admin handlers call the
+	// Go Manager methods directly; customer-identification rows are seeded by
+	// migration and protected from deletion).
+	g.GET("/api/v1/functions", perm(handleListFunctions, "functions:manage"))
+	g.GET("/api/v1/functions/{name}", perm(handleGetFunction, "functions:manage"))
+	g.PUT("/api/v1/functions/{name}", perm(handleUpdateFunction, "functions:manage"))
+	g.POST("/api/v1/function/preview", perm(handlePreviewFunction, "functions:manage"))
 
 	// AI internal capabilities — list-only (registered in code, not DB).
 	// Gated on ai_agents:manage because the only consumer is the agent

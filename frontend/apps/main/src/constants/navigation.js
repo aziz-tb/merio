@@ -160,6 +160,13 @@ export const adminNavItems = [
         href: '/admin/sso',
         permission: 'oidc:manage',
         icon: 'KeyRound'
+      },
+      {
+        titleKey: 'globals.terms.secret',
+        href: '/admin/security/secrets',
+        permission: 'secrets:manage',
+        isTitleKeyPlural: true,
+        icon: 'Vault'
       }
     ]
   },
@@ -173,13 +180,24 @@ export const adminNavItems = [
         permission: 'webhooks:manage',
         isTitleKeyPlural: true,
         icon: 'Webhook'
+      }
+    ]
+  },
+  {
+    titleKey: 'admin.nav.erpIntegration',
+    icon: 'Database',
+    children: [
+      {
+        titleKey: 'admin.customerIdentification.title',
+        href: '/admin/customer-identification',
+        permission: 'customers:manage',
+        icon: 'Database'
       },
       {
-        titleKey: 'globals.terms.contextLink',
-        href: '/admin/context-links',
-        permission: 'context_links:manage',
-        isTitleKeyPlural: true,
-        icon: 'Link'
+        titleKey: 'admin.customerIdentification.erpConnectorsTitle',
+        href: '/admin/customer-identification/connectors',
+        permission: 'customers:manage',
+        icon: 'Plug'
       }
     ]
   }

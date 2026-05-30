@@ -20,61 +20,35 @@ import {
   SidebarMenuSubItem
 } from '@shared-ui/components/ui/sidebar'
 import { useAppSettingsStore } from '@main/stores/appSettings'
-import {
-  ChevronRight,
-  EllipsisVertical,
-  Search,
-  Plus,
-  CircleDashed,
-  AtSign,
-  Settings,
-  Clock,
-  Timer,
-  Inbox as InboxIcon,
-  CircleDot,
-  Tag,
-  SlidersHorizontal,
-  Eye,
-  Zap,
-  Workflow,
-  UserRound,
-  UsersRound,
-  Shield,
-  ScrollText,
-  Mail,
-  FileText,
-  KeyRound,
-  Webhook,
-  Link,
-  BarChart3,
-  CircleUser,
-  Contact,
-  BookOpen
-} from 'lucide-vue-next'
+import { At, BookOpen, Database, ChevronRight, EllipsisVertical, CircleUser, Gear, Plug, CircleDashed, CircleDot, Plus, Inbox as InboxIcon, MagnifyingGlass, LayerGroup, Clock, Bolt, Eye, Webhook, Link, Timer, Key, Shield, Users, User, Scroll, Tags, Sliders, Envelope, FileLines, DiagramNested, ChartBar, AddressCard, UserMagnifyingGlass, Vault} from '@qall/icons'
+
 
 const navIconMap = {
-  Settings,
+  Settings: Gear,
   Clock,
   Timer,
   Inbox: InboxIcon,
   CircleDot,
-  Tag,
-  SlidersHorizontal,
+  Tag: Tags,
+  SlidersHorizontal: Sliders,
   Eye,
-  Zap,
-  Workflow,
-  UserRound,
-  UsersRound,
+  Zap: Bolt,
+  Workflow: DiagramNested,
+  UserRound: User,
+  UsersRound: Users,
   Shield,
-  ScrollText,
-  Mail,
-  FileText,
-  KeyRound,
+  ScrollText: Scroll,
+  Mail: Envelope,
+  FileText: FileLines,
+  KeyRound: Key,
+  Vault,
   Webhook,
   Link,
-  BarChart3,
+  Database: UserMagnifyingGlass,
+  Plug,
+  BarChart3: ChartBar,
   CircleUser,
-  Contact,
+  Contact: AddressCard,
   BookOpen
 }
 import {
@@ -352,7 +326,7 @@ const hasSidebarContent = computed(
           <SidebarMenu>
             <SidebarMenuItem>
               <div class="flex flex-col items-start justify-between w-full px-1">
-                <span class="text-xs font-normal text-muted-foreground uppercase tracking-wider px-2">
+                <span class="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-2">
                   {{ t('globals.terms.admin') }}
                 </span>
                 <!-- App version -->
@@ -456,7 +430,7 @@ const hasSidebarContent = computed(
                 <div class="flex items-center gap-1">
                   <Button asChild variant="ghost" size="icon" class="size-7 text-muted-foreground hover:text-foreground">
                     <router-link :to="{ name: 'search' }" :title="t('globals.terms.search')">
-                      <Search class="size-4" />
+                      <MagnifyingGlass class="size-4" />
                     </router-link>
                   </Button>
                   <Button
@@ -486,7 +460,7 @@ const hasSidebarContent = computed(
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/mentioned')" @click="navigateToInbox('mentioned')">
-                    <AtSign />
+                    <At />
                     <span>
                       {{ t('globals.terms.mention', 2) }}
                     </span>
@@ -504,7 +478,7 @@ const hasSidebarContent = computed(
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
-                    <UsersRound />
+                    <LayerGroup />
                     <span>
                       {{ t('globals.messages.all') }}
                     </span>

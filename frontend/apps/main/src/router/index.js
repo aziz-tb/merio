@@ -96,10 +96,17 @@ const routes = [
           },
           {
             path: 'agents/new',
-            props: true,
-            name: 'new-ai-agent',
-            component: () => import('@main/views/ai/CreateOrEditAgent.vue'),
-            meta: { titleKey: 'aiAgent.new' }
+            name: 'agent-create',
+            component: () => import('@main/layouts/ai/AgentEditLayout.vue'),
+            meta: { titleKey: 'admin.ai.agent.newAgent', layoutContext: 'ai-agent-edit', fullBleed: true },
+            children: [
+              {
+                path: '',
+                name: 'agent-create-identity',
+                component: () => import('@main/features/ai/agents/edit/tabs/IdentityTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.newAgent' }
+              }
+            ]
           },
           {
             // Edit Agent layout. The shared AI sidebar owns the left
@@ -124,6 +131,12 @@ const routes = [
                 meta: { titleKey: 'admin.ai.agent.tab.identity' }
               },
               {
+                path: 'detection',
+                name: 'edit-ai-agent-detection',
+                component: () => import('@main/features/ai/agents/edit/tabs/DetectionTab.vue'),
+                meta: { titleKey: 'admin.ai.agent.tab.detection' }
+              },
+              {
                 path: 'instructions',
                 name: 'edit-ai-agent-instructions',
                 component: () => import('@main/features/ai/agents/edit/tabs/InstructionsTab.vue'),
@@ -140,12 +153,6 @@ const routes = [
                 name: 'edit-ai-agent-knowledge',
                 component: () => import('@main/features/ai/agents/edit/tabs/KnowledgeTab.vue'),
                 meta: { titleKey: 'admin.ai.agent.tab.knowledge' }
-              },
-              {
-                path: 'detection',
-                name: 'edit-ai-agent-detection',
-                component: () => import('@main/features/ai/agents/edit/tabs/DetectionTab.vue'),
-                meta: { titleKey: 'admin.ai.agent.tab.detection' }
               },
               {
                 path: 'history',
@@ -188,9 +195,13 @@ const routes = [
       // Bookmark redirects from the old /admin/ai/* paths.
       { path: '/admin/ai', redirect: { name: 'ai-agent-list' } },
       { path: '/admin/ai/agents', redirect: { name: 'ai-agent-list' } },
-      { path: '/admin/ai/agents/new', redirect: { name: 'new-ai-agent' } },
+      { path: '/admin/ai/agents/new', redirect: { name: 'agent-create-identity' } },
       {
         path: '/admin/ai/agents/:id/edit',
+        redirect: (to) => ({ name: 'edit-ai-agent', params: { id: to.params.id } })
+      },
+      {
+        path: '/admin/ai/agents/:id',
         redirect: (to) => ({ name: 'edit-ai-agent', params: { id: to.params.id } })
       },
       { path: '/admin/ai/tools', redirect: { name: 'ai-tool-list' } },
@@ -349,6 +360,26 @@ const routes = [
             name: 'general',
             component: () => import('@main/views/admin/general/General.vue'),
             meta: { titleKey: 'globals.terms.general' }
+          },
+          {
+            path: 'customer-identification',
+            name: 'customer-identification',
+            component: () =>
+              import('@main/views/admin/customer-identification/CustomerIdentificationPage.vue'),
+            meta: {
+              titleKey: 'admin.customerIdentification.title',
+              hidePageHeader: true
+            }
+          },
+          {
+            path: 'customer-identification/connectors',
+            name: 'customer-identification-connectors',
+            component: () =>
+              import('@main/views/admin/customer-identification/ERPConnectorsPage.vue'),
+            meta: {
+              titleKey: 'admin.customerIdentification.erpConnectorsTitle',
+              hidePageHeader: true
+            }
           },
           {
             path: 'business-hours',
@@ -598,6 +629,12 @@ const routes = [
             ]
           },
           {
+            path: 'security/secrets',
+            name: 'secrets',
+            component: () => import('@main/views/admin/security/SecretsPage.vue'),
+            meta: { titleKey: 'globals.terms.secret', titleCount: 2, hidePageHeader: true }
+          },
+          {
             path: 'webhooks',
             component: () => import('@main/views/admin/webhooks/Webhooks.vue'),
             name: 'webhooks',
@@ -620,34 +657,6 @@ const routes = [
                 name: 'new-webhook',
                 component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
                 meta: { titleKey: 'webhook.new' }
-              }
-            ]
-          },
-          {
-            path: 'context-links',
-            component: () => import('@main/views/admin/context-links/ContextLinks.vue'),
-            name: 'context-links',
-            meta: { titleKey: 'globals.terms.contextLink', titleCount: 2 },
-            children: [
-              {
-                path: '',
-                name: 'context-link-list',
-                component: () => import('@main/views/admin/context-links/ContextLinkList.vue')
-              },
-              {
-                path: ':id/edit',
-                props: true,
-                name: 'edit-context-link',
-                component: () =>
-                  import('@main/views/admin/context-links/CreateEditContextLink.vue'),
-                meta: { titleKey: 'contextLink.edit' }
-              },
-              {
-                path: 'new',
-                name: 'new-context-link',
-                component: () =>
-                  import('@main/views/admin/context-links/CreateEditContextLink.vue'),
-                meta: { titleKey: 'contextLink.new' }
               }
             ]
           },
