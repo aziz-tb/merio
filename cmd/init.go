@@ -128,6 +128,17 @@ func initConfig(ko *koanf.Koanf) {
 			return key, val
 		},
 	}), nil)
+	configRootURL = normalizeRootURL(ko.String("app.root_url"))
+}
+
+func normalizeRootURL(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), "/")
+}
+
+func applyConfigRuntimeOverrides() {
+	if configRootURL != "" {
+		ko.Set("app.root_url", configRootURL)
+	}
 }
 
 // validateConfig logs warnings/fatals for invalid config values.
@@ -285,6 +296,7 @@ func loadSettings(m *setting.Manager) {
 	if err := ko.Load(confmap.Provider(out, "."), nil); err != nil {
 		log.Fatalf("error parsing settings from DB: %v", err)
 	}
+	applyConfigRuntimeOverrides()
 }
 
 // initSettings inits setting manager.
@@ -627,6 +639,7 @@ func reloadSettings(app *App) error {
 	}
 	app.Lock()
 	err = ko.Load(confmap.Provider(out, "."), nil)
+	applyConfigRuntimeOverrides()
 	app.Unlock()
 	if err != nil {
 		app.lo.Error("error loading settings into koanf", "error", err)

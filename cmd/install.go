@@ -57,6 +57,9 @@ func install(ctx context.Context, db *sqlx.DB, fs stuffbin.FileSystem, idempoten
 	if err := installSchema(db, fs); err != nil {
 		log.Fatalf("error installing schema: %v", err)
 	}
+	if err := syncConfiguredRootURL(db); err != nil {
+		log.Fatalf("error syncing configured root URL: %v", err)
+	}
 	if err := recordCurrentMigrationVersion(db); err != nil {
 		log.Fatalf("error recording current migration version: %v", err)
 	}
@@ -93,5 +96,16 @@ func installSchema(db *sqlx.DB, fs stuffbin.FileSystem) error {
 		return err
 	}
 	_, err = db.Exec(string(q))
+	return err
+}
+
+func syncConfiguredRootURL(db *sqlx.DB) error {
+	if configRootURL == "" {
+		return nil
+	}
+	_, err := db.Exec(
+		`UPDATE settings SET value = to_jsonb($1::text), updated_at = now() WHERE key = 'app.root_url'`,
+		configRootURL,
+	)
 	return err
 }

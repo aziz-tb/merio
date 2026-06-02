@@ -33,6 +33,9 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 	settings["app.version"] = versionString
 	// Set restart required flag.
 	settings["app.restart_required"] = app.restartRequired
+	// Deployment config wins for root_url so OAuth callbacks and the admin UI
+	// agree even when the DB was seeded with local-development defaults.
+	settings["app.root_url"] = app.consts.Load().(*constants).AppBaseURL
 	return r.SendEnvelope(settings)
 }
 
@@ -53,7 +56,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	req.LogoURL = strings.TrimSpace(req.LogoURL)
 	req.Timezone = strings.TrimSpace(req.Timezone)
 	// Trim whitespace and trailing slash from root URL.
-	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
+	req.RootURL = normalizeRootURL(req.RootURL)
 
 	// Get current language before update.
 	app.Lock()

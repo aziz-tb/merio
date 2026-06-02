@@ -25,10 +25,12 @@ func handleGetConfig(r *fastglue.Request) error {
 	}
 
 	// Filter to only include public fields needed for initial app load
+	consts := app.consts.Load().(*constants)
 	publicSettings := map[string]any{
 		"app.lang":        settings["app.lang"],
 		"app.favicon_url": settings["app.favicon_url"],
 		"app.logo_url":    settings["app.logo_url"],
+		"app.root_url":    consts.AppBaseURL,
 		"app.site_name":   settings["app.site_name"],
 	}
 

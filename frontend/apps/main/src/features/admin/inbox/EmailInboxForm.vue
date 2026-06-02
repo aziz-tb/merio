@@ -852,8 +852,11 @@ const isSubmittingOAuth = ref(false)
 
 // Computed callback URL for OAuth
 const callbackUrl = computed(() => {
-  const rootUrl = appSettingsStore.settings['app.root_url']
-  return `${rootUrl}/api/v1/inboxes/oauth/${selectedProvider.value}/callback`
+  const rootUrl =
+    appSettingsStore.settings['app.root_url'] ||
+    appSettingsStore.public_config?.['app.root_url'] ||
+    window.location.origin
+  return `${String(rootUrl).replace(/\/+$/, '')}/api/v1/inboxes/oauth/${selectedProvider.value}/callback`
 })
 
 // Show form fields when OAuth is connected or manual setup is selected

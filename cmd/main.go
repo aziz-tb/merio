@@ -86,11 +86,12 @@ import (
 )
 
 var (
-	ko          = koanf.New(".")
-	ctx         = context.Background()
-	appName     = "merio"
-	frontendDir = "frontend/dist/main"
-	widgetDir   = "frontend/dist/widget"
+	ko            = koanf.New(".")
+	ctx           = context.Background()
+	appName       = "merio"
+	frontendDir   = "frontend/dist/main"
+	widgetDir     = "frontend/dist/widget"
+	configRootURL string
 
 	// Injected at build time.
 	buildString   string
@@ -276,6 +277,10 @@ func main() {
 	}
 
 	checkPendingUpgrade(db)
+
+	if err := syncConfiguredRootURL(db); err != nil {
+		log.Fatalf("error syncing configured root URL: %v", err)
+	}
 
 	// Load app settings from DB into the Koanf instance.
 	settings := initSettings(db)

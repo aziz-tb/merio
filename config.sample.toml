@@ -6,6 +6,9 @@ log_level = "debug"
 env = "dev"
 # Whether to automatically check for application updates on start up, app updates are shown as a banner in the admin panel.
 check_updates = true
+# Public URL where users access Merio. Used for OAuth callback URLs, public links, and email/template URLs.
+# Set this to your production origin, for example: https://merio.io
+root_url = "http://localhost:9000"
 # Encryption key. Generate using `openssl rand -hex 16` must be 32 characters long.
 encryption_key = "your-32-char-random-string-here!"
 # Operator-managed function secrets use MERIO_SECRETS_KEK from the

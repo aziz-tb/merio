@@ -1058,7 +1058,12 @@ const emailInboxes = computed(() =>
 
 // Get base URL from app settings
 const baseUrl = computed(() => {
-  return appSettingsStore.settings?.['app.root_url'] || window.location.origin
+  const rootUrl =
+    appSettingsStore.settings?.['app.root_url'] ||
+    appSettingsStore.public_config?.['app.root_url'] ||
+    window.location.origin
+
+  return String(rootUrl).replace(/\/+$/, '')
 })
 
 const closingScriptTag = '</scr' + 'ipt>'

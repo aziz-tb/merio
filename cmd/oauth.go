@@ -62,7 +62,7 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 	}
 
 	// Build redirect URI
-	redirectURI := app.consts.Load().(*constants).AppBaseURL + "/api/v1/inboxes/oauth/" + provider + "/callback"
+	redirectURI := strings.TrimRight(app.consts.Load().(*constants).AppBaseURL, "/") + "/api/v1/inboxes/oauth/" + provider + "/callback"
 
 	// Generate secure random state
 	state, err := stringutil.RandomAlphanumeric(32)
