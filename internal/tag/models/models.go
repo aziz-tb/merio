@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/detection"
+	"github.com/aziz-tb/merio/internal/detection"
 	"github.com/volatiletech/null/v9"
 )
 

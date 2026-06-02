@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
 // ErrFakeNotConfigured is returned when a Complete call hits a purpose

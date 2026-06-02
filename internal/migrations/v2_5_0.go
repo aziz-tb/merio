@@ -10,7 +10,7 @@ import (
 // the System Agent user, and grants the tools:call permission to the
 // Admin role on upgraded instances. Idempotent.
 //
-// The libredesk migration framework is forward-only. To roll this back,
+// The merio migration framework is forward-only. To roll this back,
 // run the SQL below manually in psql against the same database, then
 // redeploy a build that no longer contains the exec/runner code:
 //
@@ -21,9 +21,9 @@ import (
 //	           EXCEPT SELECT UNNEST(ARRAY['tools:call'])
 //	       );
 //	DELETE FROM user_roles
-//	WHERE  user_id IN (SELECT id FROM users WHERE email = 'system@libredesk.local');
+//	WHERE  user_id IN (SELECT id FROM users WHERE email = 'system@merio.local');
 //	DELETE FROM users
-//	WHERE  email = 'system@libredesk.local' AND type = 'agent';
+//	WHERE  email = 'system@merio.local' AND type = 'agent';
 //	DROP INDEX IF EXISTS idx_script_executions_invoker_user_id;
 //	DROP INDEX IF EXISTS idx_script_executions_started_at;
 //	DROP INDEX IF EXISTS idx_script_executions_conversation_id;
@@ -85,10 +85,10 @@ func V2_5_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	//    is safer than ON CONFLICT here.
 	if _, err := db.Exec(`
 		INSERT INTO users (type, enabled, email, first_name, last_name, password)
-		SELECT 'agent', TRUE, 'system@libredesk.local', 'System Agent', '', NULL
+		SELECT 'agent', TRUE, 'system@merio.local', 'System Agent', '', NULL
 		WHERE NOT EXISTS (
 			SELECT 1 FROM users
-			WHERE email = 'system@libredesk.local'
+			WHERE email = 'system@merio.local'
 			  AND type = 'agent' AND deleted_at IS NULL
 		);
 	`); err != nil {
@@ -100,7 +100,7 @@ func V2_5_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		INSERT INTO user_roles (user_id, role_id)
 		SELECT u.id, r.id
 		FROM   users u, roles r
-		WHERE  u.email = 'system@libredesk.local'
+		WHERE  u.email = 'system@merio.local'
 		  AND  u.type = 'agent' AND u.deleted_at IS NULL
 		  AND  r.name = 'Admin'
 		  AND  NOT EXISTS (

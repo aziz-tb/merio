@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/aziz-tb/merio/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/user/models"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"golang.org/x/crypto/bcrypt"

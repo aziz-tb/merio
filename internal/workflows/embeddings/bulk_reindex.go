@@ -8,7 +8,7 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
-	actembeddings "github.com/abhinavxd/libredesk/internal/activities/embeddings"
+	actembeddings "github.com/aziz-tb/merio/internal/activities/embeddings"
 )
 
 // BulkReindexInput drives a full re-indexing of one content type.

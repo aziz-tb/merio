@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	aiexecutions "github.com/abhinavxd/libredesk/internal/ai/executions"
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	aiexecutions "github.com/aziz-tb/merio/internal/ai/executions"
+	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

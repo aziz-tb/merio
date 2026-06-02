@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/httputil"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/httputil"
+	"github.com/aziz-tb/merio/internal/inbox/channel/livechat"
+	imodels "github.com/aziz-tb/merio/internal/inbox/models"
+	umodels "github.com/aziz-tb/merio/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/google/uuid"
 	"github.com/valyala/fasthttp"
@@ -22,9 +22,9 @@ const (
 	ctxWidgetInbox     = "widget_inbox"
 	ctxWidgetConfig    = "widget_config"
 
-	hdrWidgetInboxID      = "X-Libredesk-Inbox-ID"
-	hdrWidgetVisitorToken = "X-Libredesk-Visitor-Token"
-	hdrClearVisitorToken  = "X-Libredesk-Clear-Visitor"
+	hdrWidgetInboxID      = "X-Merio-Inbox-ID"
+	hdrWidgetVisitorToken = "X-Merio-Visitor-Token"
+	hdrClearVisitorToken  = "X-Merio-Clear-Visitor"
 )
 
 // validateWidgetInbox middleware validates the inbox from the request header or query param,

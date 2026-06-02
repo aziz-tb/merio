@@ -59,12 +59,12 @@ if api_key is None:
     raise SystemExit
 ```
 
-Secrets are configured by admins in Libredesk and are write-only after
+Secrets are configured by admins in Merio and are write-only after
 creation. `sdk.secret.get(name)` returns the plaintext string for this
 execution or `None` when the secret does not exist. There is no SDK write API.
 
 If a script accidentally prints a secret value to stdout, stderr, or a result
-message/data field, Libredesk replaces the value before storage with
+message/data field, Merio replaces the value before storage with
 `[REDACTED:<secret_name>]`.
 
 ## Outputs

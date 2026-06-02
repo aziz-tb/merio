@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/abhinavxd/libredesk/internal/crypto"
+	"github.com/aziz-tb/merio/internal/crypto"
 	"github.com/jmoiron/sqlx"
 )
 

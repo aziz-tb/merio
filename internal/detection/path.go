@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
-	"github.com/abhinavxd/libredesk/internal/customerdata"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	customermodels "github.com/aziz-tb/merio/internal/customer/models"
+	"github.com/aziz-tb/merio/internal/customerdata"
 )
 
 // ResolvePath returns the value at the source/path in ctx.

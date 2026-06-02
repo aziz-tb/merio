@@ -1,4 +1,4 @@
-// Package user managers all users in libredesk - agents and contacts.
+// Package user managers all users in merio - agents and contacts.
 package user
 
 import (
@@ -16,11 +16,11 @@ import (
 
 	"log"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	rmodels "github.com/abhinavxd/libredesk/internal/role/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/aziz-tb/merio/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/envelope"
+	rmodels "github.com/aziz-tb/merio/internal/role/models"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -543,7 +543,7 @@ func CreateSystemUser(ctx context.Context, password string, db *sqlx.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to create system user: %v", err)
 	}
-	log.Print("system user created successfully. Use command 'libredesk --set-system-user-password' to set the password and login with email 'System'.")
+	log.Print("system user created successfully. Use command 'merio --set-system-user-password' to set the password and login with email 'System'.")
 	return nil
 }
 

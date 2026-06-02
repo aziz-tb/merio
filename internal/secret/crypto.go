@@ -11,11 +11,11 @@ import (
 	"os"
 )
 
-const KEKEnvVar = "LIBREDESK_SECRETS_KEK"
+const KEKEnvVar = "MERIO_SECRETS_KEK"
 
 var (
-	ErrKEKMissing = errors.New("LIBREDESK_SECRETS_KEK env var is not set")
-	ErrKEKInvalid = errors.New("LIBREDESK_SECRETS_KEK is not a valid base64-encoded 32-byte key")
+	ErrKEKMissing = errors.New("MERIO_SECRETS_KEK env var is not set")
+	ErrKEKInvalid = errors.New("MERIO_SECRETS_KEK is not a valid base64-encoded 32-byte key")
 )
 
 // LoadKEK reads the secrets key-encryption key from the environment.

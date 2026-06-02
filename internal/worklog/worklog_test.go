@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/worklog/models"
+	"github.com/aziz-tb/merio/internal/worklog/models"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -17,10 +17,10 @@ import (
 // CI will skip them until the workflow grows a postgres service step (see
 // B1-WORKLOG-PLAN.md §7). Run locally with:
 //
-//	DATABASE_URL='postgres://libredesk:libredesk@localhost:5432/libredesk_test?sslmode=disable' \
+//	DATABASE_URL='postgres://merio:merio@localhost:5432/merio_test?sslmode=disable' \
 //	  go test ./internal/worklog/...
 //
-// The DB must already have the libredesk schema applied (worklogs table, plus
+// The DB must already have the merio schema applied (worklogs table, plus
 // users + conversations + their dependencies for FK satisfaction).
 
 func mustOpenDB(t *testing.T) *sqlx.DB {

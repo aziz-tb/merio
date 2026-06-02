@@ -1,4 +1,4 @@
-# Libredesk Roadmap
+# Merio Roadmap
 
 ## Vision
 A high-performance, omni-channel, self-hosted customer support desk.

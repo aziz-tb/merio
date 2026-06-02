@@ -65,7 +65,7 @@ func V0_10_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 
 <p>
 Best regards,<br>
-libredesk
+merio
 </p>',
 					false,
 					'Mentioned in conversation',

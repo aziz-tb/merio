@@ -3,14 +3,14 @@ package agentvalidation
 import (
 	"fmt"
 
-	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
-	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
-	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
-	"github.com/abhinavxd/libredesk/internal/contract"
-	"github.com/abhinavxd/libredesk/internal/conversation"
-	"github.com/abhinavxd/libredesk/internal/customer"
-	"github.com/abhinavxd/libredesk/internal/detection"
-	"github.com/abhinavxd/libredesk/internal/realtime"
+	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
+	aiagents "github.com/aziz-tb/merio/internal/ai/agents"
+	aioperations "github.com/aziz-tb/merio/internal/ai/operations"
+	"github.com/aziz-tb/merio/internal/contract"
+	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/customer"
+	"github.com/aziz-tb/merio/internal/detection"
+	"github.com/aziz-tb/merio/internal/realtime"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 )

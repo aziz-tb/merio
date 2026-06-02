@@ -1,6 +1,6 @@
 package main
 
-import cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+import cmodels "github.com/aziz-tb/merio/internal/conversation/models"
 
 func invalidateLinkedConversationCaches(app *App, conv *cmodels.Conversation, reason string) {
 	if app == nil || conv == nil {

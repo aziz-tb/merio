@@ -7,9 +7,9 @@ import (
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/llm/catalog"
-	"github.com/abhinavxd/libredesk/internal/ai/llm/preset"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm/catalog"
+	"github.com/aziz-tb/merio/internal/ai/llm/preset"
 )
 
 // reqToSDKParams turns our provider-agnostic CompletionRequest +

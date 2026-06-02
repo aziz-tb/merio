@@ -9,21 +9,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/conversation/models"
+	imodels "github.com/aziz-tb/merio/internal/inbox/models"
+	"github.com/aziz-tb/merio/internal/stringutil"
 	"github.com/knadh/smtppool"
 )
 
 const (
-	headerReturnPath              = "Return-Path"
-	headerMessageID               = "Message-ID"
-	headerReferences              = "References"
-	headerInReplyTo               = "In-Reply-To"
-	headerLibredeskLoopPrevention = "X-Libredesk-Loop-Prevention"
-	headerLibredeskConversationID = "X-Libredesk-Conversation-UUID"
-	headerAutoreply               = "X-Autoreply"
-	headerAutoSubmitted           = "Auto-Submitted"
+	headerReturnPath          = "Return-Path"
+	headerMessageID           = "Message-ID"
+	headerReferences          = "References"
+	headerInReplyTo           = "In-Reply-To"
+	headerMerioLoopPrevention = "X-Merio-Loop-Prevention"
+	headerMerioConversationID = "X-Merio-Conversation-UUID"
+	headerAutoreply           = "X-Autoreply"
+	headerAutoSubmitted       = "Auto-Submitted"
 
 	dispositionInline = "inline"
 )
@@ -159,13 +159,13 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		Headers:     textproto.MIMEHeader{},
 	}
 
-	// Set libredesk loop prevention header to from address.
+	// Set merio loop prevention header to from address.
 	emailAddress, err := stringutil.ExtractEmail(m.From)
 	if err != nil {
 		e.lo.Error("failed to extract email address from the 'from' header", "error", err)
 		return fmt.Errorf("failed to extract email address from 'From' header: %w", err)
 	}
-	email.Headers.Set(headerLibredeskLoopPrevention, emailAddress)
+	email.Headers.Set(headerMerioLoopPrevention, emailAddress)
 
 	if rt := resolveReplyTo(m.ReplyTo, e.replyTo, emailAddress, m.ConversationUUID, e.enablePlusAddressing); rt != "" {
 		email.Headers.Set("Reply-To", rt)
@@ -200,7 +200,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 
 	// Set conversation uuid header
 	if m.ConversationUUID != "" {
-		email.Headers.Set(headerLibredeskConversationID, m.ConversationUUID)
+		email.Headers.Set(headerMerioConversationID, m.ConversationUUID)
 		e.lo.Debug("conversation uuid header set", "conversation_uuid", m.ConversationUUID)
 	}
 

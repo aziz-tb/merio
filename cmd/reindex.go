@@ -9,8 +9,8 @@ import (
 
 	enumspb "go.temporal.io/api/enums/v1"
 
-	"github.com/abhinavxd/libredesk/internal/temporal"
-	wfembeddings "github.com/abhinavxd/libredesk/internal/workflows/embeddings"
+	"github.com/aziz-tb/merio/internal/temporal"
+	wfembeddings "github.com/aziz-tb/merio/internal/workflows/embeddings"
 )
 
 // runReindexEmbeddings is invoked from main when --reindex-embeddings is
@@ -23,7 +23,7 @@ import (
 //
 // Usage:
 //
-//	./libredesk --reindex-embeddings \
+//	./merio --reindex-embeddings \
 //	    --reindex-content-type=kb_chunk \
 //	    --reindex-batch-size=100 \
 //	    --reindex-parallelism=4

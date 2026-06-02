@@ -1,6 +1,6 @@
 // Copyright Kailash Nadh (https://github.com/knadh/listmonk)
 // SPDX-License-Identifier: AGPL-3.0
-// Adapted from listmonk for Libredesk.
+// Adapted from listmonk for Merio.
 
 package main
 
@@ -14,7 +14,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-const updateCheckURL = "https://updates.libredesk.io/updates.json"
+const updateCheckURL = "https://updates.merio.io/updates.json"
 
 type AppUpdate struct {
 	Update struct {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	aiopmodels "github.com/aziz-tb/merio/internal/ai/operations/models"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 func (a *Activities) CreateOperationActivity(ctx context.Context, in cimodels.CreateOperationInput) (cimodels.CreateOperationOutput, error) {

@@ -3,10 +3,10 @@ package customeridentification
 import (
 	"encoding/json"
 
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	convmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
-	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	customermodels "github.com/aziz-tb/merio/internal/customer/models"
+	verificationmodels "github.com/aziz-tb/merio/internal/verification/models"
 )
 
 const (

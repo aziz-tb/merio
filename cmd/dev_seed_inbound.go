@@ -11,12 +11,12 @@ import (
 	"time"
 	"unicode"
 
-	conv "github.com/abhinavxd/libredesk/internal/conversation"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	conv "github.com/aziz-tb/merio/internal/conversation"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/inbox"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	umodels "github.com/aziz-tb/merio/internal/user/models"
 	"github.com/google/uuid"
 	"github.com/volatiletech/null/v9"
 )
@@ -30,14 +30,14 @@ func runDevSeedInboundCLI(ctx context.Context, args []string) {
 }
 
 // devSeedInboundCmd creates a synthetic inbound email conversation for testing.
-// It is intentionally gated behind LIBREDESK_DEV=1 and bypasses IMAP while
+// It is intentionally gated behind MERIO_DEV=1 and bypasses IMAP while
 // still using the production CreateConversation SQL path.
 func devSeedInboundCmd(args []string) error {
-	fs := flag.NewFlagSet("libredesk dev-seed-inbound", flag.ContinueOnError)
+	fs := flag.NewFlagSet("merio dev-seed-inbound", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), `Usage:
-  LIBREDESK_DEV=1 libredesk dev-seed-inbound \
+  MERIO_DEV=1 merio dev-seed-inbound \
     --from "lukas.weber@example.com" \
     --inbox-id 1 \
     --subject "Frage zu meinem Vertrag C-880011" \
@@ -59,8 +59,8 @@ Options:
 		return err
 	}
 
-	if os.Getenv("LIBREDESK_DEV") != "1" {
-		return errors.New("dev-seed-inbound requires LIBREDESK_DEV=1 to be set")
+	if os.Getenv("MERIO_DEV") != "1" {
+		return errors.New("dev-seed-inbound requires MERIO_DEV=1 to be set")
 	}
 
 	*from = strings.ToLower(strings.TrimSpace(*from))
@@ -110,7 +110,7 @@ Options:
 	}
 	fmt.Printf("Created conversation: id=%d uuid=%s\n", convID, convUUID)
 
-	sourceID := fmt.Sprintf("dev-seed-%s@libredesk.local", uuid.NewString())
+	sourceID := fmt.Sprintf("dev-seed-%s@merio.local", uuid.NewString())
 	meta, _ := json.Marshal(map[string]any{
 		"dev_seed": true,
 		"from":     *from,
@@ -152,7 +152,7 @@ func bootstrapDevSeedInboundApp(configPath string) (*App, error) {
 		return nil, fmt.Errorf("check schema: %w", err)
 	}
 	if !installed {
-		return nil, errors.New("database tables are missing. Run libredesk --install first")
+		return nil, errors.New("database tables are missing. Run merio --install first")
 	}
 
 	i18n := initI18n(fs)

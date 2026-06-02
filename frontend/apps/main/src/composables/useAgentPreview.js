@@ -39,10 +39,10 @@ export function useAgentPreview(agentId) {
   // Persisted preference: whether the preview should claim the rail on page
   // load. The actual open state is coordinated by useAgentRightRail so other
   // panels, such as the path picker, can temporarily claim the same slot.
-  const preferOpen = useStorage('libredesk:agent-preview-prefer-open', true)
+  const preferOpen = useStorage('merio:agent-preview-prefer-open', true)
   const isOpen = computed(() => rail.isActive('preview'))
 
-  // Channel — 'chat' | 'email'. Email is the v1 Libredesk default;
+  // Channel — 'chat' | 'email'. Email is the v1 Merio default;
   // Chat is rendered but the run payload doesn't distinguish today.
   const channel = ref('email')
 

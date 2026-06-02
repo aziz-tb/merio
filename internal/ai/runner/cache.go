@@ -1,6 +1,6 @@
 package runner
 
-import "github.com/abhinavxd/libredesk/internal/ai/llm"
+import "github.com/aziz-tb/merio/internal/ai/llm"
 
 // maxCacheMarkers is Anthropic's per-request cap on cache_control
 // breakpoints. The provider also enforces this; the runner's manager

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
-	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
+	verificationmodels "github.com/aziz-tb/merio/internal/verification/models"
 )
 
 func init() {

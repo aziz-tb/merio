@@ -24,13 +24,13 @@ import (
 	"fmt"
 	"time"
 
-	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/models"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/validate"
-	execRunner "github.com/abhinavxd/libredesk/internal/exec/runner"
-	execModels "github.com/abhinavxd/libredesk/internal/exec/runner/models"
-	"github.com/abhinavxd/libredesk/internal/function"
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
+	"github.com/aziz-tb/merio/internal/ai/tools/models"
+	"github.com/aziz-tb/merio/internal/ai/tools/validate"
+	execRunner "github.com/aziz-tb/merio/internal/exec/runner"
+	execModels "github.com/aziz-tb/merio/internal/exec/runner/models"
+	"github.com/aziz-tb/merio/internal/function"
 )
 
 // DispatchRequest is the input to Dispatch — the manual-invocation API

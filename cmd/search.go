@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/zerodha/fastglue"
 )
 

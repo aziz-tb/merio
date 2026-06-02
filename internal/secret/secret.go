@@ -12,8 +12,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	secretmodels "github.com/abhinavxd/libredesk/internal/secret/models"
+	"github.com/aziz-tb/merio/internal/dbutil"
+	secretmodels "github.com/aziz-tb/merio/internal/secret/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"

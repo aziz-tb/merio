@@ -1,8 +1,8 @@
 package user
 
 import (
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/user/models"
 )
 
 // GetNotes returns all notes for a user.

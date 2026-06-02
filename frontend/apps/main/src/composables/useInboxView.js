@@ -6,7 +6,7 @@ export const INBOX_VIEW_MODES = {
   TABLE: 'table'
 }
 
-const STORAGE_NAMESPACE = 'libredesk:inbox'
+const STORAGE_NAMESPACE = 'merio:inbox'
 const viewMode = ref(INBOX_VIEW_MODES.COLUMNS)
 let initialized = false
 

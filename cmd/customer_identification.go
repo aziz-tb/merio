@@ -11,11 +11,11 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	itemporal "github.com/abhinavxd/libredesk/internal/temporal"
-	wfcustomeridentification "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	itemporal "github.com/aziz-tb/merio/internal/temporal"
+	wfcustomeridentification "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

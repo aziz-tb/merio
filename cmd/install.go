@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/colorlog"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/user"
+	"github.com/aziz-tb/merio/internal/colorlog"
+	"github.com/aziz-tb/merio/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/user"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/stuffbin"
 )
@@ -24,7 +24,7 @@ func install(ctx context.Context, db *sqlx.DB, fs stuffbin.FileSystem, idempoten
 	}
 
 	// Make sure the system user password is strong enough.
-	password := os.Getenv("LIBREDESK_SYSTEM_USER_PASSWORD")
+	password := os.Getenv("MERIO_SYSTEM_USER_PASSWORD")
 	if password != "" && !user.IsStrongPassword(password) && !schemaInstalled {
 		log.Fatalf("system user password is not strong, %s", user.PasswordHint)
 	}

@@ -6,9 +6,9 @@
 package models
 
 import (
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	convmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	custmodels "github.com/abhinavxd/libredesk/internal/customer/models"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	custmodels "github.com/aziz-tb/merio/internal/customer/models"
 )
 
 type VerificationLevel int

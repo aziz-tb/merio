@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/usage"
-	"github.com/abhinavxd/libredesk/internal/ai/usage/redact"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/usage"
+	"github.com/aziz-tb/merio/internal/ai/usage/redact"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 func (a *Activities) LLMExtractActivity(ctx context.Context, in cimodels.LLMExtractInput) (cimodels.LLMExtractOutput, error) {

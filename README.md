@@ -1,14 +1,14 @@
 <a href="https://zerodha.tech"><img src="https://zerodha.tech/static/images/github-badge.svg" align="right" alt="Zerodha Tech Badge" /></a>
 
 
-# libredesk
+# merio
 
 Modern, open source, self-hosted omnichannel customer support desk. Live chat, email, and more in a single binary.
 
-![image](https://libredesk.io/hero-dark-v2.png?q=2)
+![image](https://merio.io/hero-dark-v2.png?q=2)
 
 
-Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live demo**](https://demo.libredesk.io/).
+Visit [merio.io](https://merio.io) for more info. Check out the [**live demo**](https://demo.merio.io/).
 
 ## Features
 
@@ -41,54 +41,54 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live 
 - **Command bar**  
   Opens with a simple shortcut (CTRL+K) and lets you quickly perform actions on conversations.
 
-And more — checkout [libredesk.io](https://libredesk.io) or try the [live demo](https://demo.libredesk.io/).
+And more — checkout [merio.io](https://merio.io) or try the [live demo](https://demo.merio.io/).
 
 
 ## Installation
 
 ### Docker
 
-The latest image is available on DockerHub at [`libredesk/libredesk:latest`](https://hub.docker.com/r/libredesk/libredesk/tags?page=1&ordering=last_updated&name=latest)
+The latest image is available on DockerHub at [`merio/merio:latest`](https://hub.docker.com/r/merio/merio/tags?page=1&ordering=last_updated&name=latest)
 
 ```shell
 # Download the compose file and sample config file in the current directory.
-curl -LO https://github.com/abhinavxd/libredesk/raw/main/docker-compose.yml
-curl -LO https://github.com/abhinavxd/libredesk/raw/main/config.sample.toml
+curl -LO https://github.com/aziz-tb/merio/raw/main/docker-compose.yml
+curl -LO https://github.com/aziz-tb/merio/raw/main/config.sample.toml
 
 # Copy the config.sample.toml to config.toml and edit it as needed.
 cp config.sample.toml config.toml
 
 # Configure the Secrets Manager KEK used for operator-managed function secrets.
-export LIBREDESK_SECRETS_KEK="$(openssl rand -base64 32)"
+export MERIO_SECRETS_KEK="$(openssl rand -base64 32)"
 
 # Run the services in the background.
 docker compose up -d
 
 # Setting System user password.
-docker exec -it libredesk_app ./libredesk --set-system-user-password
+docker exec -it merio_app ./merio --set-system-user-password
 ```
 
 Go to `http://localhost:9000` and login with username `System` and the password you set using the `--set-system-user-password` command.
 
-See [installation docs](https://docs.libredesk.io/getting-started/installation)
+See [installation docs](https://docs.merio.io/getting-started/installation)
 
 __________________
 
 ### Binary
-- Download the [latest release](https://github.com/abhinavxd/libredesk/releases) and extract the libredesk binary.
+- Download the [latest release](https://github.com/aziz-tb/merio/releases) and extract the merio binary.
 - Edit config.toml as needed.
-- Set `LIBREDESK_SECRETS_KEK` to a base64-encoded 32-byte AES key (`openssl rand -base64 32`).
-- `./libredesk --install` to setup the Postgres DB.
-- Run `./libredesk --set-system-user-password` to set the password for the System user.
-- Run `./libredesk` and visit `http://localhost:9000` and login with email `System` and the password you set using the --set-system-user-password command.
+- Set `MERIO_SECRETS_KEK` to a base64-encoded 32-byte AES key (`openssl rand -base64 32`).
+- `./merio --install` to setup the Postgres DB.
+- Run `./merio --set-system-user-password` to set the password for the System user.
+- Run `./merio` and visit `http://localhost:9000` and login with email `System` and the password you set using the --set-system-user-password command.
 
-See [installation docs](https://docs.libredesk.io/getting-started/installation)
+See [installation docs](https://docs.merio.io/getting-started/installation)
 __________________
 
 ## Developers
 
 - If you are interested in contributing, **please read [CONTRIBUTING.md](./CONTRIBUTING.md) first**.
-- For local development and setup, refer to the [developer setup](https://docs.libredesk.io/contributing/developer-setup).
+- For local development and setup, refer to the [developer setup](https://docs.merio.io/contributing/developer-setup).
 - For planned features and project direction, see [ROADMAP.md](./ROADMAP.md).
 
 The backend is written in Go and the frontend is Vue.js 3 with Shadcn UI.
@@ -96,4 +96,4 @@ The backend is written in Go and the frontend is Vue.js 3 with Shadcn UI.
 
 
 ## Translators
-You can help translate libredesk into your language on [Crowdin](https://crowdin.com/project/libredesk).  
+You can help translate merio into your language on [Crowdin](https://crowdin.com/project/merio).

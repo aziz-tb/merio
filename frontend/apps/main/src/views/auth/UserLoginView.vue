@@ -9,7 +9,7 @@
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
           <CardTitle class="text-2xl font-bold text-foreground">
-            {{ appSettingsStore.public_config?.['app.site_name'] || 'libredesk' }}
+            {{ appSettingsStore.public_config?.['app.site_name'] || 'merio' }}
           </CardTitle>
           <p class="text-sm text-muted-foreground">{{ t('auth.signIn') }}</p>
         </div>
@@ -155,8 +155,8 @@ const appSettingsStore = useAppSettingsStore()
 const isDemoBuild = import.meta.env.VITE_DEMO_BUILD === 'true'
 
 const demoCredentials = {
-  email: 'demo@libredesk.io',
-  password: 'demo@libredesk.io'
+  email: 'demo@merio.io',
+  password: 'demo@merio.io'
 }
 
 onMounted(async () => {

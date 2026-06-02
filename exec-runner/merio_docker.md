@@ -49,10 +49,10 @@ services:
 
   exec-runner:
     build: ./services/exec-runner
-    container_name: libredesk_exec_runner
+    container_name: merio_exec_runner
     restart: unless-stopped
     networks:
-      - libredesk
+      - merio
     # KVM device passthrough — required for hardware virtualization
     # On macOS Docker Desktop, this won't work; see docs/exec-runner-dev.md
     devices:

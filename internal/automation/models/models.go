@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
-	"github.com/abhinavxd/libredesk/internal/detection"
+	authzModels "github.com/aziz-tb/merio/internal/authz/models"
+	"github.com/aziz-tb/merio/internal/detection"
 	"github.com/lib/pq"
 )
 

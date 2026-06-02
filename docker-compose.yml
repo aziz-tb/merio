@@ -1,5 +1,5 @@
 services:
-  # Libredesk app.
+  # Merio app.
   app:
     build:
       context: .
@@ -10,27 +10,27 @@ services:
       args:
         VERSION: ${VERSION:-dev}
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    container_name: libredesk_app
+    container_name: merio_app
     restart: unless-stopped
     ports:
       - "9000:9000"
     environment:
-      LIBREDESK_SYSTEM_USER_PASSWORD: ${LIBREDESK_SYSTEM_USER_PASSWORD:-}
-      LIBREDESK_SECRETS_KEK: ${LIBREDESK_SECRETS_KEK:?set LIBREDESK_SECRETS_KEK to openssl rand -base64 32}
-      LIBREDESK_EXEC__SANDBOX_URL: http://host.docker.internal:8090
+      MERIO_SYSTEM_USER_PASSWORD: ${MERIO_SYSTEM_USER_PASSWORD:-}
+      MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?set MERIO_SECRETS_KEK to openssl rand -base64 32}
+      MERIO_EXEC__SANDBOX_URL: http://host.docker.internal:8090
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - libredesk
+      - merio
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
     volumes:
-      - ./uploads:/libredesk/uploads:rw
-      - ./config.toml:/libredesk/config.toml
-      - ./config:/libredesk/config:ro
+      - ./uploads:/merio/uploads:rw
+      - ./config.toml:/merio/config.toml
+      - ./config:/merio/config:ro
     healthcheck:
       # Hits a known-cheap endpoint. If 9000 doesn't respond, the app
       # is considered unhealthy and restart policy applies.
@@ -39,23 +39,23 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    command: [sh, -c, "./libredesk --install --idempotent-install --yes --config /libredesk/config.toml && ./libredesk --upgrade --yes --config /libredesk/config.toml && ./libredesk --config /libredesk/config.toml"]
+    command: [sh, -c, "./merio --install --idempotent-install --yes --config /merio/config.toml && ./merio --upgrade --yes --config /merio/config.toml && ./merio --config /merio/config.toml"]
 
   # PostgreSQL — main application database.
   db:
     image: pgvector/pgvector:pg17
-    container_name: libredesk_db
+    container_name: merio_db
     restart: unless-stopped
     networks:
-      - libredesk
+      - merio
     ports:
       - "127.0.0.1:5433:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-libredesk}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-libredesk}
-      POSTGRES_DB: ${POSTGRES_DB:-libredesk}
+      POSTGRES_USER: ${POSTGRES_USER:-merio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-merio}
+      POSTGRES_DB: ${POSTGRES_DB:-merio}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-libredesk} -d ${POSTGRES_DB:-libredesk}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-merio} -d ${POSTGRES_DB:-merio}"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -65,12 +65,12 @@ services:
   # Redis.
   redis:
     image: redis:7-alpine
-    container_name: libredesk_redis
+    container_name: merio_redis
     restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"
     networks:
-      - libredesk
+      - merio
     volumes:
       - redis-data:/data
     healthcheck:
@@ -82,14 +82,14 @@ services:
   # Temporal Postgres (dedicated; separate from the app's main DB).
   temporal-postgresql:
     image: postgres:17-alpine
-    container_name: libredesk_temporal_db
+    container_name: merio_temporal_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: temporal
       POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:-temporal}
       POSTGRES_DB: temporal
     networks:
-      - libredesk
+      - merio
     ports:
       - "127.0.0.1:5434:5432"
     volumes:
@@ -104,7 +104,7 @@ services:
   # Temporal server (dev/local pattern via auto-setup image).
   temporal:
     image: temporalio/auto-setup:1.29
-    container_name: libredesk_temporal
+    container_name: merio_temporal
     restart: unless-stopped
     environment:
       DB: postgres12
@@ -113,10 +113,10 @@ services:
       POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:-temporal}
       POSTGRES_SEEDS: temporal-postgresql
       DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
-      DEFAULT_NAMESPACE: libredesk
+      DEFAULT_NAMESPACE: merio
       DEFAULT_NAMESPACE_RETENTION: 30d
     networks:
-      - libredesk
+      - merio
     ports:
       - "127.0.0.1:7233:7233"
       - "127.0.0.1:9090:9090"
@@ -129,13 +129,13 @@ services:
   # Temporal Web UI.
   temporal-ui:
     image: temporalio/ui:2.32.0
-    container_name: libredesk_temporal_ui
+    container_name: merio_temporal_ui
     restart: unless-stopped
     environment:
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_CORS_ORIGINS: http://localhost:3000
     networks:
-      - libredesk
+      - merio
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -144,7 +144,7 @@ services:
   # Temporal worker.
   #
   # Now version-stamped via build args and depends on the main DB
-  # being healthy (worker activities read from libredesk DB, not just
+  # being healthy (worker activities read from merio DB, not just
   # Temporal's own DB). Healthcheck verifies the worker can reach
   # Temporal; if Temporal is down or the worker has crashed, restart
   # policy kicks in.
@@ -155,17 +155,17 @@ services:
       args:
         VERSION: ${VERSION:-dev}
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    container_name: libredesk_temporal_worker
+    container_name: merio_temporal_worker
     restart: unless-stopped
     environment:
-      LIBREDESK_TEMPORAL__ENABLED: "true"
-      LIBREDESK_TEMPORAL__ADDRESS: "temporal:7233"
-      LIBREDESK_TEMPORAL__NAMESPACE: "libredesk"
+      MERIO_TEMPORAL__ENABLED: "true"
+      MERIO_TEMPORAL__ADDRESS: "temporal:7233"
+      MERIO_TEMPORAL__NAMESPACE: "merio"
     volumes:
       - ./config.toml:/worker/config.toml:ro
       - ./config:/worker/config:ro
     networks:
-      - libredesk
+      - merio
     depends_on:
       db:
         condition: service_healthy
@@ -179,7 +179,7 @@ services:
       start_period: 15s
 
 networks:
-  libredesk:
+  merio:
 
 volumes:
   postgres-data:

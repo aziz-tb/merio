@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 var emailRE = regexp.MustCompile(`(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b`)

@@ -18,13 +18,13 @@ import (
 
 	"github.com/zerodha/logf"
 
-	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
-	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
-	"github.com/abhinavxd/libredesk/internal/ai/embeddings/chunking"
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/usage"
-	"github.com/abhinavxd/libredesk/internal/ai/usage/redact"
-	"github.com/abhinavxd/libredesk/internal/knowledge"
+	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
+	"github.com/aziz-tb/merio/internal/ai/embeddings"
+	"github.com/aziz-tb/merio/internal/ai/embeddings/chunking"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/usage"
+	"github.com/aziz-tb/merio/internal/ai/usage/redact"
+	"github.com/aziz-tb/merio/internal/knowledge"
 )
 
 // Activities groups every embedding-related activity. One instance is

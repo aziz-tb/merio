@@ -1,8 +1,8 @@
 // Package token manages short-lived authentication tokens that scripts
-// running inside the Python sandbox use to call back into Libredesk.
+// running inside the Python sandbox use to call back into Merio.
 //
 // The token is presented as a normal `Authorization: Token <key>:<secret>`
-// header (the format Libredesk's existing API-key auth already parses).
+// header (the format Merio's existing API-key auth already parses).
 // The key has the prefix `sx_` so authenticateUser can dispatch to this
 // package instead of the API-key user lookup. Both halves of the tuple
 // are the full token string — the "secret" half is meaningless for these
@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/exec/token/models"
+	"github.com/aziz-tb/merio/internal/exec/token/models"
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )
@@ -40,8 +40,8 @@ const redisKeyPrefix = "exec:token:"
 
 // Manager owns the Redis-backed token store.
 type Manager struct {
-	rd  *redis.Client
-	lo  *logf.Logger
+	rd *redis.Client
+	lo *logf.Logger
 }
 
 // Opts are the dependencies Manager needs.

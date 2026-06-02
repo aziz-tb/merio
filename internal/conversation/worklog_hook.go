@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	wlmodels "github.com/abhinavxd/libredesk/internal/worklog/models"
+	wlmodels "github.com/aziz-tb/merio/internal/worklog/models"
 )
 
 // startWorklog opens a worklog entry for an action on the given conversation

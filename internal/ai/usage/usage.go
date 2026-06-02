@@ -7,19 +7,19 @@
 //
 // Two non-obvious design choices:
 //
-//   1. Synchronous write. ~5ms on a healthy DB. We treat ai_usage
-//      writes as load-bearing for audit + cost analysis and would
-//      rather block the run for 5ms than risk losing rows in a queue
-//      under back-pressure. If volume outgrows this assumption, swap
-//      to a buffered async writer; the Manager interface stays stable.
+//  1. Synchronous write. ~5ms on a healthy DB. We treat ai_usage
+//     writes as load-bearing for audit + cost analysis and would
+//     rather block the run for 5ms than risk losing rows in a queue
+//     under back-pressure. If volume outgrows this assumption, swap
+//     to a buffered async writer; the Manager interface stays stable.
 //
-//   2. Idempotency leans on the partial unique index
-//      (trace_id, call_sequence_in_trace, created_at). The caller
-//      stamps created_at ONCE per LLM call so a retry of the insert
-//      uses the same value and trips the unique constraint cleanly.
-//      Cross-partition collisions are not possible because no caller
-//      generates two rows with the same (trace_id, seq) and different
-//      created_at.
+//  2. Idempotency leans on the partial unique index
+//     (trace_id, call_sequence_in_trace, created_at). The caller
+//     stamps created_at ONCE per LLM call so a retry of the insert
+//     uses the same value and trips the unique constraint cleanly.
+//     Cross-partition collisions are not possible because no caller
+//     generates two rows with the same (trace_id, seq) and different
+//     created_at.
 package usage
 
 import (
@@ -31,8 +31,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm/catalog"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/ai/llm/catalog"
+	"github.com/aziz-tb/merio/internal/dbutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
@@ -109,12 +109,12 @@ type Row struct {
 	TraceID             string
 	CallSequenceInTrace int
 
-	InboxID            int
-	ConversationID     *int64
-	AgentID            *int
-	AgentExecutionID   *int64
+	InboxID             int
+	ConversationID      *int64
+	AgentID             *int
+	AgentExecutionID    *int64
 	ResolutionAttemptID *int
-	UserID             *int64
+	UserID              *int64
 
 	Provider   string
 	Model      string

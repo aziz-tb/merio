@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
 )
 
 func init() {

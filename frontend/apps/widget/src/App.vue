@@ -1,6 +1,6 @@
 <template>
   <div
-    class="libredesk-widget-app text-foreground bg-background"
+    class="merio-widget-app text-foreground bg-background"
     :class="{ dark: widgetStore.config.dark_mode, mobile: widgetStore.isMobileFullScreen }"
     :style="customColorStyle"
     @click.once="initAudioContext"
@@ -162,7 +162,7 @@ watch(
 </script>
 
 <style scoped>
-.libredesk-widget-app {
+.merio-widget-app {
   width: 100vw;
   height: 100dvh;
   overflow: hidden;

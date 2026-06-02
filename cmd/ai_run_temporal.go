@@ -13,8 +13,8 @@ import (
 	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/converter"
 
-	itemporal "github.com/abhinavxd/libredesk/internal/temporal"
-	wfairuns "github.com/abhinavxd/libredesk/internal/workflows/airuns"
+	itemporal "github.com/aziz-tb/merio/internal/temporal"
+	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
 )
 
 type inFlightAgentRun struct {

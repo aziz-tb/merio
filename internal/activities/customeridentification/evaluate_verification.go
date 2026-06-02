@@ -3,8 +3,8 @@ package customeridentification
 import (
 	"context"
 
-	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	verificationmodels "github.com/aziz-tb/merio/internal/verification/models"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 func (a *Activities) EvaluateVerificationActivity(ctx context.Context, in cimodels.EvaluateVerificationInput) (cimodels.EvaluateVerificationOutput, error) {

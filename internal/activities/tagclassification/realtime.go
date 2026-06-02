@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
-	"github.com/abhinavxd/libredesk/internal/realtime"
+	aiopmodels "github.com/aziz-tb/merio/internal/ai/operations/models"
+	"github.com/aziz-tb/merio/internal/realtime"
 )
 
 func (a *Activities) publishTagsCompleted(ctx context.Context, convUUID, status, traceID, errorMessage string) error {

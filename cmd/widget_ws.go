@@ -10,8 +10,8 @@ import (
 
 	realip "github.com/ferluci/fast-realip"
 
-	"github.com/abhinavxd/libredesk/internal/httputil"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/aziz-tb/merio/internal/httputil"
+	"github.com/aziz-tb/merio/internal/inbox/channel/livechat"
 	"github.com/fasthttp/websocket"
 	"github.com/zerodha/fastglue"
 )
@@ -108,8 +108,8 @@ func handleWidgetWS(r *fastglue.Request) error {
 		sc := &safeConn{conn: conn}
 
 		var (
-			client   *livechat.Client
-			liveChat *livechat.LiveChat
+			client    *livechat.Client
+			liveChat  *livechat.LiveChat
 			inboxUUID string
 			userID    int
 		)

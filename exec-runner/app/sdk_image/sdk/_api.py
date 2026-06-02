@@ -37,7 +37,7 @@ every call is fast.
 Scripts that need `requests` for their own external API calls can still
 install it via the `packages` parameter — they just pay the cold-restore cost.
 
-Auth shape: Libredesk's existing `Authorization` parser accepts
+Auth shape: Merio's existing `Authorization` parser accepts
 `Token <key>:<secret>`. Script tokens use the same shape — both halves
 of the tuple carry the same `sx_<value>` string. The "secret" half is
 meaningless for these short-lived tokens; we just match the parser's
@@ -71,7 +71,7 @@ _TIMEOUT_SECONDS = 30
 
 def _auth_value() -> str:
     """
-    Builds the `Authorization` header value. Libredesk's parser expects
+    Builds the `Authorization` header value. Merio's parser expects
     `Token <key>:<secret>` — we send the same token in both halves; the
     server-side resolver only reads the key (the secret half is ignored
     for sx_-prefixed tokens).

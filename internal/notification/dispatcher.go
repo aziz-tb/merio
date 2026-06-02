@@ -3,8 +3,8 @@ package notifier
 import (
 	"encoding/json"
 
-	"github.com/abhinavxd/libredesk/internal/notification/models"
-	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	"github.com/aziz-tb/merio/internal/notification/models"
+	wsmodels "github.com/aziz-tb/merio/internal/ws/models"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )

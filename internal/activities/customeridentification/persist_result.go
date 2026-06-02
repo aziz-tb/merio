@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
-	"github.com/abhinavxd/libredesk/internal/ai/operations/payloads"
-	"github.com/abhinavxd/libredesk/internal/realtime"
-	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	aiopmodels "github.com/aziz-tb/merio/internal/ai/operations/models"
+	"github.com/aziz-tb/merio/internal/ai/operations/payloads"
+	"github.com/aziz-tb/merio/internal/realtime"
+	verificationmodels "github.com/aziz-tb/merio/internal/verification/models"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 type previousLinks struct {

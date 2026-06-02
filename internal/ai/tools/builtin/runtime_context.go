@@ -11,12 +11,12 @@
 package builtin
 
 import (
-	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
+	"github.com/aziz-tb/merio/internal/ai/embeddings"
 	"github.com/zerodha/logf"
 
-	"github.com/abhinavxd/libredesk/internal/conversation"
-	"github.com/abhinavxd/libredesk/internal/knowledge"
-	"github.com/abhinavxd/libredesk/internal/user"
+	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/knowledge"
+	"github.com/aziz-tb/merio/internal/user"
 )
 
 // KBScope is the runtime representation of the agent's kb_scope JSONB
@@ -104,7 +104,7 @@ type ToolRuntimeContext struct {
 	Logf *logf.Logger
 
 	// Manager handles the runtime injects so capabilities can read
-	// Libredesk's existing data without going through the HTTP API.
+	// Merio's existing data without going through the HTTP API.
 	// Only the managers actually used by registered capabilities live
 	// here; add more (DB, PythonRunner, RequestCache) when the first
 	// capability that needs them ships.

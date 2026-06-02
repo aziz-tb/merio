@@ -6,8 +6,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/llm/catalog"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm/catalog"
 )
 
 // Registry is the in-memory set of presets, purpose→preset mapping,

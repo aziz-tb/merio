@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/secret"
+	"github.com/aziz-tb/merio/internal/secret"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -31,7 +31,7 @@ func runSecretsCLI(ctx context.Context, args []string) {
 }
 
 func runSecretsRotateKEK(ctx context.Context, args []string) {
-	fs := flag.NewFlagSet("libredesk secrets rotate-kek", flag.ExitOnError)
+	fs := flag.NewFlagSet("merio secrets rotate-kek", flag.ExitOnError)
 	configPath := fs.String("config", "config.toml", "path to config file")
 	oldRaw := fs.String("old-kek", "", "old base64-encoded 32-byte KEK")
 	newRaw := fs.String("new-kek", "", "new base64-encoded 32-byte KEK")
@@ -60,7 +60,7 @@ func runSecretsRotateKEK(ctx context.Context, args []string) {
 }
 
 func runSecretsVerify(ctx context.Context, args []string) {
-	fs := flag.NewFlagSet("libredesk secrets verify", flag.ExitOnError)
+	fs := flag.NewFlagSet("merio secrets verify", flag.ExitOnError)
 	configPath := fs.String("config", "config.toml", "path to config file")
 	_ = fs.Parse(args)
 
@@ -95,7 +95,7 @@ func ensureSecretsCLISchema(db *sqlx.DB) {
 		log.Fatalf("error checking db schema: %v", err)
 	}
 	if !installed {
-		log.Fatal("database tables are missing. Run libredesk --install first.")
+		log.Fatal("database tables are missing. Run merio --install first.")
 	}
 }
 
@@ -113,8 +113,8 @@ func readSecretsCLIValue(label, current string) string {
 
 func printSecretsCLIUsage() {
 	fmt.Fprintf(os.Stderr, `Usage:
-  libredesk secrets rotate-kek --old-kek <base64> --new-kek <base64>
-  libredesk secrets verify
+  merio secrets rotate-kek --old-kek <base64> --new-kek <base64>
+  merio secrets verify
 
 Options:
   --config <path>    Path to config file (default: config.toml)

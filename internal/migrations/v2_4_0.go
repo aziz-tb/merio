@@ -9,7 +9,7 @@ import (
 // V2_4_0 provisions the knowledge base tables (B3) and grants the new
 // permissions to the existing seeded roles on upgraded instances. Idempotent.
 //
-// The libredesk migration framework is forward-only. To roll this back,
+// The merio migration framework is forward-only. To roll this back,
 // run the SQL below manually in psql against the same database, then
 // redeploy a build that no longer contains the knowledge code:
 //

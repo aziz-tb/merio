@@ -1,4 +1,4 @@
-# Multi-stage build for the libredesk binary.
+# Multi-stage build for the merio binary.
 #
 # Stages:
 #   1. frontend — builds frontend/dist/{main,widget} via pnpm
@@ -41,11 +41,11 @@ RUN CGO_ENABLED=0 go build -a \
     -ldflags="-s -w \
         -X 'main.buildString=${VERSION} (${GIT_COMMIT})' \
         -X 'main.versionString=${VERSION}' \
-        -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}'" \
-    -o /out/libredesk \
+        -X 'github.com/aziz-tb/merio/internal/version.Version=${VERSION}'" \
+    -o /out/merio \
     cmd/*.go
 
-RUN stuffbin -a stuff -in /out/libredesk -out /out/libredesk \
+RUN stuffbin -a stuff -in /out/merio -out /out/merio \
     frontend/dist i18n schema.sql static
 
 # ----- Stage 3: runtime -------------------------------------------------
@@ -53,10 +53,10 @@ FROM alpine:3.18
 
 RUN apk --no-cache add ca-certificates tzdata
 
-WORKDIR /libredesk
+WORKDIR /merio
 
-COPY --from=backend /out/libredesk .
+COPY --from=backend /out/merio .
 COPY config.sample.toml config.toml
 
 EXPOSE 9000
-CMD ["./libredesk"]
+CMD ["./merio"]

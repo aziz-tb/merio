@@ -287,7 +287,7 @@ function contactTitleName () {
 }
 
 function updateDocumentTitle () {
-  const siteName = appSettingsStore.settings?.['app.site_name'] || 'libredesk'
+  const siteName = appSettingsStore.settings?.['app.site_name'] || 'merio'
   const name = contactTitleName()
   document.title = `${name ? `${name} · ` : ''}${t('globals.terms.contact', 2)} - ${siteName}`
 }

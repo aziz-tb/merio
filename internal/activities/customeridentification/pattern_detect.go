@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 type freshCustomerEmailRow struct {

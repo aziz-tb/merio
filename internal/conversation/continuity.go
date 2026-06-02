@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/inbox/channel/livechat"
+	"github.com/aziz-tb/merio/internal/stringutil"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )

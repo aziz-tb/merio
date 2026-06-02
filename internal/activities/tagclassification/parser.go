@@ -3,7 +3,7 @@ package tagclassification
 import (
 	"fmt"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
 func parseClassifyTagsResponse(resp llm.CompletionResponse) (Result, error) {

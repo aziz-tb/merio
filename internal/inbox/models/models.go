@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/stringutil"
 	"github.com/volatiletech/null/v9"
 )
 

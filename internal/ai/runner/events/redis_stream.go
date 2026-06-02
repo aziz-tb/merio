@@ -9,7 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 
-	"github.com/abhinavxd/libredesk/internal/ai/runner"
+	"github.com/aziz-tb/merio/internal/ai/runner"
 )
 
 const (

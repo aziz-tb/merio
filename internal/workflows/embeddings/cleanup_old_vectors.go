@@ -7,7 +7,7 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
-	actembeddings "github.com/abhinavxd/libredesk/internal/activities/embeddings"
+	actembeddings "github.com/aziz-tb/merio/internal/activities/embeddings"
 )
 
 // CleanupOldVectorsInput drives the durable-wait cleanup workflow.

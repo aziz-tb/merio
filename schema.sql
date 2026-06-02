@@ -1183,7 +1183,7 @@ if not resp.ok:
     raise SystemExit
 
 # Expected output shape - array of partial customer records.
-# libredesk will fetch full details for each via search_customer_by_id,
+# merio will fetch full details for each via search_customer_by_id,
 # so this only needs to return the IDs:
 #
 #   [ { "id": "<external customer id>" }, ... ]
@@ -1545,7 +1545,7 @@ VALUES
     ('app.lang', '"en"'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
     ('app.logo_url', '"http://localhost:9000/logo.png"'::jsonb),
-    ('app.site_name', '"libredesk"'::jsonb),
+    ('app.site_name', '"merio"'::jsonb),
     ('app.favicon_url', '"http://localhost:9000/favicon.ico"'::jsonb),
     ('app.max_file_upload_size', '20'::jsonb),
     ('app.allowed_file_upload_extensions', '["*"]'::jsonb),
@@ -1651,17 +1651,17 @@ VALUES
 -- System Agent user — script-execution callbacks act as this user when
 -- a script opts into system identity. Identified by stable reserved email.
 INSERT INTO users (type, enabled, email, first_name, last_name, password)
-SELECT 'agent', TRUE, 'system@libredesk.local', 'System Agent', '', NULL
+SELECT 'agent', TRUE, 'system@merio.local', 'System Agent', '', NULL
 WHERE NOT EXISTS (
 	SELECT 1 FROM users
-	WHERE email = 'system@libredesk.local'
+	WHERE email = 'system@merio.local'
 	  AND type = 'agent' AND deleted_at IS NULL
 );
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM   users u, roles r
-WHERE  u.email = 'system@libredesk.local'
+WHERE  u.email = 'system@merio.local'
   AND  u.type = 'agent' AND u.deleted_at IS NULL
   AND  r.name = 'Admin';
 
@@ -1683,7 +1683,7 @@ VALUES('email_notification'::template_type, '
 
 <div>
     Best regards,<br>
-    Libredesk
+    Merio
 </div>
 
 ', false, 'Conversation assigned', 'New conversation assigned to you', true);
@@ -1710,7 +1710,7 @@ VALUES (
 
 <p>
   Best regards,<br>
-  Libredesk
+  Merio
 </p>
 
 ',
@@ -1741,7 +1741,7 @@ VALUES (
 
 <p>
   Best regards,<br>
-  Libredesk
+  Merio
 </p>
 
 ',
@@ -1768,7 +1768,7 @@ VALUES (
 
 <p>
 Best regards,<br>
-libredesk
+merio
 </p>
 ',
   false,

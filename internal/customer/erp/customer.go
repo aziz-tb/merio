@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	custmodels "github.com/abhinavxd/libredesk/internal/customer/models"
-	"github.com/abhinavxd/libredesk/internal/customerdata"
+	custmodels "github.com/aziz-tb/merio/internal/customer/models"
+	"github.com/aziz-tb/merio/internal/customerdata"
 	"github.com/volatiletech/null/v9"
 )
 

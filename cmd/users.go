@@ -8,14 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	notifier "github.com/abhinavxd/libredesk/internal/notification"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	tmpl "github.com/abhinavxd/libredesk/internal/template"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/image"
+	mmodels "github.com/aziz-tb/merio/internal/media/models"
+	notifier "github.com/aziz-tb/merio/internal/notification"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	tmpl "github.com/aziz-tb/merio/internal/template"
+	"github.com/aziz-tb/merio/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -228,7 +228,7 @@ func handleCreateAgent(r *fastglue.Request) error {
 
 		if err := app.notifier.Send(notifier.Message{
 			RecipientEmails: []string{req.Email},
-			Subject:         app.i18n.T("globals.messages.welcomeToLibredesk"),
+			Subject:         app.i18n.T("globals.messages.welcomeToMerio"),
 			Content:         content,
 			Provider:        notifier.ProviderEmail,
 		}); err != nil {

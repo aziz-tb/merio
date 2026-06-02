@@ -1,6 +1,6 @@
 // Copyright Kailash Nadh (https://github.com/knadh/listmonk)
 // SPDX-License-Identifier: AGPL-3.0
-// Adapted from listmonk for Libredesk.
+// Adapted from listmonk for Merio.
 
 package main
 
@@ -9,8 +9,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/migrations"
+	"github.com/aziz-tb/merio/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/migrations"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -198,6 +198,6 @@ func checkPendingUpgrade(db *sqlx.DB) {
 		vers = append(vers, m.version)
 	}
 
-	log.Fatalf(`there are %d pending database upgrade(s): %v. The last upgrade was %s. Backup the database and run libredesk --upgrade`,
+	log.Fatalf(`there are %d pending database upgrade(s): %v. The last upgrade was %s. Backup the database and run merio --upgrade`,
 		len(toRun), vers, lastVer)
 }
