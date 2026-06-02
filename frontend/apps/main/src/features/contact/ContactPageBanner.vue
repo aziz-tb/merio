@@ -52,7 +52,7 @@
             size="sm"
             @click="$emit('newConversation')"
           >
-            <Plus class="mr-1 size-3.5" />
+            <Plus class="mr-1 size-4" />
             {{ t('contact.page.newConversation') }}
           </Button>
 

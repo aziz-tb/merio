@@ -1,64 +1,52 @@
 <template>
-  <div>
-    <AdminSplitLayout>
-      <template #content>
-        <LoadingOverlay :loading="isLoading" reserve-height>
-          <div class="flex justify-between mb-5">
-            <div class="flex justify-end mb-4 w-full">
-              <Dialog v-model:open="dialogOpen">
-                <DialogTrigger as-child @click="newStatus">
-                  <Button class="ml-auto">
-                    {{
-                      $t('status.new')
-                    }}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent class="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {{
-                        isEditing
-                          ? $t('status.edit')
-                          : $t('status.new')
-                      }}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {{ $t('admin.conversationStatus.name.description') }}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <StatusForm @submit.prevent="onSubmit">
-                    <template #footer>
-                      <DialogFooter class="mt-10">
-                        <Button type="submit" :isLoading="isLoading" :disabled="isLoading">
-                          {{ isEditing ? $t('globals.messages.save') : $t('globals.messages.create') }}
-                        </Button>
-                      </DialogFooter>
-                    </template>
-                  </StatusForm>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-          <div>
-            <DataTable :columns="createColumns(t, { onEdit: editStatus })" :data="statuses" :loading="isLoading" />
-          </div>
-        </LoadingOverlay>
-      </template>
-
-      <template #help>
-        <p>{{ $t('admin.status.help') }}</p>
-      </template>
-    </AdminSplitLayout>
-  </div>
+  <PageHeader :description="description">
+    <template #actions>
+      <Dialog v-model:open="dialogOpen">
+        <DialogTrigger as-child @click="newStatus">
+          <Button>
+            {{
+              $t('status.new')
+            }}
+          </Button>
+        </DialogTrigger>
+        <DialogContent class="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {{
+                isEditing
+                  ? $t('status.edit')
+                  : $t('status.new')
+              }}
+            </DialogTitle>
+            <DialogDescription>
+              {{ $t('admin.conversationStatus.name.description') }}
+            </DialogDescription>
+          </DialogHeader>
+          <StatusForm @submit.prevent="onSubmit">
+            <template #footer>
+              <DialogFooter class="mt-10">
+                <Button type="submit" :isLoading="isLoading" :disabled="isLoading">
+                  {{ isEditing ? $t('globals.messages.save') : $t('globals.messages.create') }}
+                </Button>
+              </DialogFooter>
+            </template>
+          </StatusForm>
+        </DialogContent>
+      </Dialog>
+    </template>
+  </PageHeader>
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <DataTable :columns="columns" :data="statuses" :loading="isLoading" :searchable="true" />
+  </LoadingOverlay>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
-import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import { createColumns } from '../../../features/admin/status/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import StatusForm from '@/features/admin/status/StatusForm.vue'
 import {
   Dialog,
@@ -73,6 +61,7 @@ import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from '../../../features/admin/status/formSchema.js'
 import { useEmitter } from '../../../composables/useEmitter'
+import { useNavDescription } from '@main/composables/useNavDescription'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
@@ -85,6 +74,11 @@ const emit = useEmitter()
 const dialogOpen = ref(false)
 const isEditing = ref(false)
 const editingId = ref(null)
+const description = useNavDescription()
+const columns = computed(() => createColumns(t, {
+  onEdit: editStatus,
+  onDelete: deleteStatus
+}))
 
 const refreshHandler = (data) => {
   if (data?.model === 'status') getStatuses()
@@ -131,6 +125,18 @@ const getStatuses = async () => {
     statuses.value = resp.data.data
   } finally {
     isLoading.value = false
+  }
+}
+
+const deleteStatus = async (status) => {
+  try {
+    await api.deleteStatus(status.id)
+    emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'status' })
+  } catch (error) {
+    emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
   }
 }
 

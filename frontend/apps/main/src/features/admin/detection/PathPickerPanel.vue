@@ -34,7 +34,7 @@
               :aria-label="t('admin.detection.pathPicker.clearSelection')"
               @click="clearConversation"
             >
-              <X class="size-3.5" />
+              <X class="size-4" />
             </Button>
           </div>
 
@@ -60,7 +60,7 @@
               class="max-h-72 overflow-y-auto rounded-md border border-input bg-background py-1"
             >
               <div v-if="searching" class="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                <Loader2 class="size-3.5 animate-spin" />
+                <Loader2 class="size-4 animate-spin" />
                 {{ t('admin.detection.pathPicker.searching') }}
               </div>
 

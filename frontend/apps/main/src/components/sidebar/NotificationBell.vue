@@ -8,7 +8,7 @@
         <Bell class="!size-[18px]" />
         <span
           v-if="notificationStore.unreadCount > 0"
-          class="absolute top-0.5 right-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-destructive-foreground"
+          class="absolute top-0.5 right-0.5 inline-flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-destructive-foreground"
         >
           {{ notificationStore.unreadCount > 99 ? '99' : notificationStore.unreadCount }}
         </span>

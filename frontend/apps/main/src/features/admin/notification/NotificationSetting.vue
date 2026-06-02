@@ -1,23 +1,16 @@
 <template>
-  <AdminSplitLayout>
-    <template #content>
-      <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-        <Spinner v-if="isLoading" />
-        <NotificationsForm :initial-values="initialValues" :submit-form="submitForm" />
-      </div>
-    </template>
-
-    <template #help>
-      <p>{{ $t('admin.notification.help.description') }}</p>
-      <p>{{ $t('admin.notification.help.detail') }}</p>
-    </template>
-  </AdminSplitLayout>
+  <PageHeader :description="description" />
+  <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
+    <Spinner v-if="isLoading" />
+    <NotificationsForm :initial-values="initialValues" :submit-form="submitForm" />
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@main/api'
-import AdminSplitLayout from '@main/layouts/admin/AdminSplitLayout.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
+import { useNavDescription } from '@main/composables/useNavDescription'
 import { useI18n } from 'vue-i18n'
 import NotificationsForm from './NotificationSettingForm.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
@@ -31,6 +24,7 @@ const { t } = useI18n()
 const isLoading = ref(false)
 const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
+const description = useNavDescription()
 
 onMounted(() => {
   getNotificationSettings()

@@ -29,7 +29,7 @@
           <SidebarMenuItem v-for="item in filteredAiNavItems" :key="item.titleKey">
             <SidebarMenuButton :isActive="isActive(item.href)" asChild>
               <router-link :to="item.href">
-                <component :is="navIconMap[item.icon]" v-if="item.icon" />
+                <component :is="item.icon" v-if="item.icon" />
                 <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
               </router-link>
             </SidebarMenuButton>
@@ -44,7 +44,6 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Bot, Wrench } from 'lucide-vue-next'
 import {
   SidebarContent,
   SidebarGroup,
@@ -61,7 +60,6 @@ const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 
-const navIconMap = { Bot, Wrench }
 const agentId = computed(() => {
   const id = Number(route.params.id)
   return Number.isFinite(id) && id > 0 ? id : null

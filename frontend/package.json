@@ -30,7 +30,7 @@
     "@fsegurai/codemirror-theme-github-light": "^6.2.5",
     "@fsegurai/codemirror-theme-vscode-light": "^6.2.6",
     "@internationalized/date": "^3.5.5",
-    "@qall/icons": "^0.1.5",
+    "@qall/icons": "^0.1.7",
     "@radix-icons/vue": "^1.0.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/vue-table": "^8.19.2",

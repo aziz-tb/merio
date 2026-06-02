@@ -1,70 +1,83 @@
 <template>
-  <div class="rounded-md border border-border overflow-hidden">
-    <div class="grid grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] gap-3 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/40">
-      <div>{{ t('globals.terms.tag') }}</div>
+  <div class="overflow-hidden rounded-md border border-border bg-background">
+    <div class="sticky top-0 z-20 grid h-9 grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] items-center gap-3 border-b border-border bg-background px-3 text-xs font-medium text-muted-foreground/80">
+      <div>{{ t('admin.tags.tag') }}</div>
       <div>{{ t('admin.tags.type') }}</div>
-      <div>{{ t('admin.detection.mode') }}</div>
-      <div>{{ t('admin.tags.modified') }}</div>
+      <div>{{ t('admin.tags.detectionMode') }}</div>
+      <div>{{ t('admin.tags.lastModified') }}</div>
       <div>{{ t('admin.tags.modifiedBy') }}</div>
     </div>
 
-    <div v-if="grouped.length === 0" class="px-4 py-8 text-sm text-muted-foreground text-center">
+    <div v-if="grouped.length === 0" class="flex h-64 items-center justify-center px-4 text-center text-sm text-muted-foreground">
       {{ t('globals.messages.noResultsFound') }}
     </div>
 
-    <div v-for="group in grouped" :key="group.parent?.id || 'root'" class="border-t border-border first:border-t-0">
-      <button
+    <div v-for="group in grouped" :key="group.parent?.id || 'root'" class="border-b border-border/40 last:border-b-0">
+      <div
         v-if="group.parent"
-        class="w-full grid grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] gap-3 px-4 py-2 text-left hover:bg-muted/40"
-        @click="toggle(group.parent.id)"
+        class="grid min-h-14 cursor-pointer grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] items-center gap-3 px-3 py-2 transition-colors hover:bg-muted/40"
+        @click="$emit('edit', group.parent)"
       >
-        <div class="flex items-center gap-2 font-medium">
-          <ChevronRight class="size-4 transition-transform" :class="{ 'rotate-90': openGroups[group.parent.id] }" />
+        <div class="flex min-w-0 items-center gap-2 font-medium">
+          <button
+            v-if="group.children.length > 0"
+            type="button"
+            class="shrink-0 rounded p-0.5 hover:bg-muted"
+            @click.stop="toggle(group.parent.id)"
+          >
+            <ChevronRight class="size-4 transition-transform" :class="{ 'rotate-90': openGroups[group.parent.id] }" />
+          </button>
+          <span v-else class="size-5 shrink-0" />
           <TagPill :tag="group.parent" />
         </div>
         <div class="text-sm text-muted-foreground">{{ group.parent.type }}</div>
         <div class="text-sm text-muted-foreground">{{ group.parent.detection?.mode || 'manual_only' }}</div>
         <div class="text-sm text-muted-foreground">{{ formatDate(group.parent.updated_at) }}</div>
         <div class="text-sm text-muted-foreground">{{ group.parent.updated_by_name || '-' }}</div>
-      </button>
+      </div>
 
-      <button
-        v-if="group.parent"
-        class="w-full grid grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] gap-3 px-4 py-2 text-left hover:bg-muted/40"
-        @click="$emit('edit', group.parent)"
+      <div
+        v-for="child in (group.parent && openGroups[group.parent.id] ? group.children : [])"
+        :key="child.id"
+        class="grid min-h-14 cursor-pointer grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] items-center gap-3 border-t border-border/40 px-3 py-2 transition-colors hover:bg-muted/40"
+        @click="$emit('edit', child)"
       >
-        <div class="pl-6"><TagPill :tag="group.parent" /></div>
-        <div class="text-sm text-muted-foreground">{{ group.parent.type }}</div>
-        <div class="text-sm text-muted-foreground">{{ group.parent.detection?.mode || 'manual_only' }}</div>
-        <div class="text-sm text-muted-foreground">{{ formatDate(group.parent.updated_at) }}</div>
-        <div class="text-sm text-muted-foreground">{{ group.parent.updated_by_name || '-' }}</div>
-      </button>
+        <div class="pl-7">
+          <TagPill :tag="child" />
+        </div>
+        <div class="text-sm text-muted-foreground">{{ child.type }}</div>
+        <div class="text-sm text-muted-foreground">{{ child.detection?.mode || 'manual_only' }}</div>
+        <div class="text-sm text-muted-foreground">{{ formatDate(child.updated_at) }}</div>
+        <div class="text-sm text-muted-foreground">{{ child.updated_by_name || '-' }}</div>
+      </div>
 
-      <div v-if="!group.parent || openGroups[group.parent.id]">
-        <button
+      <template v-if="!group.parent">
+        <div
           v-for="tag in group.children"
           :key="tag.id"
-          class="w-full grid grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] gap-3 px-4 py-2 text-left hover:bg-muted/40"
+          class="grid min-h-14 cursor-pointer grid-cols-[1.5fr_0.7fr_0.9fr_1fr_1fr] items-center gap-3 border-t border-border/40 px-3 py-2 transition-colors first:border-t-0 hover:bg-muted/40"
           @click="$emit('edit', tag)"
         >
-          <div :class="group.parent ? 'pl-10' : ''">
+          <div class="flex min-w-0 items-center gap-2">
+            <span class="size-5 shrink-0" />
             <TagPill :tag="tag" />
           </div>
           <div class="text-sm text-muted-foreground">{{ tag.type }}</div>
           <div class="text-sm text-muted-foreground">{{ tag.detection?.mode || 'manual_only' }}</div>
           <div class="text-sm text-muted-foreground">{{ formatDate(tag.updated_at) }}</div>
           <div class="text-sm text-muted-foreground">{{ tag.updated_by_name || '-' }}</div>
-        </button>
-      </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, reactive } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight } from 'lucide-vue-next'
-import { format } from 'date-fns'
+import TagPill from '@shared-ui/components/TagPill.vue'
+import { formatDateTime } from '@main/utils/date'
 
 const props = defineProps({
   tags: { type: Array, default: () => [] }
@@ -83,28 +96,41 @@ const idValue = (value) => {
 
 const grouped = computed(() => {
   const byID = new Map(props.tags.map((tag) => [tag.id, tag]))
-  const parentIDs = new Set(props.tags.map((tag) => idValue(tag.parent_id)).filter(Boolean))
-  const root = []
-  const groups = []
-
-  for (const parentID of parentIDs) {
-    const parent = byID.get(parentID)
-    if (!parent) continue
-    groups.push({
-      parent,
-      children: props.tags.filter((tag) => idValue(tag.parent_id) === parentID && tag.id !== parentID)
-    })
-    if (openGroups[parentID] === undefined) openGroups[parentID] = true
-  }
+  const childrenByParent = new Map()
+  const rootTags = []
 
   for (const tag of props.tags) {
-    if (!idValue(tag.parent_id) && !parentIDs.has(tag.id)) {
-      root.push(tag)
+    const parentID = idValue(tag.parent_id)
+    if (parentID && byID.has(parentID)) {
+      if (!childrenByParent.has(parentID)) childrenByParent.set(parentID, [])
+      childrenByParent.get(parentID).push(tag)
+    } else {
+      rootTags.push(tag)
     }
   }
-  if (root.length > 0) groups.unshift({ parent: null, children: root })
+
+  const parentTags = rootTags.filter((tag) => childrenByParent.has(tag.id))
+  const leafRootTags = rootTags.filter((tag) => !childrenByParent.has(tag.id))
+  const groups = []
+
+  for (const parent of parentTags) {
+    groups.push({
+      parent,
+      children: childrenByParent.get(parent.id) || []
+    })
+  }
+
+  if (leafRootTags.length > 0) groups.push({ parent: null, children: leafRootTags })
   return groups
 })
+
+watch(grouped, (groups) => {
+  for (const group of groups) {
+    if (group.parent && openGroups[group.parent.id] === undefined) {
+      openGroups[group.parent.id] = true
+    }
+  }
+}, { immediate: true })
 
 const toggle = (id) => {
   openGroups[id] = !openGroups[id]
@@ -112,29 +138,6 @@ const toggle = (id) => {
 
 const formatDate = (value) => {
   if (!value) return '-'
-  return format(new Date(value), 'PPp')
+  return formatDateTime(value) || '-'
 }
-
-const colorClasses = {
-  grey: 'bg-secondary text-secondary-foreground',
-  green: 'bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-100',
-  red: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100',
-  blue: 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-100',
-  yellow: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-950 dark:text-yellow-100',
-  purple: 'bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-100',
-  orange: 'bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-100',
-  teal: 'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-100'
-}
-
-const TagPill = defineComponent({
-  props: { tag: { type: Object, required: true } },
-  setup (props) {
-    return () => h('span', {
-      class: [
-        'inline-flex min-h-5 max-w-full items-center rounded-md px-2 py-0.5 text-xs font-medium',
-        colorClasses[props.tag.color] || colorClasses.grey
-      ]
-    }, props.tag.name)
-  }
-})
 </script>

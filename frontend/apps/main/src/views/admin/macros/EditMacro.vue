@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <Spinner v-if="isLoading" />
   <MacroForm :initialValues="macro" :submitForm="submitForm" :isLoading="formLoading" v-else />
 </template>
@@ -13,7 +11,7 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import MacroForm from '@main/features/admin/macros/MacroForm.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useI18n } from 'vue-i18n'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useMacroStore } from '@main/stores/macro'
@@ -24,11 +22,6 @@ const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
 const macroStore = useMacroStore()
-
-const breadcrumbLinks = [
-  { path: 'macro-list', label: t('globals.terms.macro', 2) },
-  { path: '', label: t('macro.editMacro') }
-]
 
 const submitForm = (values) => {
   updateMacro(values)

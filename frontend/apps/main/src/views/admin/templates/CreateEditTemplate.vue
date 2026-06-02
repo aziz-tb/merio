@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <LoadingOverlay :loading="isLoading">
     <TemplateForm
       :initial-values="template"
@@ -16,8 +14,8 @@ import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import TemplateForm from '@/features/admin/templates/TemplateForm.vue'
 import { useRouter, useRoute } from 'vue-router'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
@@ -66,15 +64,6 @@ const submitForm = async (values) => {
     formLoading.value = false
   }
 }
-
-const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
-}
-
-const breadcrumbLinks = [
-  { path: 'template-list', label: t('globals.terms.template') },
-  { path: '', label: breadCrumLabel() }
-]
 
 onMounted(async () => {
   if (props.id) {

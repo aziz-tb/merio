@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <LoadingOverlay :loading="isLoading">
     <WebhookForm @submit.prevent="onSubmit" :form="form" :isNewForm="isNewForm">
       <template #footer>
@@ -31,7 +29,7 @@ import { onMounted, ref, computed } from 'vue'
 import api from '../../../api'
 import WebhookForm from '@/features/admin/webhooks/WebhookForm.vue'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
@@ -115,18 +113,9 @@ const handleTestWebhook = async () => {
   }
 }
 
-const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
-}
-
 const isNewForm = computed(() => {
   return props.id ? false : true
 })
-
-const breadcrumbLinks = [
-  { path: 'webhook-list', label: t('globals.terms.webhook') },
-  { path: '', label: breadCrumLabel() }
-]
 
 onMounted(async () => {
   if (props.id) {

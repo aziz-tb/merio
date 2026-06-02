@@ -14,7 +14,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
-import { Copy, Check } from 'lucide-vue-next'
+import { Copy, Check } from '@qall/icons'
 
 const props = defineProps({
   text: { type: String, required: true }

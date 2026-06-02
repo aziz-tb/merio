@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <AgentForm :submitForm="onSubmit" :initialValues="{}" :isNewForm="true" :isLoading="formLoading" />
 </template>
 
@@ -9,7 +7,7 @@
 import { ref } from 'vue'
 import AgentForm from '@/features/admin/agents/AgentForm.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '../../../composables/useEmitter'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
@@ -20,13 +18,6 @@ const { t } = useI18n()
 const emitter = useEmitter()
 const router = useRouter()
 const formLoading = ref(false)
-const breadcrumbLinks = [
-  { path: 'agent-list', label: t('globals.terms.agent', 2) },
-  {
-    path: '',
-    label: t('agent.new')
-  }
-]
 
 const onSubmit = (values) => {
   createNewUser(values)

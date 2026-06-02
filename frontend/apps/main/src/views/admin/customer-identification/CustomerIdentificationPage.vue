@@ -1,18 +1,14 @@
 <template>
+  <PageHeader :description="description">
+    <template #actions>
+      <Button type="button" :is-loading="saving" @click="save">
+        <FloppyDisk class="size-4" />
+        {{ t('admin.customerIdentification.save') }}
+      </Button>
+    </template>
+  </PageHeader>
   <LoadingOverlay :loading="loading" class="h-full">
-    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <div class="sticky top-0 z-10 -mx-1 flex items-center justify-between gap-4 bg-background/95 px-1 py-2 backdrop-blur">
-        <div>
-          <h1 class="text-xl font-semibold text-foreground">
-            {{ t('admin.customerIdentification.title') }}
-          </h1>
-        </div>
-        <Button type="button" :is-loading="saving" @click="save">
-          <FloppyDisk class="size-4" />
-          {{ t('admin.customerIdentification.save') }}
-        </Button>
-      </div>
-
+    <div class="mx-auto flex w-full flex-col gap-6">
       <Alert v-if="loadError" variant="destructive">
         <AlertDescription>{{ loadError }}</AlertDescription>
       </Alert>
@@ -108,7 +104,9 @@ import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
 import { Switch } from '@shared-ui/components/ui/switch'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useEmitter } from '@/composables/useEmitter'
+import { useNavDescription } from '@main/composables/useNavDescription'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { useUserStore } from '@/stores/user'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -153,6 +151,7 @@ const { t } = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
 const userStore = useUserStore()
+const description = useNavDescription()
 
 const loading = ref(false)
 const saving = ref(false)

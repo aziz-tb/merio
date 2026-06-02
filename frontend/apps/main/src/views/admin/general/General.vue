@@ -1,32 +1,30 @@
 <template>
-  <AdminSplitLayout>
-    <template #content>
-      <LoadingOverlay :loading="isLoading">
-        <GeneralSettingForm
-          :submitForm="submitForm"
-          :initial-values="initialValues"
-          :available-languages="availableLanguages"
-        />
-      </LoadingOverlay>
-    </template>
-    <template #help>
-      <p>{{ $t('admin.general.help') }}</p>
-    </template>
-  </AdminSplitLayout>
+  <PageHeader :description="description" />
+  <LoadingOverlay :loading="isLoading">
+    <GeneralSettingForm
+      :submitForm="submitForm"
+      :initial-values="initialValues"
+      :available-languages="availableLanguages"
+    />
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import GeneralSettingForm from '@/features/admin/general/GeneralSettingForm.vue'
-import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
+import { useNavDescription } from '@main/composables/useNavDescription'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import api from '@/api'
+
+defineOptions({ name: 'GeneralPage' })
 
 const initialValues = ref({})
 const availableLanguages = ref([])
 const isLoading = ref(false)
 const settingsStore = useAppSettingsStore()
+const description = useNavDescription()
 
 onMounted(async () => {
   isLoading.value = true

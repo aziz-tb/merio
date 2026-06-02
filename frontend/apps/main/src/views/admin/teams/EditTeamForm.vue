@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <Spinner v-if="isLoading"></Spinner>
   <TeamForm :initial-values="team" :submitForm="submitForm" :isLoading="formLoading" v-else />
 </template>
@@ -10,7 +8,7 @@
 import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import TeamForm from '@/features/admin/teams/TeamForm.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -23,12 +21,6 @@ const team = ref({})
 const emitter = useEmitter()
 const formLoading = ref(false)
 const isLoading = ref(false)
-
-const breadcrumbLinks = [
-
-  { path: 'team-list', label: t('globals.terms.team', 2) },
-  { path: '', label: t('globals.messages.edit') }
-]
 
 const props = defineProps({
   id: {

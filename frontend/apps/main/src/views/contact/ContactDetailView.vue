@@ -1,5 +1,6 @@
 <template>
-  <div class="overflow-y-auto bg-background">
+  <div class="h-full overflow-y-auto bg-background px-6 py-6 sm:px-8">
+    <PageHeader />
     <ContactPageBanner
       :contact="contact"
       :customer="customer"
@@ -10,7 +11,7 @@
       @new-conversation="handleNewConversation"
     />
 
-    <div class="mx-auto px-6 py-6">
+    <div class="mx-auto py-6">
       <div v-if="loading && !contact" class="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div v-for="i in 4" :key="i" class="h-36 animate-pulse rounded-md bg-muted" />
       </div>
@@ -74,6 +75,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Card } from '@shared-ui/components/ui/card'
 import api from '@/api'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { useEmitter } from '@/composables/useEmitter'
 import { useAppSettingsStore } from '@/stores/appSettings'

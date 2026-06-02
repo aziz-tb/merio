@@ -22,7 +22,6 @@ import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
 import { useNotificationStore } from './stores/notification'
 import { initAudioContext } from '@shared-ui/composables/useNotificationSound'
-import PageHeader from './components/layout/PageHeader.vue'
 import ViewForm from '@/features/view/ViewForm.vue'
 import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
@@ -32,8 +31,8 @@ import CreateConversation from '@/features/conversation/CreateConversation.vue'
 import SmallScreenOverlay from '@/components/SmallScreenOverlay.vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { SidebarProvider } from '@shared-ui/components/ui/sidebar'
 import RouteContextHost from '@main/components/layout/RouteContextHost.vue'
+import { TooltipProvider } from '@shared-ui/components/ui/tooltip'
 import api from '@main/api'
 import PathPickerPanel from '@/features/admin/detection/PathPickerPanel.vue'
 import { useAgentRightRail } from '@/composables/useAgentRightRail'
@@ -53,7 +52,7 @@ function dismissSmallScreen() {
 const isInboxRoute = computed(() => route.path.startsWith('/inboxes'))
 
 // True for routes that render their own multi-panel card frames and
-// must NOT be wrapped in App.vue's outer rounded card + PageHeader.
+// must NOT be wrapped in App.vue's outer rounded card.
 // Inbox qualifies; the agent-edit three-rail layout opts in via
 // meta.fullBleed. Keep this distinct from isInboxRoute — the
 // padding-start logic (ps-[var(--page-space)]) is inbox-specific
@@ -211,13 +210,11 @@ const refreshViews = async (data) => {
 <template>
   <SmallScreenOverlay v-if="showSmallScreenOverlay" @dismiss="dismissSmallScreen" />
 
-  <SidebarProvider class="contents">
+  <TooltipProvider :delay-duration="0">
     <RouteContextHost>
       <div class="bg-canvas h-screen text-foreground">
-        <!-- Icon rail (extracted to its own component for clarity) -->
         <IconRail />
 
-        <!-- Secondary sidebar (5 modes, fixed-positioned internally) -->
         <Sidebar
           :userTeams="userStore.teams"
           :userViews="userViews"
@@ -251,7 +248,6 @@ const refreshViews = async (data) => {
                   : 'rounded-lg bg-background border border-input shadow-sm'
               ]"
             >
-              <PageHeader v-if="!isFullBleedRoute" />
               <RouterView class="flex-grow" />
             </div>
             <div
@@ -265,7 +261,7 @@ const refreshViews = async (data) => {
         </div>
       </div>
     </RouteContextHost>
-  </SidebarProvider>
+  </TooltipProvider>
 
   <!-- Command box -->
   <Command />

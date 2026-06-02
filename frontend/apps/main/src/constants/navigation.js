@@ -1,203 +1,269 @@
+import {
+  AddressCard,
+  Bolt,
+  ChartBar,
+  CircleDot,
+  CircleUser,
+  Clock,
+  DiagramNested,
+  Envelope,
+  Eye,
+  FileLines,
+  Gear,
+  House,
+  Inbox,
+  Key,
+  MessageBot,
+  Plug,
+  Scroll,
+  Shield,
+  Sliders,
+  Tags,
+  Timer,
+  User,
+  UserMagnifyingGlass,
+  Users,
+  Vault,
+  Webhook,
+  Wrench
+} from '@qall/icons'
+
 export const reportsNavItems = [
   {
     titleKey: 'globals.terms.overview',
     href: '/reports/overview',
     permission: 'reports:manage',
-    icon: 'BarChart3'
+    icon: ChartBar
   }
 ]
+
+export const adminHomeNavItem = {
+  titleKey: 'admin.nav.home.title',
+  href: '/admin',
+  icon: House
+}
 
 export const adminNavItems = [
   {
     titleKey: 'globals.terms.workspace',
+    iconBgClass: 'bg-purple-200 dark:bg-purple-950/35',
     children: [
       {
         titleKey: 'globals.terms.general',
+        descriptionKey: 'admin.nav.general.description',
         href: '/admin/general',
         permission: 'general_settings:manage',
-        icon: 'Settings'
+        icon: Gear
       },
       {
         titleKey: 'globals.terms.businessHour',
+        descriptionKey: 'admin.nav.businessHours.description',
         href: '/admin/business-hours',
         permission: 'business_hours:manage',
         isTitleKeyPlural: true,
-        icon: 'Clock'
+        icon: Clock
       },
       {
         titleKey: 'globals.terms.slaPolicy',
+        descriptionKey: 'admin.nav.slaPolicies.description',
         href: '/admin/sla',
         permission: 'sla:manage',
         isTitleKeyPlural: true,
-        icon: 'Timer'
+        icon: Timer
       }
     ]
   },
   {
     titleKey: 'globals.terms.channel',
     isTitleKeyPlural: true,
+    iconBgClass: 'bg-pink-200 dark:bg-pink-950/35',
     children: [
       {
         titleKey: 'globals.terms.inbox',
+        descriptionKey: 'admin.nav.inboxes.description',
         href: '/admin/inboxes',
         permission: 'inboxes:manage',
         isTitleKeyPlural: true,
-        icon: 'Inbox'
+        icon: Inbox
       }
     ]
   },
   {
     titleKey: 'globals.terms.conversation',
     isTitleKeyPlural: true,
+    iconBgClass: 'bg-blue-200 dark:bg-blue-950/35',
     children: [
       {
         titleKey: 'globals.terms.status',
+        descriptionKey: 'admin.nav.statuses.description',
         href: '/admin/conversations/statuses',
         permission: 'status:manage',
         isTitleKeyPlural: true,
-        icon: 'CircleDot'
+        icon: CircleDot
       },
       {
         titleKey: 'globals.terms.tag',
+        descriptionKey: 'admin.nav.tags.description',
         href: '/admin/conversations/tags',
         permission: 'tags:manage',
         isTitleKeyPlural: true,
-        icon: 'Tag'
+        icon: Tags
       },
       {
         titleKey: 'globals.terms.customAttribute',
+        descriptionKey: 'admin.nav.customAttributes.description',
         href: '/admin/custom-attributes',
         permission: 'custom_attributes:manage',
         isTitleKeyPlural: true,
-        icon: 'SlidersHorizontal'
+        icon: Sliders
       },
       {
         titleKey: 'globals.terms.sharedView',
+        descriptionKey: 'admin.nav.sharedViews.description',
         href: '/admin/conversations/shared-views',
         permission: 'shared_views:manage',
         isTitleKeyPlural: true,
-        icon: 'Eye'
+        icon: Eye
       }
     ]
   },
   {
     titleKey: 'globals.terms.productivity',
+    iconBgClass: 'bg-amber-200 dark:bg-amber-950/35',
     children: [
       {
         titleKey: 'globals.terms.macro',
+        descriptionKey: 'admin.nav.macros.description',
         href: '/admin/conversations/macros',
         permission: 'macros:manage',
         isTitleKeyPlural: true,
-        icon: 'Zap'
+        icon: Bolt
       },
       {
         titleKey: 'globals.terms.automation',
+        descriptionKey: 'admin.nav.automations.description',
         href: '/admin/automations',
         permission: 'automations:manage',
         isTitleKeyPlural: true,
-        icon: 'Workflow'
+        icon: DiagramNested
       }
     ]
   },
   {
     titleKey: 'globals.terms.teammate',
     isTitleKeyPlural: true,
+    iconBgClass: 'bg-emerald-200 dark:bg-emerald-950/35',
     children: [
       {
         titleKey: 'globals.terms.agent',
+        descriptionKey: 'admin.nav.agents.description',
         href: '/admin/teams/agents',
         permission: 'users:manage',
         isTitleKeyPlural: true,
-        icon: 'UserRound'
+        icon: User
       },
       {
         titleKey: 'globals.terms.team',
+        descriptionKey: 'admin.nav.teams.description',
         href: '/admin/teams/teams',
         permission: 'teams:manage',
         isTitleKeyPlural: true,
-        icon: 'UsersRound'
+        icon: Users
       },
       {
         titleKey: 'globals.terms.role',
+        descriptionKey: 'admin.nav.roles.description',
         href: '/admin/teams/roles',
         permission: 'roles:manage',
         isTitleKeyPlural: true,
-        icon: 'Shield'
+        icon: Shield
       },
       {
         titleKey: 'globals.terms.activityLog',
+        descriptionKey: 'admin.nav.activityLog.description',
         href: '/admin/teams/activity-log',
         permission: 'activity_logs:manage',
         isTitleKeyPlural: true,
-        icon: 'ScrollText'
+        icon: Scroll
       }
     ]
   },
   {
     titleKey: 'globals.terms.notification',
     isTitleKeyPlural: true,
+    iconBgClass: 'bg-sky-200 dark:bg-sky-950/35',
     children: [
       {
         titleKey: 'globals.terms.email',
+        descriptionKey: 'admin.nav.emailNotifications.description',
         href: '/admin/notification',
         permission: 'notification_settings:manage',
-        icon: 'Mail'
+        icon: Envelope
       },
       {
         titleKey: 'globals.terms.template',
+        descriptionKey: 'admin.nav.templates.description',
         href: '/admin/templates',
         permission: 'templates:manage',
         isTitleKeyPlural: true,
-        icon: 'FileText'
+        icon: FileLines
       }
     ]
   },
   {
     titleKey: 'globals.terms.security',
+    iconBgClass: 'bg-rose-200 dark:bg-rose-950/35',
     children: [
       {
         titleKey: 'globals.terms.sso',
+        descriptionKey: 'admin.nav.sso.description',
         href: '/admin/sso',
         permission: 'oidc:manage',
-        icon: 'KeyRound'
+        icon: Key
       },
       {
         titleKey: 'globals.terms.secret',
+        descriptionKey: 'admin.nav.secrets.description',
         href: '/admin/security/secrets',
         permission: 'secrets:manage',
         isTitleKeyPlural: true,
-        icon: 'Vault'
+        icon: Vault
       }
     ]
   },
   {
     titleKey: 'globals.terms.integration',
     isTitleKeyPlural: true,
+    iconBgClass: 'bg-violet-200 dark:bg-violet-950/35',
     children: [
       {
         titleKey: 'globals.terms.webhook',
+        descriptionKey: 'admin.nav.webhooks.description',
         href: '/admin/webhooks',
         permission: 'webhooks:manage',
         isTitleKeyPlural: true,
-        icon: 'Webhook'
+        icon: Webhook
       }
     ]
   },
   {
     titleKey: 'admin.nav.erpIntegration',
-    icon: 'Database',
+    icon: UserMagnifyingGlass,
+    iconBgClass: 'bg-orange-200 dark:bg-orange-950/35',
     children: [
       {
         titleKey: 'admin.customerIdentification.title',
-        href: '/admin/customer-identification',
+        descriptionKey: 'admin.nav.customerIdentification.description',
+        href: '/admin/erp/customer-identification',
         permission: 'customers:manage',
-        icon: 'Database'
+        icon: UserMagnifyingGlass
       },
       {
         titleKey: 'admin.customerIdentification.erpConnectorsTitle',
-        href: '/admin/customer-identification/connectors',
+        descriptionKey: 'admin.nav.erpConnectors.description',
+        href: '/admin/erp/connectors',
         permission: 'customers:manage',
-        icon: 'Plug'
+        icon: Plug
       }
     ]
   }
@@ -213,14 +279,14 @@ export const aiNavItems = [
     href: '/ai/agents',
     permission: 'ai_agents:manage',
     isTitleKeyPlural: true,
-    icon: 'Bot'
+    icon: MessageBot
   },
   {
     titleKey: 'globals.terms.aiTool',
     href: '/ai/tools',
     permission: 'ai_tools:manage',
     isTitleKeyPlural: true,
-    icon: 'Wrench'
+    icon: Wrench
   }
 ]
 
@@ -228,7 +294,7 @@ export const accountNavItems = [
   {
     titleKey: 'globals.terms.profile',
     href: '/account/profile',
-    icon: 'CircleUser'
+    icon: CircleUser
   }
 ]
 
@@ -238,6 +304,6 @@ export const contactNavItems = [
     allLabelKey: 'contact.allContacts',
     href: '/contacts',
     isTitleKeyPlural: true,
-    icon: 'Contact'
+    icon: AddressCard
   }
 ]

@@ -1,63 +1,21 @@
 <template>
+  <PageHeader :description="t('admin.secrets.subtitle')">
+    <template #actions>
+      <Button @click="openAddDialog">
+        <Plus class="size-4" />
+        {{ t('admin.secrets.add') }}
+      </Button>
+    </template>
+  </PageHeader>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex h-full flex-col gap-4 bg-background p-6">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold tracking-normal">{{ t('admin.secrets.title') }}</h1>
-          <p class="mt-1 text-sm text-muted-foreground">{{ t('admin.secrets.subtitle') }}</p>
-        </div>
-        <Button @click="openAddDialog">
-          <Plus class="mr-2 size-4" />
-          {{ t('admin.secrets.add') }}
-        </Button>
-      </div>
-
-      <div class="overflow-hidden rounded-md border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead class="w-7/12">{{ t('globals.terms.name') }}</TableHead>
-              <TableHead>{{ t('admin.secrets.lastUsed') }}</TableHead>
-              <TableHead class="w-16 text-right">{{ t('globals.terms.action', 2) }}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-if="secrets.length === 0">
-              <TableCell colspan="3" class="h-28 text-center text-sm text-muted-foreground">
-                {{ t('admin.secrets.empty') }}
-              </TableCell>
-            </TableRow>
-            <TableRow v-for="item in secrets" :key="item.name">
-              <TableCell>
-                <div class="font-mono text-sm">{{ item.name }}</div>
-              </TableCell>
-              <TableCell class="text-sm text-muted-foreground">
-                {{ lastUsedLabel(item.last_accessed_at) }}
-              </TableCell>
-              <TableCell class="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" size="icon" :aria-label="t('globals.messages.openMenu')">
-                      <MoreHorizontal class="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem @click="openEditDialog(item)">
-                      <Pencil class="mr-2 size-4" />
-                      {{ t('globals.messages.edit') }}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem class="text-destructive" @click="openDeleteDialog(item)">
-                      <Trash2 class="mr-2 size-4" />
-                      {{ t('globals.messages.delete') }}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+    <DataTable
+      row-id="name"
+      :columns="columns"
+      :data="secrets"
+      :loading="isLoading"
+      :searchable="false"
+      :empty-text="t('admin.secrets.empty')"
+    />
   </LoadingOverlay>
 
   <Dialog v-model:open="secretDialogOpen">
@@ -144,12 +102,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { formatDistanceToNow } from 'date-fns'
-import { Eye, EyeOff, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Eye, EyeOff, Plus } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
+import DataTable from '@main/components/datatable/DataTable.vue'
+import DataTableRowActions from '@main/components/datatable/DataTableRowActions.vue'
+import { actionsCol, textCol } from '@main/components/datatable/helpers'
 import api from '@main/api'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -160,22 +122,8 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@shared-ui/components/ui/dropdown-menu'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@shared-ui/components/ui/table'
 import { Textarea } from '@shared-ui/components/ui/textarea'
 
 const { t } = useI18n()
@@ -194,6 +142,46 @@ const formError = ref('')
 const form = ref({ name: '', value: '' })
 
 const isEditing = computed(() => Boolean(selectedSecret.value))
+const columns = computed(() => {
+  const actionColumn = actionsCol()
+
+  return [
+    textCol(t, 'name', {
+      headerKey: 'globals.terms.name',
+      enableSorting: false,
+      enableGlobalFilter: false,
+      meta: {
+        label: t('globals.terms.name'),
+        font: 'mono',
+        width: 420
+      }
+    }),
+    textCol(t, 'last_accessed_at', {
+      headerKey: 'admin.secrets.lastUsed',
+      formatter: (value) => lastUsedLabel(value),
+      enableSorting: false,
+      meta: {
+        label: t('admin.secrets.lastUsed'),
+        width: 220
+      }
+    }),
+    {
+      ...actionColumn,
+      size: 72,
+      meta: {
+        ...actionColumn.meta,
+        align: 'right',
+        width: 72
+      },
+      cell: ({ row }) =>
+        h('div', { class: 'flex justify-end' },
+          h(DataTableRowActions, {
+            items: rowActions(row.original)
+          })
+        )
+    }
+  ]
+})
 const nameError = computed(() => {
   if (!form.value.name.trim()) return t('admin.secrets.validation.nameRequired')
   if (!namePattern.test(form.value.name.trim())) return t('admin.secrets.validation.nameFormat')
@@ -241,6 +229,18 @@ const openDeleteDialog = (item) => {
   selectedSecret.value = item
   deleteDialogOpen.value = true
 }
+
+const rowActions = (item) => [
+  {
+    label: t('globals.messages.edit'),
+    onClick: () => openEditDialog(item)
+  },
+  {
+    label: t('globals.messages.delete'),
+    destructive: true,
+    onClick: () => openDeleteDialog(item)
+  }
+]
 
 const saveSecret = async () => {
   formError.value = ''

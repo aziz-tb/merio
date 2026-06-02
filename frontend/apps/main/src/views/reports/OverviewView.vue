@@ -1,7 +1,8 @@
 <template>
-  <div class="overflow-y-auto">
+  <div class="h-full overflow-y-auto px-6 py-6 sm:px-8">
+    <PageHeader />
     <div
-      class="p-6 w-[calc(100%-3rem)]"
+      class="w-full"
       :class="{ 'opacity-50 transition-opacity duration-300': isLoading }"
     >
       <Spinner v-if="isLoading" />
@@ -259,6 +260,7 @@ import Card from '@/features/reports/OverviewCard.vue'
 import LineChart from '@/features/reports/OverviewLineChart.vue'
 import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
 import { DateFilter } from '@shared-ui/components/ui/date-filter'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useI18n } from 'vue-i18n'
 import api from '../../api'
 

@@ -1,15 +1,7 @@
 <template>
+  <PageHeader :description="t('admin.customerIdentification.erpConnectorsIntro')" />
   <LoadingOverlay :loading="loading" class="h-full">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <div class="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-2 backdrop-blur">
-        <h1 class="text-xl font-semibold text-foreground">
-          {{ t('admin.customerIdentification.erpConnectorsTitle') }}
-        </h1>
-        <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-          {{ t('admin.customerIdentification.erpConnectorsIntro') }}
-        </p>
-      </div>
-
       <Alert v-if="loadError" variant="destructive">
         <AlertDescription>{{ loadError }}</AlertDescription>
       </Alert>
@@ -101,6 +93,7 @@ import {
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import FunctionEditor from '@/features/ai/functions/FunctionEditor.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'

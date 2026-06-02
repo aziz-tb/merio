@@ -1,92 +1,64 @@
 import { h } from 'vue'
-import dataTableDropdown from '@/features/admin/custom-attributes/dataTableDropdown.vue'
-import { format } from 'date-fns'
+import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
+import { actionsCol, dateTimeCol } from '@/components/datatable/helpers.js'
 
-export const createColumns = (t, { onEdit } = {}) => [
-    {
-        accessorKey: 'name',
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.name'))
-        },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' },
+export const createColumns = (t, { onEdit, onDelete } = {}) => {
+    const actionColumn = actionsCol()
+
+    return [
+        {
+            accessorKey: 'name',
+            header: () => t('globals.terms.name'),
+            cell: ({ row }) =>
                 onEdit
                   ? h('span', {
                       class: 'text-primary hover:underline cursor-pointer',
                       onClick: () => onEdit(row.original)
                     }, row.getValue('name'))
                   : row.getValue('name')
-            )
-        }
-    },
-    {
-        accessorKey: 'key',
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.key'))
         },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, row.getValue('key'))
-        }
-    },
-    {
-        accessorKey: 'data_type',
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.type'))
+        {
+            accessorKey: 'key',
+            header: () => t('globals.terms.key'),
+            cell: ({ row }) => row.getValue('key')
         },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, row.getValue('data_type'))
-        }
-    },
-    {
-        accessorKey: 'applies_to',
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.appliesTo'))
+        {
+            accessorKey: 'data_type',
+            header: () => t('globals.terms.type'),
+            cell: ({ row }) => row.getValue('data_type')
         },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, row.getValue('applies_to'))
-        }
-    },
-    {
-        accessorKey: 'created_at',
-        enableGlobalFilter: false,
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+        {
+            accessorKey: 'applies_to',
+            header: () => t('globals.terms.appliesTo'),
+            cell: ({ row }) => row.getValue('applies_to')
         },
-        cell: function ({ row }) {
-            return h(
-                'div',
-                { class: 'text-center' },
-                format(row.getValue('created_at'), 'PPpp')
-            )
+        dateTimeCol(t, 'created_at'),
+        dateTimeCol(t, 'updated_at'),
+        {
+            ...actionColumn,
+            size: 72,
+            meta: {
+                ...actionColumn.meta,
+                align: 'right',
+                width: 72
+            },
+            cell: ({ row }) =>
+                h('div', { class: 'flex justify-end' },
+                    h(DataTableRowActions, {
+                        items: [
+                            {
+                                label: t('globals.messages.edit'),
+                                onClick: () => onEdit?.(row.original)
+                            },
+                            {
+                                label: t('globals.messages.delete'),
+                                destructive: true,
+                                confirm: t('customAttribute.deletionConfirmation'),
+                                onClick: () => onDelete?.(row.original)
+                            }
+                        ]
+                    })
+                )
         }
-    },
-    {
-        accessorKey: 'updated_at',
-        enableGlobalFilter: false,
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
-        },
-        cell: function ({ row }) {
-            return h(
-                'div',
-                { class: 'text-center' },
-                format(row.getValue('updated_at'), 'PPpp')
-            )
-        }
-    },
-    {
-        id: 'actions',
-        enableHiding: false,
-        enableSorting: false,
-        cell: ({ row }) => {
-            const customAttribute = row.original
-            return h(
-                'div',
-                { class: 'relative' },
-                h(dataTableDropdown, {
-                    customAttribute
-                })
-            )
-        }
-    }
-]
+    ]
+}

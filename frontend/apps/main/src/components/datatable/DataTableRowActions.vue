@@ -1,4 +1,4 @@
-<!--
+<!-- frontend/apps/main/src/components/datatable/DataTableRowActions.vue
   DataTableRowActions — shared dropdown menu for the per-row actions
   column of a DataTable. Replaces every dataTableDropdown.vue.
 
@@ -16,7 +16,7 @@
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger
-      class="inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+      class="inline-flex size-7 items-center justify-center rounded text-muted-foreground/60 opacity-0 transition-opacity hover:bg-muted hover:text-foreground data-[state=open]:opacity-100 group-hover:opacity-100"
       @click.stop
     >
       <span class="sr-only">{{ t('globals.messages.openMenu') }}</span>

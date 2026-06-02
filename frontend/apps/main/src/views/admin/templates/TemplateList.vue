@@ -1,8 +1,7 @@
 <template>
-  <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-between mb-5">
-      <div></div>
-      <div class="flex justify-end mb-4">
+  <Tabs default-value="email_outgoing" v-model="templateType">
+    <PageHeader :description="description">
+      <template #actions>
         <Button
           @click="navigateToNewTemplate"
           :disabled="templateType !== 'email_outgoing'"
@@ -11,11 +10,9 @@
             $t('template.new')
           }}
         </Button>
-      </div>
-    </div>
-    <div>
-      <Tabs default-value="email_outgoing" v-model="templateType">
-        <TabsList class="grid w-full grid-cols-2 mb-5">
+      </template>
+      <template #tabs>
+        <TabsList class="grid w-full grid-cols-2">
           <TabsTrigger value="email_outgoing">
             {{ $t('admin.template.outgoingEmailTemplates') }}
           </TabsTrigger>
@@ -23,19 +20,21 @@
             {{ $t('admin.template.emailNotificationTemplates') }}
           </TabsTrigger>
         </TabsList>
+      </template>
+    </PageHeader>
+    <LoadingOverlay :loading="isLoading" reserve-height>
         <TabsContent value="email_outgoing">
-          <DataTable :columns="createOutgoingEmailTableColumns(t)" :data="templates" :loading="isLoading" />
+          <DataTable :columns="outgoingEmailColumns" :data="templates" :loading="isLoading" :searchable="true" />
         </TabsContent>
         <TabsContent value="email_notification">
-          <DataTable :columns="createEmailNotificationTableColumns(t)" :data="templates" :loading="isLoading" />
+          <DataTable :columns="emailNotificationColumns" :data="templates" :loading="isLoading" :searchable="true" />
         </TabsContent>
-      </Tabs>
-    </div>
-  </LoadingOverlay>
+    </LoadingOverlay>
+  </Tabs>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import {
   createOutgoingEmailTableColumns,
@@ -44,7 +43,9 @@ import {
 import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useEmitter } from '../../../composables/useEmitter'
+import { useNavDescription } from '@main/composables/useNavDescription'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useStorage } from '@vueuse/core'
@@ -58,6 +59,9 @@ const templates = ref([])
 const isLoading = ref(false)
 const router = useRouter()
 const emit = useEmitter()
+const description = useNavDescription()
+const outgoingEmailColumns = computed(() => createOutgoingEmailTableColumns(t, { onDelete: deleteTemplate }))
+const emailNotificationColumns = computed(() => createEmailNotificationTableColumns(t, { onDelete: deleteTemplate }))
 
 onMounted(async () => {
   emit.on(EMITTER_EVENTS.REFRESH_LIST, refreshList)
@@ -93,6 +97,20 @@ const navigateToNewTemplate = () => {
     name: 'new-template',
     query: { type: templateType.value }
   })
+}
+
+const deleteTemplate = async (template) => {
+  try {
+    await api.deleteTemplate(template.id)
+    emit.emit(EMITTER_EVENTS.REFRESH_LIST, {
+      model: 'templates'
+    })
+  } catch (error) {
+    emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
 }
 
 watch(templateType, () => {

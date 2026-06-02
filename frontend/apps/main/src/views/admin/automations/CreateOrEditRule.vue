@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <LoadingOverlay :loading="isLoading">
     <form @submit="onSubmit">
       <div class="space-y-5">
@@ -108,7 +106,6 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { SelectTag } from '@shared-ui/components/ui/select'
 import {
   Select,
@@ -127,6 +124,7 @@ import {
   FormMessage
 } from '@shared-ui/components/ui/form'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import ActionBox from '@/features/admin/automation/ActionBox.vue'
 import DetectionBuilder from '@/features/admin/detection/DetectionBuilder.vue'
 import { createFormSchema } from '@/features/admin/automation/formSchema.js'
@@ -181,11 +179,6 @@ const conversationEventOptions = [
 ]
 
 const isNewForm = computed(() => !props.id)
-const breadcrumbPageLabel = () => props.id > 0 ? t('automation.editRule') : t('automation.newRule')
-const breadcrumbLinks = [
-  { path: 'automation-list', label: t('globals.terms.automation') },
-  { path: '', label: breadcrumbPageLabel() }
-]
 
 const form = useForm({
   validationSchema: toTypedSchema(createFormSchema(t)),

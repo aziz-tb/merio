@@ -1,4 +1,5 @@
 import * as z from 'zod'
+import { TAG_COLORS } from '@shared-ui/utils/tag'
 
 export const createFormSchema = (t) => z.object({
   name: z
@@ -10,7 +11,7 @@ export const createFormSchema = (t) => z.object({
     }),
   parent_id: z.any().nullable().optional(),
   type: z.enum(['skill', 'topic', 'contact', 'other']).default('skill'),
-  color: z.enum(['grey', 'green', 'red', 'blue', 'yellow', 'purple', 'orange', 'teal']).default('grey'),
+  color: z.enum(TAG_COLORS).default('grey'),
   visibility: z.enum(['public', 'private', 'disabled']).default('public'),
   description: z.string().default(''),
   detection: z.any().optional(),

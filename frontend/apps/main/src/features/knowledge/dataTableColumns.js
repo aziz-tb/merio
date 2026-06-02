@@ -45,7 +45,7 @@ export const createColumns = (t, { folderById = {} } = {}) => [
       const name = folderById[row.original.folder_id]?.name
       return h(
         'div',
-        { class: 'text-left text-sm text-muted-foreground' },
+        { class: 'text-left ml-6 text-sm text-muted-foreground' },
         name || '—'
       )
     },
@@ -55,6 +55,7 @@ export const createColumns = (t, { folderById = {} } = {}) => [
   textCol(t, 'locale', {
     headerKey: 'admin.knowledge.locale.label',
     formatter: (v) => v?.toUpperCase() ?? '—',
+    meta: { align: 'center' },
   }),
 
   // Status — badge.

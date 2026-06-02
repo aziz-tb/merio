@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <LoadingOverlay :loading="isLoading">
     <BusinessHoursForm
       :initial-values="businessHours"
@@ -18,7 +16,7 @@ import api from '../../../api'
 import BusinessHoursForm from '@/features/admin/business-hours/BusinessHoursForm.vue'
 import { useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -62,18 +60,9 @@ const submitForm = async (values) => {
   }
 }
 
-const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
-}
-
 const isNewForm = computed(() => {
   return props.id ? false : true
 })
-
-const breadcrumbLinks = [
-  { path: 'business-hours-list', label: t('globals.terms.businessHour', 2) },
-  { path: '', label: breadCrumLabel() }
-]
 
 onMounted(async () => {
   if (props.id) {

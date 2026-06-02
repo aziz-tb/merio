@@ -28,7 +28,7 @@
                 <p class="text-sm font-medium text-gray-700 dark:text-foreground">
                   {{
                     props.initialValues.last_active_at
-                      ? format(new Date(props.initialValues.last_active_at), 'PPpp')
+                      ? formatDateTime(props.initialValues.last_active_at)
                       : 'N/A'
                   }}
                 </p>
@@ -41,7 +41,7 @@
                 <p class="text-sm font-medium text-gray-700 dark:text-foreground">
                   {{
                     props.initialValues.last_login_at
-                      ? format(new Date(props.initialValues.last_login_at), 'PPpp')
+                      ? formatDateTime(props.initialValues.last_login_at)
                       : 'N/A'
                   }}
                 </p>
@@ -211,7 +211,7 @@
         <!-- Last Used Info -->
         <div v-if="apiKeyLastUsedAt" class="text-xs text-gray-500">
           {{ $t('globals.messages.lastUsed') }}:
-          {{ format(new Date(apiKeyLastUsedAt), 'PPpp') }}
+          {{ formatDateTime(apiKeyLastUsedAt) }}
         </div>
       </div>
 
@@ -332,7 +332,7 @@ import { Alert, AlertDescription, AlertTitle } from '@shared-ui/components/ui/al
 import { useI18n } from 'vue-i18n'
 import { useEmitter } from '../../../composables/useEmitter.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { format } from 'date-fns'
+import { formatDateTime } from '@main/utils/date'
 import api from '../../../api/index.js'
 
 const props = defineProps({

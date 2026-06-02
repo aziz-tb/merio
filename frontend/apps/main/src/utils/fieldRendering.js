@@ -1,3 +1,5 @@
+import { formatDateTime } from './date'
+
 export function humanizeKey (key) {
   if (!key) return ''
 
@@ -27,10 +29,8 @@ export function formatValue (value) {
   }
 
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    const date = new Date(value)
-    if (!Number.isNaN(date.getTime())) {
-      return { kind: 'simple', display: date.toLocaleString() }
-    }
+    const display = formatDateTime(value)
+    if (display) return { kind: 'simple', display }
   }
 
   if (Array.isArray(value)) {

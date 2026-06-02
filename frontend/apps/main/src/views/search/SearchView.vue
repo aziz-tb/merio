@@ -1,5 +1,6 @@
 <template>
-  <div class="flex flex-col h-screen">
+  <div class="flex flex-col h-screen bg-background">
+     <!-- Header -->
     <SearchHeader v-model="searchQuery" @search="handleSearch" />
     <div class="flex-1 overflow-y-auto">
       <div v-if="loading" class="flex justify-center items-center h-64">

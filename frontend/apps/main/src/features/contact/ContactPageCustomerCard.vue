@@ -78,7 +78,7 @@
       </div>
 
       <div class="relative">
-        <Search class="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Search class="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           v-model="searchQuery"
           class="h-9 pl-8"

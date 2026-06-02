@@ -6,7 +6,6 @@ import {
   TooltipTrigger,
 } from '../tooltip';
 import SidebarMenuButtonChild from './SidebarMenuButtonChild.vue';
-import { useSidebar } from './utils';
 
 defineOptions({
   inheritAttrs: false,
@@ -21,8 +20,6 @@ const props = defineProps({
   as: { type: null, required: false, default: 'button' },
   tooltip: { type: null, required: false },
 });
-
-const { isMobile, state } = useSidebar();
 
 const delegatedProps = computed(() => {
   const { tooltip, ...delegated } = props;
@@ -47,7 +44,6 @@ const delegatedProps = computed(() => {
     <TooltipContent
       side="right"
       align="center"
-      :hidden="state !== 'collapsed' || isMobile"
     >
       <template v-if="typeof tooltip === 'string'">
         {{ tooltip }}

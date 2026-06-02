@@ -23,7 +23,7 @@
         <DropdownMenuTrigger as-child>
           <button
             type="button"
-            class="opacity-0 group-hover:opacity-100 size-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            class="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 size-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
             @click.stop
           >
             <EllipsisVertical class="size-3" />
@@ -66,7 +66,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronRight, EllipsisVertical, Folder } from 'lucide-vue-next'
+import { Folder, ChevronRight, EllipsisVertical } from "@qall/icons"
 import {
   DropdownMenu,
   DropdownMenuContent,

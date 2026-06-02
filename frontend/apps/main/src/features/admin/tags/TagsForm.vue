@@ -119,6 +119,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
+import { TAG_COLORS } from '@shared-ui/utils/tag'
 import DetectionBuilder from '@/features/admin/detection/DetectionBuilder.vue'
 import TagTestRunner from './TagTestRunner.vue'
 
@@ -133,14 +134,22 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const colors = ['grey', 'green', 'red', 'blue', 'yellow', 'purple', 'orange', 'teal']
+const colors = TAG_COLORS
 
 const idValue = (value) => {
   if (value && typeof value === 'object') return value.Valid ? value.Int : null
   return value || null
 }
 
-const parentOptions = computed(() => props.tags.filter((item) => item.id !== tag.value.id))
+const parentOptions = computed(() => {
+  const currentID = tag.value.id
+  return props.tags.filter((item) => {
+    if (item.id === currentID) return false
+    if (idValue(item.parent_id)) return false
+    if (idValue(item.parent_id) === currentID) return false
+    return true
+  })
+})
 
 const toSelect = (value) => {
   const id = idValue(value)

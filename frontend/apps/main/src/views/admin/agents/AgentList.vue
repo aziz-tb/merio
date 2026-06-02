@@ -1,6 +1,6 @@
 <template>
-  <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-end mb-5 gap-2">
+  <PageHeader :description="description">
+    <template #actions>
       <Importer
         entity-key="globals.terms.agent"
         :upload-fn="api.importAgents"
@@ -24,21 +24,23 @@
           $t('agent.new')
         }}</Button>
       </router-link>
-    </div>
-    <div>
-      <DataTable :columns="createColumns(t)" :data="data" :loading="isLoading" />
-    </div>
+    </template>
+  </PageHeader>
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <DataTable :columns="columns" :data="data" :loading="isLoading" :searchable="true" />
   </LoadingOverlay>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { createColumns } from '@/features/admin/agents/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@/components/datatable/DataTable.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import { useEmitter } from '@/composables/useEmitter'
+import { useNavDescription } from '@/composables/useNavDescription'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUsersStore } from '@/stores/users'
 import { useI18n } from 'vue-i18n'
@@ -50,6 +52,8 @@ const usersStore = useUsersStore()
 const { t } = useI18n()
 const data = ref([])
 const emitter = useEmitter()
+const description = useNavDescription()
+const columns = computed(() => createColumns(t, { onDelete: deleteAgent }))
 
 const refreshHandler = (data) => {
   if (data?.model === 'agent') getData()
@@ -76,6 +80,20 @@ const getData = async () => {
     })
   } finally {
     isLoading.value = false
+  }
+}
+
+const deleteAgent = async (agent) => {
+  try {
+    await api.deleteUser(agent.id)
+    emitter.emit(EMITTER_EVENTS.REFRESH_LIST, {
+      model: 'agent'
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
   }
 }
 </script>

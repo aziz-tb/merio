@@ -1,59 +1,41 @@
 import { h } from 'vue'
-import { RouterLink } from 'vue-router'
-import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
+import { actionsCol, dateTimeCol, linkCol } from '@/components/datatable/helpers.js'
 
-export const createColumns = (t) => [
-    {
-        accessorKey: 'name',
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.name'))
-        },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' },
-                h(RouterLink,
-                    {
-                        to: { name: 'edit-business-hours', params: { id: row.original.id } },
-                        class: 'text-primary hover:underline'
-                    },
-                    () => row.getValue('name')
+export const createColumns = (t, { onDelete } = {}) => {
+    const actionColumn = actionsCol()
+
+    return [
+        linkCol(t, 'name', {
+            to: (row) => ({ name: 'edit-business-hours', params: { id: row.id } })
+        }),
+        dateTimeCol(t, 'created_at'),
+        dateTimeCol(t, 'updated_at'),
+        {
+            ...actionColumn,
+            size: 72,
+            meta: {
+                ...actionColumn.meta,
+                align: 'right',
+                width: 72
+            },
+            cell: ({ row }) =>
+                h('div', { class: 'flex justify-end' },
+                    h(DataTableRowActions, {
+                        items: [
+                            {
+                                label: t('globals.messages.edit'),
+                                to: { name: 'edit-business-hours', params: { id: row.original.id } }
+                            },
+                            {
+                                label: t('globals.messages.delete'),
+                                destructive: true,
+                                confirm: t('businessHour.deletionConfirmation'),
+                                onClick: () => onDelete?.(row.original)
+                            }
+                        ]
+                    })
                 )
-            )
         }
-    },
-    {
-        accessorKey: 'created_at',
-        enableGlobalFilter: false,
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
-        },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
-        }
-    },
-    {
-        accessorKey: 'updated_at',
-        enableGlobalFilter: false,
-        header: function () {
-            return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
-        },
-        cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
-        }
-    },
-    {
-        id: 'actions',
-        enableHiding: false,
-        enableSorting: false,
-        cell: ({ row }) => {
-            const role = row.original
-            return h(
-                'div',
-                { class: 'relative' },
-                h(dropdown, {
-                    role
-                })
-            )
-        }
-    }
-]
+    ]
+}

@@ -1,7 +1,9 @@
 <template>
   <div>
     <div class="flex items-center px-2 h-12">
-      <SidebarTrigger class="cursor-pointer" />
+      <LayoutSidebarTrigger class="cursor-pointer">
+        <ViewVerticalIcon />
+      </LayoutSidebarTrigger>
       <Input
         v-model="model"
         :placeholder="t('globals.terms.search')"
@@ -15,7 +17,8 @@
 <script setup>
 import { Separator } from '@shared-ui/components/ui/separator'
 import { Input } from '@shared-ui/components/ui/input'
-import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
+import { ViewVerticalIcon } from '@radix-icons/vue'
+import LayoutSidebarTrigger from '@main/components/sidebar/LayoutSidebarTrigger.vue'
 import { useI18n } from 'vue-i18n'
 const model = defineModel({
   type: String,
