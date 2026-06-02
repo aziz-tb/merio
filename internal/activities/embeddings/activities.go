@@ -18,6 +18,7 @@ import (
 
 	"github.com/zerodha/logf"
 
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
 	"github.com/abhinavxd/libredesk/internal/ai/embeddings/chunking"
 	"github.com/abhinavxd/libredesk/internal/ai/llm"
@@ -61,6 +62,17 @@ func New(a *Activities) (*Activities, error) {
 		return nil, errors.New("embedding activities: InboxID must be > 0 (system inbox)")
 	}
 	return a, nil
+}
+
+func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
+	return New(&Activities{
+		Store:     deps.EmbeddingStore,
+		Provider:  deps.EmbeddingProvider,
+		Knowledge: deps.Knowledge,
+		Usage:     deps.Usage,
+		InboxID:   deps.SystemInboxID,
+		Lo:        deps.Logger("embedding-activities"),
+	})
 }
 
 // FetchSourceInput / FetchSourceOutput is the (content_type, source_id) →

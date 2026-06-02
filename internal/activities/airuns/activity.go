@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	executions "github.com/abhinavxd/libredesk/internal/ai/executions"
 	executionmodels "github.com/abhinavxd/libredesk/internal/ai/executions/models"
 	"github.com/abhinavxd/libredesk/internal/ai/llm"
@@ -23,6 +24,15 @@ type Activities struct {
 	Executions *executions.Manager
 	Events     runner.EventPublisher
 	Lo         *logf.Logger
+}
+
+func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
+	return &Activities{
+		Runner:     deps.AgentRunner,
+		Executions: deps.Executions,
+		Events:     deps.RunEvents,
+		Lo:         deps.Logger("ai-run-activities"),
+	}, nil
 }
 
 func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.AgentRunWorkflowParams) (*wfairuns.AgentRunResult, error) {
@@ -111,7 +121,7 @@ func buildRunRequest(params wfairuns.AgentRunWorkflowParams) runner.RunRequest {
 		Context:             params.Context,
 		ConversationID:      params.ConversationID,
 		InboxID:             params.InboxID,
-		LegitimationLevel:   params.LegitimationLevel,
+		VerificationLevel:   params.VerificationLevel,
 		MaxIterations:       params.MaxIterations,
 		TotalTokenBudget:    params.TotalTokenBudget,
 		TraceID:             params.TraceID,

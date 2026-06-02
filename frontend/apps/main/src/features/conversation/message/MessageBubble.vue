@@ -2,7 +2,7 @@
   <!-- Inline message row (no bubble bg). Borders come from `divide-y` on the parent list, so single messages have no border and stacks have hairlines only between adjacent rows. -->
   <div
     class="group flex flex-row gap-3 px-4 py-4 w-full"
-    :class="{ 'bg-private/40': isPrivateMessage }"
+    :class="{ 'bg-private': isPrivateMessage }"
   >
     <!-- Avatar -->
     <Avatar class="w-9 h-9 flex-shrink-0">

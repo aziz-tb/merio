@@ -14,7 +14,7 @@
 // options with no state to track until Phase 2.
 //
 // Run payload uses the existing /ai/agents/:id/run shape:
-//   { inbound_message, conversation_id, legitimation_level, ... }
+//   { inbound_message, conversation_id, verification_level, ... }
 // Per the fork resolution, `safe_mode` is sent through (backend
 // accepts but doesn't yet enforce — separate batch).
 
@@ -24,6 +24,7 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'
 import { useAgentRunStream } from '@/composables/useAgentRunStream'
+import { useAgentRightRail } from '@/composables/useAgentRightRail'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 
@@ -32,13 +33,14 @@ export const AGENT_PREVIEW_KEY = Symbol('AgentPreview')
 export function useAgentPreview(agentId) {
   const emitter = useEmitter()
   const { t } = useI18n()
+  const rail = useAgentRightRail()
   const resolveAgentID = () => Number(toValue(agentId))
 
-  // Preview rail open/closed — persisted across page loads so the
-  // operator's choice survives refresh. Default open on first visit;
-  // useStorage reads the existing value when present. Per-key so it
-  // doesn't collide with other localStorage values.
-  const isOpen = useStorage('libredesk:agent-preview-open', true)
+  // Persisted preference: whether the preview should claim the rail on page
+  // load. The actual open state is coordinated by useAgentRightRail so other
+  // panels, such as the path picker, can temporarily claim the same slot.
+  const preferOpen = useStorage('libredesk:agent-preview-prefer-open', true)
+  const isOpen = computed(() => rail.isActive('preview'))
 
   // Channel — 'chat' | 'email'. Email is the v1 Libredesk default;
   // Chat is rendered but the run payload doesn't distinguish today.
@@ -56,9 +58,9 @@ export function useAgentPreview(agentId) {
   // split ships.
   const safeMode = ref(false)
 
-  // Per-run legitimation override. Defaults to whatever was set when
+  // Per-run verification override. Defaults to whatever was set when
   // the ticket was loaded; 0 (public) otherwise.
-  const legitimationOverride = ref(0)
+  const verificationOverride = ref(0)
 
   const lastRun = ref(null)
   const running = ref(false)
@@ -85,14 +87,14 @@ export function useAgentPreview(agentId) {
     linkedTicket.value = ticket
     subject.value = ticket.subject ?? ''
     composeBody.value = ticket.last_message_text ?? ticket.body ?? ''
-    legitimationOverride.value = ticket.legitimation ?? 0
+    verificationOverride.value = ticket.verification ?? 0
   }
 
   function reset() {
     linkedTicket.value = null
     subject.value = ''
     composeBody.value = ''
-    legitimationOverride.value = 0
+    verificationOverride.value = 0
   }
 
   function resetSession() {
@@ -104,6 +106,21 @@ export function useAgentPreview(agentId) {
     reset()
   }
 
+  function open() {
+    rail.open('preview')
+    preferOpen.value = true
+  }
+
+  function close() {
+    rail.close()
+    preferOpen.value = false
+  }
+
+  function toggle() {
+    if (isOpen.value) close()
+    else open()
+  }
+
   async function run() {
     const id = resolveAgentID()
     if (!composeBody.value.trim() || running.value || !Number.isFinite(id) || id <= 0) return
@@ -113,7 +130,7 @@ export function useAgentPreview(agentId) {
       const body = {
         inbound_message: composeBody.value,
         conversation_id: linkedTicket.value?.id ?? 0,
-        legitimation_level: legitimationOverride.value,
+        verification_level: verificationOverride.value,
         safe_mode: safeMode.value,
       }
       const resp = await api.runAIAgent(id, body)
@@ -158,17 +175,21 @@ export function useAgentPreview(agentId) {
 
   return {
     isOpen,
+    preferOpen,
     channel,
     linkedTicket,
     subject,
     composeBody,
     safeMode,
-    legitimationOverride,
+    verificationOverride,
     lastRun,
     running,
     streamEvents,
     streamStatus,
     streamError,
+    open,
+    close,
+    toggle,
     run,
     loadFromTicket,
     reset,

@@ -1,56 +1,22 @@
 <template>
+  <PageHeader :description="t('admin.ai.tool.help')">
+    <template #actions>
+      <RouterLink :to="{ name: 'new-ai-tool' }">
+        <Button>{{ $t('aiTool.new') }}</Button>
+      </RouterLink>
+    </template>
+  </PageHeader>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex flex-col h-full">
-      <!-- Sub-header strip: description + primary action -->
-      <div class="flex items-center justify-between px-6 pt-4 pb-3">
-        <p class="text-sm text-muted-foreground">{{ $t('admin.ai.tool.help') }}</p>
-        <RouterLink :to="{ name: 'new-ai-tool' }">
-          <Button>{{ $t('aiTool.new') }}</Button>
-        </RouterLink>
-      </div>
-      <Separator />
-
-      <!-- Filter bar -->
-      <div class="flex items-center gap-2 px-6 py-3">
-        <Select v-model="enabledFilter" @update:modelValue="fetchAll">
-          <SelectTrigger class="w-[140px]">
-            <SelectValue :placeholder="$t('globals.terms.status')" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{{ $t('globals.messages.all') }}</SelectItem>
-            <SelectItem value="true">{{ $t('globals.terms.enabled') }}</SelectItem>
-            <SelectItem value="false">{{ $t('globals.terms.disabled') }}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <!-- Tool table -->
-      <div class="flex-1 overflow-auto px-6 pb-6">
-        <DataTable :columns="columns" :data="tools" :loading="isLoading" />
-        <p
-          v-if="!isLoading && tools.length === 0"
-          class="text-center text-muted-foreground py-8"
-        >
-          {{ $t('admin.ai.noTools') }}
-        </p>
-      </div>
-    </div>
+    <DataTable :columns="columns" :data="tools" :loading="isLoading" :searchable="true" :empty-text="$t('admin.ai.noTools')" />
   </LoadingOverlay>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import { createColumns } from '@/features/ai/tools/list/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
-import { Separator } from '@shared-ui/components/ui/separator/index.js'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@shared-ui/components/ui/select'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
@@ -62,8 +28,7 @@ const tools = ref([])
 const { t } = useI18n()
 const isLoading = ref(false)
 const emit = useEmitter()
-const enabledFilter = ref('all')
-const columns = createColumns(t)
+const columns = computed(() => createColumns(t, { onDelete: deleteTool }))
 
 onMounted(() => {
   fetchAll()
@@ -82,7 +47,6 @@ const fetchAll = async () => {
   try {
     isLoading.value = true
     const params = { page: 1, page_size: 500 }
-    if (enabledFilter.value !== 'all') params.enabled = enabledFilter.value
     const resp = await api.getAITools(params)
     tools.value = resp.data.data?.results ?? []
   } catch (error) {
@@ -92,6 +56,21 @@ const fetchAll = async () => {
     })
   } finally {
     isLoading.value = false
+  }
+}
+
+const deleteTool = async (tool) => {
+  try {
+    await api.deleteAITool(tool.id)
+    emit.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'ai_tool' })
+    emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('globals.messages.deletedSuccessfully')
+    })
+  } catch (error) {
+    emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
   }
 }
 </script>

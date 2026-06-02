@@ -98,7 +98,7 @@
                 <label class="block text-sm font-medium mb-2">{{ $t('globals.terms.tag') }}</label>
                 <SelectTag
                   v-model="action.value"
-                  :items="tagsStore.tagNames.map((tag) => ({ label: tag, value: tag }))"
+                  :items="tagNameOptions"
                   :placeholder="$t('placeholders.selectTags')"
                 />
               </div>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Plus } from 'lucide-vue-next'
 import {
@@ -156,6 +157,13 @@ defineProps({
 })
 
 const tagsStore = useTagStore()
+const tagNameOptions = computed(() =>
+  tagsStore.tags.map((tag) => ({
+    label: tag.name,
+    value: tag.name,
+    color: tag.color || 'grey'
+  }))
+)
 
 const updateField = (value, index) => {
   const newModel = [...model.value]

@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <Spinner v-if="isLoading"/>
   <AgentForm :initialValues="user" :submitForm="submitForm" :isLoading="formLoading" v-else />
 </template>
@@ -13,7 +11,7 @@ import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import AgentForm from '@/features/admin/agents/AgentForm.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useI18n } from 'vue-i18n'
 
@@ -22,14 +20,6 @@ const { t } = useI18n()
 const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
-
-const breadcrumbLinks = [
-  { path: 'agent-list', label: t('globals.terms.agent', 2) },
-  {
-    path: '',
-    label: t('agent.edit')
-  }
-]
 
 const submitForm = (values) => {
   updateUser(values)

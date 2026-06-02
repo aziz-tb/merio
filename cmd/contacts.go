@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
@@ -20,6 +22,18 @@ type createContactNoteReq struct {
 
 type blockContactReq struct {
 	Enabled bool `json:"enabled"`
+}
+
+type updateLinkedCustomerReq struct {
+	CustomerID null.String `json:"customer_id"`
+}
+
+type updateContactFieldsReq struct {
+	FirstName              *string `json:"first_name"`
+	LastName               *string `json:"last_name"`
+	PhoneNumber            *string `json:"phone_number"`
+	PhoneNumberCountryCode *string `json:"phone_number_country_code"`
+	Country                *string `json:"country"`
 }
 
 // handleGetContacts returns a list of contacts from the database.
@@ -77,6 +91,51 @@ func handleUpdateContact(r *fastglue.Request) error {
 	contact, err := app.user.GetContactOrVisitor(id, "")
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if strings.Contains(strings.ToLower(string(r.RequestCtx.Request.Header.ContentType())), "application/json") {
+		var req updateContactFieldsReq
+		if err := r.Decode(&req, "json"); err != nil {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		}
+
+		contactToUpdate := models.User{
+			FirstName:              contact.FirstName,
+			LastName:               contact.LastName,
+			Email:                  contact.Email,
+			AvatarURL:              contact.AvatarURL,
+			PhoneNumber:            contact.PhoneNumber,
+			PhoneNumberCountryCode: contact.PhoneNumberCountryCode,
+			Country:                contact.Country,
+		}
+		if req.FirstName != nil {
+			contactToUpdate.FirstName = strings.TrimSpace(*req.FirstName)
+		}
+		if req.LastName != nil {
+			contactToUpdate.LastName = strings.TrimSpace(*req.LastName)
+		}
+		if req.PhoneNumber != nil {
+			phoneNumber := strings.TrimSpace(*req.PhoneNumber)
+			contactToUpdate.PhoneNumber = null.NewString(phoneNumber, phoneNumber != "")
+		}
+		if req.PhoneNumberCountryCode != nil {
+			countryCode := strings.TrimSpace(*req.PhoneNumberCountryCode)
+			contactToUpdate.PhoneNumberCountryCode = null.NewString(countryCode, countryCode != "")
+		}
+		if req.Country != nil {
+			country := strings.TrimSpace(*req.Country)
+			contactToUpdate.Country = null.NewString(country, country != "")
+		}
+
+		if err := app.user.UpdateContact(id, contactToUpdate); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+
+		contact, err = app.user.GetContactOrVisitor(id, "")
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		return r.SendEnvelope(contact)
 	}
 
 	form, err := r.RequestCtx.MultipartForm()
@@ -176,6 +235,91 @@ func handleUpdateContact(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(contact)
+}
+
+func handleUpdateContactLinkedCustomer(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	id, _ := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	var req updateLinkedCustomerReq
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+
+	if _, err := app.user.GetContactOrVisitor(id, ""); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	if req.CustomerID.Valid {
+		req.CustomerID.String = strings.TrimSpace(req.CustomerID.String)
+		if req.CustomerID.String == "" {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "customer_id must not be empty", nil, envelope.InputError)
+		}
+		if _, err := app.customer.GetByCustomerID(req.CustomerID.String); err != nil {
+			if errors.Is(err, customer.ErrCustomerNotFound) {
+				return r.SendErrorEnvelope(fasthttp.StatusUnprocessableEntity, "customer_id does not exist", nil, envelope.DataError)
+			}
+			return sendCustomerContractError(r, app, err)
+		}
+	}
+
+	if err := app.user.UpdateContactLinkedCustomer(id, req.CustomerID); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	contact, err := app.user.GetContactOrVisitor(id, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(contact)
+}
+
+// handleGetContactConversations returns paginated conversation history for a contact.
+func handleGetContactConversations(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	page, pageSize := getPagination(r)
+	if len(r.RequestCtx.QueryArgs().Peek("page_size")) == 0 {
+		pageSize = 20
+	}
+	excludeUUID := string(r.RequestCtx.QueryArgs().Peek("exclude_uuid"))
+
+	items, total, err := app.conversation.GetConversationsByContact(r.RequestCtx, id, page, pageSize, excludeUUID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(map[string]any{
+		"items":     items,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
+// handleGetCustomerLinkedContacts returns contacts that share a linked customer.
+func handleGetCustomerLinkedContacts(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	customerID := strings.TrimSpace(r.RequestCtx.UserValue("customer_id").(string))
+	if customerID == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	excludeContactID, _ := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("exclude_contact_id")))
+	contacts, err := app.user.GetContactsLinkedToCustomer(customerID, excludeContactID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(contacts)
 }
 
 // handleGetContactNotes returns all notes for a contact.

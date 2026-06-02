@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <LoadingOverlay :loading="isLoading">
     <OIDCForm
       :initial-values="oidc"
@@ -17,7 +15,7 @@ import { onMounted, ref, computed } from 'vue'
 import api from '../../../api'
 import OIDCForm from '@/features/admin/oidc/OIDCForm.vue'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -67,18 +65,9 @@ const submitForm = async (values) => {
   }
 }
 
-const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
-}
-
 const isNewForm = computed(() => {
   return props.id ? false : true
 })
-
-const breadcrumbLinks = [
-  { path: 'sso-list', label: t('globals.terms.sso') },
-  { path: '', label: breadCrumLabel() }
-]
 
 onMounted(async () => {
   if (props.id) {

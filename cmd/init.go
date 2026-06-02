@@ -37,15 +37,17 @@ import (
 	"github.com/abhinavxd/libredesk/internal/automation"
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
 	"github.com/abhinavxd/libredesk/internal/colorlog"
-	contextlink "github.com/abhinavxd/libredesk/internal/context_link"
+	"github.com/abhinavxd/libredesk/internal/contract"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	customAttribute "github.com/abhinavxd/libredesk/internal/custom_attribute"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	execrunner "github.com/abhinavxd/libredesk/internal/exec/runner"
 	exectoken "github.com/abhinavxd/libredesk/internal/exec/token"
+	"github.com/abhinavxd/libredesk/internal/function"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
@@ -64,6 +66,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/report"
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
+	"github.com/abhinavxd/libredesk/internal/secret"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -457,12 +460,13 @@ func initSystemUserID(db *sqlx.DB) int {
 // initExecRunner constructs the script-execution dispatcher. Fatally
 // errors if the [exec] config block is missing or incomplete; that's
 // deliberate, the platform should not boot in a half-configured state.
-func initExecRunner(db *sqlx.DB, tokMgr *exectoken.Manager, systemUserID int) *execrunner.Manager {
+func initExecRunner(db *sqlx.DB, tokMgr *exectoken.Manager, systemUserID int, secretMgr *secret.Manager) *execrunner.Manager {
 	lo := initLogger("exec-runner")
 	mgr, err := execrunner.New(execrunner.Opts{
 		Token:           tokMgr,
 		DB:              db,
 		Logger:          lo,
+		Secrets:         secretMgr,
 		SandboxURL:      ko.MustString("exec.sandbox_url"),
 		SandboxToken:    ko.MustString("exec.sandbox_token"),
 		PlatformBaseURL: ko.MustString("exec.platform_base_url"),
@@ -470,6 +474,28 @@ func initExecRunner(db *sqlx.DB, tokMgr *exectoken.Manager, systemUserID int) *e
 	})
 	if err != nil {
 		log.Fatalf("error initializing exec-runner: %v", err)
+	}
+	return mgr
+}
+
+func initSecretsKEK() []byte {
+	kek, err := secret.LoadKEK()
+	if err != nil {
+		log.Fatalf("error loading secrets KEK from %s: %v", secret.KEKEnvVar, err)
+	}
+	colorlog.Green("Secrets KEK loaded successfully (length=%d)", len(kek))
+	return kek
+}
+
+func initSecret(db *sqlx.DB, i18n *i18n.I18n, kek []byte) *secret.Manager {
+	mgr, err := secret.New(secret.Opts{
+		DB:   db,
+		Lo:   initLogger("secret_manager"),
+		I18n: i18n,
+		KEK:  kek,
+	})
+	if err != nil {
+		log.Fatalf("error initializing secret manager: %v", err)
 	}
 	return mgr
 }
@@ -744,6 +770,53 @@ func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
 	return m
 }
 
+// initFunction initializes the unified functions manager — the single home
+// for every named, sandbox-runnable code blob (custom AI tools, customer-
+// identification executors, future domains). It runs functions through the
+// shared F6 exec runner.
+func initFunction(db *sqlx.DB, runner *execrunner.Manager, i18n *i18n.I18n) *function.Manager {
+	var lo = initLogger("function")
+	m, err := function.New(function.Opts{
+		DB:     db,
+		Runner: runner,
+		Lo:     lo,
+		I18n:   i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing function manager: %v", err)
+	}
+	return m
+}
+
+func initCustomer(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager, functions *function.Manager) *customer.Manager {
+	m, err := customer.New(customer.Opts{
+		DB:       db,
+		Lo:       initLogger("customer"),
+		I18n:     i18n,
+		Settings: settings,
+		Function: functions,
+	})
+	if err != nil {
+		log.Fatalf("error initializing customer manager: %v", err)
+	}
+	return m
+}
+
+func initContract(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager, functions *function.Manager, customers *customer.Manager) *contract.Manager {
+	m, err := contract.New(contract.Opts{
+		DB:       db,
+		Lo:       initLogger("contract"),
+		I18n:     i18n,
+		Settings: settings,
+		Function: functions,
+		Customer: customers,
+	})
+	if err != nil {
+		log.Fatalf("error initializing contract manager: %v", err)
+	}
+	return m
+}
+
 // initAIExecutions wires the persistence manager for agent_executions +
 // agent_execution_outcomes (the Composer tab's storage layer, migration
 // v2_7_6).
@@ -913,6 +986,8 @@ func initAgentRunner(
 	knowledgeMgr *knowledge.Manager,
 	conversationMgr *conversation.Manager,
 	userMgr *user.Manager,
+	customerMgr *customer.Manager,
+	contractMgr *contract.Manager,
 	usageMgr *aiusage.Manager,
 	eventPub runner.EventPublisher,
 ) *runner.Runner {
@@ -931,6 +1006,8 @@ func initAgentRunner(
 		Knowledge:    knowledgeMgr,
 		Conversation: conversationMgr,
 		User:         userMgr,
+		Customer:     customerMgr,
+		Contract:     contractMgr,
 		Usage:        &runnerUsageAdapter{m: usageMgr},
 	})
 	if err != nil {
@@ -986,6 +1063,8 @@ func (a *runnerUsageAdapter) Record(ctx context.Context, in runner.UsageRow) err
 		Outcome:             in.Outcome,
 		ProviderRequestID:   in.ProviderRequestID,
 		ProviderMetadata:    in.ProviderMetadata,
+		RequestPayload:      in.RequestPayload,
+		ResponsePayload:     in.ResponsePayload,
 	})
 }
 
@@ -1000,13 +1079,15 @@ func initDetectionManager(provider llm.LLMProvider, usageMgr *aiusage.Manager, s
 }
 
 // initAutomationEngine initializes the automation engine.
-func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n, detectionMgr *detection.Manager) *automation.Engine {
+func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n, detectionMgr *detection.Manager, customerMgr *customer.Manager, contractMgr *contract.Manager) *automation.Engine {
 	var lo = initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
 		DB:           db,
 		Lo:           lo,
 		I18n:         i18n,
 		DetectionMgr: detectionMgr,
+		Customer:     customerMgr,
+		Contract:     contractMgr,
 	})
 	if err != nil {
 		log.Fatalf("error initializing automation engine: %v", err)
@@ -1426,21 +1507,6 @@ func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
 	return m
 }
 
-// initContextLink inits context link manager.
-func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
-	var lo = initLogger("context-link")
-	m, err := contextlink.New(contextlink.Opts{
-		DB:            db,
-		Lo:            lo,
-		I18n:          i18n,
-		EncryptionKey: ko.MustString("app.encryption_key"),
-	})
-	if err != nil {
-		log.Fatalf("error initializing context link manager: %v", err)
-	}
-	return m
-}
-
 // initWebhook inits webhook manager.
 func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 	var lo = initLogger("webhook")
@@ -1608,27 +1674,12 @@ func initQueryEmbeddingCache(rdb *redis.Client) *embeddings.QueryEmbeddingCache 
 // embedding provider isn't configured — kb_search will report the
 // disabled state via SetKBSearcher receiving nil.
 func initSearcher(store *embeddings.Store, embed embeddings.Provider, rank reranker.Provider, cache *embeddings.QueryEmbeddingCache) *embeddings.Searcher {
-	if embed == nil {
-		return nil
-	}
-	lo := initLogger("embeddings-searcher")
-	// Reranker threshold defaults to 0.3 when the key is absent so older
-	// configs keep the documented filtering behaviour; an explicit 0.0
-	// in TOML disables the filter. Semantic threshold defaults to 0.0
-	// (no filter) — only enabled once operators have tuned against real
-	// trace similarity values.
-	minReranker := 0.3
-	if ko.Exists("embeddings.min_reranker_score") {
-		minReranker = ko.Float64("embeddings.min_reranker_score")
-	}
-	s, err := embeddings.NewSearcher(embeddings.SearcherOpts{
-		Store:                 store,
-		Embed:                 embed,
-		Reranker:              rank,
-		Cache:                 cache,
-		Lo:                    lo,
-		MinSemanticSimilarity: ko.Float64("embeddings.min_semantic_similarity"),
-		MinRerankerScore:      minReranker,
+	s, err := embeddings.NewConfiguredSearcher(ko, embeddings.SearcherOpts{
+		Store:    store,
+		Embed:    embed,
+		Reranker: rank,
+		Cache:    cache,
+		Lo:       initLogger("embeddings-searcher"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing embeddings searcher: %v", err)

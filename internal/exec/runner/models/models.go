@@ -9,6 +9,7 @@
 package models
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 )
@@ -116,7 +117,7 @@ const (
 
 // MaxStderrBytes caps Stderr bytes we propagate / persist. Long Python
 // tracebacks aren't useful past this; the Result envelope and the
-// tool_executions.data._stderr field both honor this cap and add a
+// function_executions.data._stderr field both honor this cap and add a
 // trailing marker on truncation.
 const MaxStderrBytes = 8 * 1024
 
@@ -124,11 +125,11 @@ const MaxStderrBytes = 8 * 1024
 // completed (or failed). It mirrors the structure of the sandbox's
 // ExecuteResponse but with named Go-side fields.
 type Result struct {
-	Kind      Kind           `json:"kind"`
-	Data      map[string]any `json:"data,omitempty"`
-	Message   string         `json:"message,omitempty"`
-	Code      string         `json:"code,omitempty"`
-	Retryable bool           `json:"retryable,omitempty"`
+	Kind      Kind            `json:"kind"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	Message   string          `json:"message,omitempty"`
+	Code      string          `json:"code,omitempty"`
+	Retryable bool            `json:"retryable,omitempty"`
 
 	// Stderr captures the script's stderr stream, regardless of outcome.
 	// Always present on returned Result (may be empty). Capped at
@@ -153,8 +154,23 @@ func (r *Result) IsSuccess() bool {
 	return r != nil && r.Kind == KindSuccess
 }
 
+// DecodedData decodes the raw executor data for callers that need structured
+// access. The raw bytes remain the source of truth for API/audit pass-through.
+func (r *Result) DecodedData() (any, error) {
+	if r == nil || len(r.Data) == 0 || string(r.Data) == "null" {
+		return nil, nil
+	}
+	var out any
+	dec := json.NewDecoder(bytes.NewReader(r.Data))
+	dec.UseNumber()
+	if err := dec.Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InternalAuditRow is the input shape for Manager.RecordInternalAudit.
-// Mirrors the columns of the tool_executions table that apply to
+// Mirrors the columns of the function_executions table that apply to
 // in-process Go capability invocations (no warm-pool, no result-code
 // from the sandbox, language is hardcoded to "internal" inside the
 // runner). Kept in this package so the dispatcher (which lives outside

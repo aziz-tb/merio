@@ -38,6 +38,8 @@ import (
 
 	actagentvalidation "github.com/abhinavxd/libredesk/internal/activities/agentvalidation"
 	actairuns "github.com/abhinavxd/libredesk/internal/activities/airuns"
+	actcustomeridentification "github.com/abhinavxd/libredesk/internal/activities/customeridentification"
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	actembeddings "github.com/abhinavxd/libredesk/internal/activities/embeddings"
 	acttagclassification "github.com/abhinavxd/libredesk/internal/activities/tagclassification"
 	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
@@ -58,12 +60,15 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
 	aiusage "github.com/abhinavxd/libredesk/internal/ai/usage"
 	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
+	"github.com/abhinavxd/libredesk/internal/contract"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	execrunner "github.com/abhinavxd/libredesk/internal/exec/runner"
 	exectoken "github.com/abhinavxd/libredesk/internal/exec/token"
+	"github.com/abhinavxd/libredesk/internal/function"
 	"github.com/abhinavxd/libredesk/internal/knowledge"
 	"github.com/abhinavxd/libredesk/internal/migrations"
 	"github.com/abhinavxd/libredesk/internal/realtime"
@@ -73,8 +78,10 @@ import (
 	"github.com/abhinavxd/libredesk/internal/team"
 	"github.com/abhinavxd/libredesk/internal/temporal"
 	"github.com/abhinavxd/libredesk/internal/user"
+	"github.com/abhinavxd/libredesk/internal/verification"
 	wfagentvalidation "github.com/abhinavxd/libredesk/internal/workflows/agentvalidation"
 	wfairuns "github.com/abhinavxd/libredesk/internal/workflows/airuns"
+	wfcustomeridentification "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
 	wfembeddings "github.com/abhinavxd/libredesk/internal/workflows/embeddings"
 	wftagclassification "github.com/abhinavxd/libredesk/internal/workflows/tagclassification"
 
@@ -135,6 +142,7 @@ func main() {
 	if len(queues) == 0 {
 		log.Fatalf("temporal-worker: no queues selected — check --queues filter")
 	}
+	deps := buildDependencies(ko, queues, lo)
 
 	// Bring up the dependencies the embedding workflows need: DB,
 	// Voyage provider, embeddings store, knowledge manager, ai_usage
@@ -143,17 +151,19 @@ func main() {
 	// when running narrow deployments.
 	var embedActs *actembeddings.Activities
 	if queueWanted(queues, temporal.QueueEmbeddings) {
-		embedActs = buildEmbeddingActivities(ko, lo)
+		embedActs = buildEmbeddingActivities(deps)
 	}
 	var aiRunActs *actairuns.Activities
 	if queueWanted(queues, temporal.QueueAIRuns) {
-		aiRunActs = buildAIRunActivities(ko, lo)
+		aiRunActs = buildAIRunActivities(deps)
 	}
 	var tagClassActs *acttagclassification.Activities
 	var agentValidationActs *actagentvalidation.Activities
+	var customerIdentificationActs *actcustomeridentification.Activities
 	if queueWanted(queues, temporal.QueuePipeline) {
-		tagClassActs = buildTagClassificationActivities(ko, lo)
-		agentValidationActs = buildAgentValidationActivities(ko, lo)
+		tagClassActs = buildTagClassificationActivities(deps)
+		agentValidationActs = buildAgentValidationActivities(deps)
+		customerIdentificationActs = buildCustomerIdentificationActivities(deps)
 	}
 
 	lo.Info("temporal worker pool starting", "queues", queues)
@@ -194,6 +204,19 @@ func main() {
 			if agentValidationActs != nil {
 				w.RegisterWorkflow(wfagentvalidation.AgentValidationWorkflow)
 				w.RegisterActivity(agentValidationActs.ValidateAgentsActivity)
+			}
+			if customerIdentificationActs != nil {
+				w.RegisterWorkflow(wfcustomeridentification.CustomerIdentificationWorkflow)
+				w.RegisterActivity(customerIdentificationActs.CreateOperationActivity)
+				w.RegisterActivity(customerIdentificationActs.LoadSettingsActivity)
+				w.RegisterActivity(customerIdentificationActs.ShouldRunActivity)
+				w.RegisterActivity(customerIdentificationActs.PrepareMessageActivity)
+				w.RegisterActivity(customerIdentificationActs.PatternDetectActivity)
+				w.RegisterActivity(customerIdentificationActs.LLMExtractActivity)
+				w.RegisterActivity(customerIdentificationActs.SearchCustomerByFieldsActivity)
+				w.RegisterActivity(customerIdentificationActs.LoadContractAndCustomerActivity)
+				w.RegisterActivity(customerIdentificationActs.EvaluateVerificationActivity)
+				w.RegisterActivity(customerIdentificationActs.PersistResultActivity)
 			}
 		}
 
@@ -376,490 +399,320 @@ func queueWanted(selected []string, q string) bool {
 	return false
 }
 
-// buildEmbeddingActivities wires the dependency graph the F12 embedding
-// activities need: DB → Voyage provider → embeddings.Store → knowledge
-// manager → ai_usage manager → system inbox id → Activities struct.
-//
-// Fatally errors on any missing dependency. The worker is allowed to
-// boot without it only when --queues excludes embeddings.
-func buildEmbeddingActivities(ko *koanf.Koanf, lo *logf.Logger) *actembeddings.Activities {
-	db := openDB(ko)
-
-	// Knowledge manager (FetchSourceContent reads from this).
-	i18nInst := loadI18n()
-	kmgr, err := knowledge.New(knowledge.Opts{DB: db, Lo: initLogger(ko, "knowledge"), I18n: i18nInst})
-	if err != nil {
-		log.Fatalf("temporal-worker: knowledge manager: %v", err)
+func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activitydeps.Dependencies {
+	deps := activitydeps.Dependencies{
+		DB:      openDB(ko),
+		Redis:   openRedis(ko),
+		I18n:    loadI18n(),
+		Lo:      lo,
+		Loggers: map[string]*logf.Logger{},
+	}
+	logger := func(name string) *logf.Logger {
+		l := initLogger(ko, name)
+		deps.Loggers[name] = l
+		return l
 	}
 
-	// ai_usage — embeddings record one row per provider call here.
-	catalogPath := ko.String("ai.models_catalog_path")
-	if catalogPath == "" {
-		catalogPath = "config/anthropic_models.json"
+	needsEmbeddings := queueWanted(queues, temporal.QueueEmbeddings)
+	needsAIRuns := queueWanted(queues, temporal.QueueAIRuns)
+	needsPipeline := queueWanted(queues, temporal.QueuePipeline)
+	needsAI := needsEmbeddings || needsAIRuns || needsPipeline
+	needsLLM := needsAIRuns || needsPipeline
+	needsExec := needsAIRuns || needsPipeline
+	needsConversationGraph := needsAIRuns || needsPipeline
+	needsEmbeddingSearch := needsEmbeddings || needsAIRuns
+
+	deps.SystemInboxID = resolveSystemInboxID(deps.DB)
+	deps.SystemUserID = resolveSystemUserID(deps.DB)
+
+	if needsAI {
+		var err error
+		deps.AIModelCatalog, err = loadAIModelCatalog(ko)
+		if err != nil {
+			log.Fatalf("temporal-worker: load AI model catalog: %v", err)
+		}
+		deps.AIPresets, err = loadAIPresetRegistry(ko, deps.AIModelCatalog)
+		if err != nil {
+			log.Fatalf("temporal-worker: load AI preset registry: %v", err)
+		}
+		deps.Usage, err = aiusage.New(aiusage.Opts{
+			DB:      deps.DB,
+			Catalog: deps.AIModelCatalog,
+			Lo:      logger("ai-usage"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: ai_usage manager: %v", err)
+		}
 	}
-	if abs, err := filepath.Abs(catalogPath); err == nil {
-		catalogPath = abs
+	if needsLLM {
+		deps.LLMProvider = buildAnthropicProvider(ko, deps.DB, deps.AIPresets, deps.AIModelCatalog)
+		if deps.LLMProvider == nil {
+			log.Fatalf("temporal-worker: Anthropic provider not configured — selected queues require it")
+		}
 	}
-	cat, err := aicatalog.Load(catalogPath)
-	if err != nil {
-		log.Fatalf("temporal-worker: load model catalog: %v", err)
+	if needsExec {
+		var err error
+		deps.ExecToken, err = exectoken.New(exectoken.Opts{
+			Redis:  deps.Redis,
+			Logger: logger("exec-token"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: exec token manager: %v", err)
+		}
+		deps.ExecRunner, err = execrunner.New(execrunner.Opts{
+			Token:           deps.ExecToken,
+			DB:              deps.DB,
+			Logger:          logger("exec-runner"),
+			SandboxURL:      ko.MustString("exec.sandbox_url"),
+			SandboxToken:    ko.MustString("exec.sandbox_token"),
+			PlatformBaseURL: ko.MustString("exec.platform_base_url"),
+			SystemUserID:    deps.SystemUserID,
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: exec runner: %v", err)
+		}
+		deps.Functions, err = function.New(function.Opts{
+			DB:     deps.DB,
+			Runner: deps.ExecRunner,
+			Lo:     logger("function"),
+			I18n:   deps.I18n,
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: function manager: %v", err)
+		}
 	}
-	usageMgr, err := aiusage.New(aiusage.Opts{DB: db, Catalog: cat, Lo: initLogger(ko, "ai-usage")})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai_usage manager: %v", err)
+	if needsEmbeddingSearch {
+		var err error
+		deps.Knowledge, err = knowledge.New(knowledge.Opts{DB: deps.DB, Lo: logger("knowledge"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: knowledge manager: %v", err)
+		}
+		deps.EmbeddingProvider = buildEmbeddingProvider(deps.AIPresets, ko)
+		if needsEmbeddings && deps.EmbeddingProvider == nil {
+			log.Fatalf("temporal-worker: Voyage API key not set (provider_keys.voyage) — required for the embeddings queue")
+		}
+		deps.RerankProvider = buildRerankProvider(deps.AIPresets, ko)
+		deps.EmbeddingStore, err = embeddings.NewStore(embeddings.StoreOpts{
+			DB: deps.DB,
+			Lo: logger("embeddings-store"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: embeddings store: %v", err)
+		}
+		deps.QueryEmbedCache = buildQueryEmbeddingCache(ko, deps.Redis)
+		deps.EmbeddingSearcher, err = buildSearcher(deps.EmbeddingStore, deps.EmbeddingProvider, deps.RerankProvider, deps.QueryEmbedCache, ko)
+		if err != nil {
+			log.Fatalf("temporal-worker: embeddings searcher: %v", err)
+		}
+		if needsAIRuns {
+			aicapabilities.SetKBSearcher(deps.EmbeddingSearcher)
+		}
+	}
+	if needsConversationGraph {
+		var err error
+		deps.Settings, err = setting.New(setting.Opts{
+			DB:            deps.DB,
+			Lo:            logger("setting"),
+			EncryptionKey: ko.MustString("app.encryption_key"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: setting manager: %v", err)
+		}
+		deps.BusinessHours, err = businesshours.New(businesshours.Opts{
+			DB:   deps.DB,
+			Lo:   logger("business-hours"),
+			I18n: deps.I18n,
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: business-hours manager: %v", err)
+		}
+		deps.Teams, err = team.New(team.Opts{DB: deps.DB, Lo: logger("team"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: team manager: %v", err)
+		}
+		deps.Users, err = user.New(deps.I18n, user.Opts{DB: deps.DB, Lo: logger("user")})
+		if err != nil {
+			log.Fatalf("temporal-worker: user manager: %v", err)
+		}
+		deps.SLA, err = sla.New(
+			sla.Opts{DB: deps.DB, Lo: logger("sla"), I18n: deps.I18n},
+			deps.Teams,
+			deps.Settings,
+			deps.BusinessHours,
+			nil,
+			deps.Users,
+			nil,
+		)
+		if err != nil {
+			log.Fatalf("temporal-worker: sla manager: %v", err)
+		}
+		deps.Statuses, err = status.New(status.Opts{DB: deps.DB, Lo: logger("status"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: status manager: %v", err)
+		}
+		deps.Priorities, err = priority.New(priority.Opts{DB: deps.DB, Lo: logger("priority"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: priority manager: %v", err)
+		}
+		deps.Conversation, err = conversation.New(
+			nil,
+			deps.I18n,
+			deps.SLA,
+			deps.Statuses,
+			deps.Priorities,
+			nil,
+			deps.Users,
+			deps.Teams,
+			nil,
+			deps.Settings,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			conversation.Opts{
+				DB:               deps.DB,
+				Lo:               logger("conversation"),
+				SubjectRefFormat: "#{ref}",
+			},
+		)
+		if err != nil {
+			log.Fatalf("temporal-worker: conversation manager: %v", err)
+		}
+	}
+	if needsAIRuns || needsPipeline {
+		var err error
+		deps.Customers, err = customer.New(customer.Opts{
+			DB:       deps.DB,
+			Lo:       logger("customer"),
+			I18n:     deps.I18n,
+			Settings: deps.Settings,
+			Function: deps.Functions,
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: customer manager: %v", err)
+		}
+		deps.Contracts, err = contract.New(contract.Opts{
+			DB:       deps.DB,
+			Lo:       logger("contract"),
+			I18n:     deps.I18n,
+			Settings: deps.Settings,
+			Function: deps.Functions,
+			Customer: deps.Customers,
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: contract manager: %v", err)
+		}
+	}
+	if needsAIRuns || needsPipeline {
+		var err error
+		deps.Agents, err = aiagents.New(aiagents.Opts{DB: deps.DB, Lo: logger("ai-agents"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: ai agents manager: %v", err)
+		}
+	}
+	if needsAIRuns {
+		var err error
+		deps.Tools, err = aitools.New(aitools.Opts{DB: deps.DB, Lo: logger("ai-tools"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: ai tools manager: %v", err)
+		}
+		deps.Executions, err = aiexecutions.New(aiexecutions.Opts{DB: deps.DB, Lo: logger("ai-executions"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: ai executions manager: %v", err)
+		}
+		dispatcher := aitools.NewDispatcher(deps.Tools, deps.ExecRunner, deps.Functions)
+		deps.AgentRunner, err = airunner.New(airunner.Opts{
+			Provider:     deps.LLMProvider,
+			Agents:       deps.Agents,
+			Resolver:     resolver.New(deps.Tools, nil),
+			Dispatcher:   dispatcher,
+			PresetReg:    deps.AIPresets,
+			Lo:           logger("agent-runner"),
+			Knowledge:    deps.Knowledge,
+			Conversation: deps.Conversation,
+			User:         deps.Users,
+			Customer:     deps.Customers,
+			Contract:     deps.Contracts,
+			Usage:        &workerRunnerUsageAdapter{m: deps.Usage},
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: agent runner: %v", err)
+		}
+		deps.RunEvents, err = runnerevents.NewRedisStreamPublisher(deps.Redis, logger("ai-run-events"), ko.Duration("agent_run.event_ttl"))
+		if err != nil {
+			log.Fatalf("temporal-worker: ai run event publisher: %v", err)
+		}
+	}
+	if needsPipeline {
+		var err error
+		deps.AIOperations, err = aioperations.New(aioperations.Opts{DB: deps.DB, Lo: logger("ai-operations")})
+		if err != nil {
+			log.Fatalf("temporal-worker: ai_operations manager: %v", err)
+		}
+		deps.Tags, err = tag.New(tag.Opts{DB: deps.DB, Lo: logger("tag"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: tag manager: %v", err)
+		}
+		deps.Realtime, err = realtime.NewRedisPublisher(deps.Redis)
+		if err != nil {
+			log.Fatalf("temporal-worker: realtime publisher: %v", err)
+		}
+		deps.SystemUser, err = deps.Users.GetSystemUser()
+		if err != nil {
+			log.Fatalf("temporal-worker: resolve system user: %v", err)
+		}
+		deps.Detection = detection.New(detection.Opts{
+			Lo:            logger("detection"),
+			LLMProvider:   deps.LLMProvider,
+			UsageMgr:      deps.Usage,
+			SystemInboxID: deps.SystemInboxID,
+		})
+		deps.Verification = verification.New(verification.Opts{Lo: logger("verification")})
 	}
 
-	// Voyage embedding provider — provider key from ai_presets.json.
-	presetsPath := ko.String("ai.presets_path")
-	if presetsPath == "" {
-		presetsPath = "config/ai_presets.json"
-	}
-	if abs, err := filepath.Abs(presetsPath); err == nil {
-		presetsPath = abs
-	}
-	reg, err := aipreset.Load(presetsPath, cat)
-	if err != nil {
-		log.Fatalf("temporal-worker: load presets: %v", err)
-	}
-	apiKey := reg.ProviderKey("voyage")
-	if apiKey == "" {
-		log.Fatalf("temporal-worker: Voyage API key not set (provider_keys.voyage in %s) — required for the embeddings queue", presetsPath)
-	}
-	provider, err := voyageembed.New(voyageembed.Opts{
-		APIKey:       apiKey,
-		Concurrency:  ko.Int("embeddings.concurrency"),
-		TotalTimeout: ko.Duration("embeddings.total_timeout"),
-		Lo:           initLogger(ko, "voyage-embeddings"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: voyage provider: %v", err)
-	}
+	return deps
+}
 
-	// embeddings.Store — the storage surface for chunk insert + swap.
-	store, err := embeddings.NewStore(embeddings.StoreOpts{DB: db, Lo: initLogger(ko, "embeddings-store")})
-	if err != nil {
-		log.Fatalf("temporal-worker: embeddings store: %v", err)
-	}
-
-	// System inbox id — ai_usage.inbox_id FK target for non-conversation
-	// LLM calls. Resolved by the stable UUID seeded in v2_7_7.
-	var systemInboxID int
-	if err := db.QueryRow(`SELECT id FROM inboxes WHERE uuid = $1`, migrations.SystemInboxUUID).Scan(&systemInboxID); err != nil {
-		log.Fatalf("temporal-worker: resolve system inbox: %v", err)
-	}
-
-	acts, err := actembeddings.New(&actembeddings.Activities{
-		Store:     store,
-		Provider:  provider,
-		Knowledge: kmgr,
-		Usage:     usageMgr,
-		InboxID:   systemInboxID,
-		Lo:        initLogger(ko, "embedding-activities"),
-	})
+// buildEmbeddingActivities adapts the worker-wide dependency graph to the
+// embedding activities package.
+func buildEmbeddingActivities(deps activitydeps.Dependencies) *actembeddings.Activities {
+	acts, err := actembeddings.NewActivities(deps)
 	if err != nil {
 		log.Fatalf("temporal-worker: embedding activities: %v", err)
 	}
 	return acts
 }
 
-// buildAIRunActivities wires the dependency graph the async agent-run
-// workflow needs. This deliberately mirrors only the subset of the main
-// app graph the runner touches at runtime; broad constructor dedup is a
-// follow-up cleanup, not a goal of Batch 5.
-func buildAIRunActivities(ko *koanf.Koanf, lo *logf.Logger) *actairuns.Activities {
-	_ = lo
-
-	db := openDB(ko)
-	rdb := openRedis(ko)
-	i18nInst := loadI18n()
-
-	aiCatalog, err := loadAIModelCatalog(ko)
+func buildAIRunActivities(deps activitydeps.Dependencies) *actairuns.Activities {
+	acts, err := actairuns.NewActivities(deps)
 	if err != nil {
-		log.Fatalf("temporal-worker: load AI model catalog: %v", err)
+		log.Fatalf("temporal-worker: ai run activities: %v", err)
 	}
-	aiPresets, err := loadAIPresetRegistry(ko, aiCatalog)
-	if err != nil {
-		log.Fatalf("temporal-worker: load AI preset registry: %v", err)
-	}
-	aiProvider := buildAnthropicProvider(ko, db, aiPresets, aiCatalog)
-	if aiProvider == nil {
-		log.Fatalf("temporal-worker: Anthropic provider not configured — ai-runs queue requires it")
-	}
-
-	knowledgeMgr, err := knowledge.New(knowledge.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "knowledge"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: knowledge manager: %v", err)
-	}
-	userMgr, err := user.New(i18nInst, user.Opts{
-		DB: db,
-		Lo: initLogger(ko, "user"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: user manager: %v", err)
-	}
-	conversationMgr, err := conversation.New(
-		nil, i18nInst, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		conversation.Opts{
-			DB:               db,
-			Lo:               initLogger(ko, "conversation"),
-			SubjectRefFormat: "#{ref}",
-		},
-	)
-	if err != nil {
-		log.Fatalf("temporal-worker: conversation manager: %v", err)
-	}
-	agentsMgr, err := aiagents.New(aiagents.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "ai-agents"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai agents manager: %v", err)
-	}
-	toolsMgr, err := aitools.New(aitools.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "ai-tools"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai tools manager: %v", err)
-	}
-	executionsMgr, err := aiexecutions.New(aiexecutions.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "ai-executions"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai executions manager: %v", err)
-	}
-	usageMgr, err := aiusage.New(aiusage.Opts{
-		DB:      db,
-		Catalog: aiCatalog,
-		Lo:      initLogger(ko, "ai-usage"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai usage manager: %v", err)
-	}
-
-	systemUserID := resolveSystemUserID(db)
-	tokenMgr, err := exectoken.New(exectoken.Opts{
-		Redis:  rdb,
-		Logger: initLogger(ko, "exec-token"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: exec token manager: %v", err)
-	}
-	execRunnerMgr, err := execrunner.New(execrunner.Opts{
-		Token:           tokenMgr,
-		DB:              db,
-		Logger:          initLogger(ko, "exec-runner"),
-		SandboxURL:      ko.MustString("exec.sandbox_url"),
-		SandboxToken:    ko.MustString("exec.sandbox_token"),
-		PlatformBaseURL: ko.MustString("exec.platform_base_url"),
-		SystemUserID:    systemUserID,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: exec runner: %v", err)
-	}
-
-	embedProvider := buildEmbeddingProvider(aiPresets, ko)
-	rerankProvider := buildRerankProvider(aiPresets, ko)
-	embedStore, err := embeddings.NewStore(embeddings.StoreOpts{
-		DB: db,
-		Lo: initLogger(ko, "embeddings-store"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: embeddings store: %v", err)
-	}
-	queryCache := buildQueryEmbeddingCache(ko, rdb)
-	searcher, err := buildSearcher(embedStore, embedProvider, rerankProvider, queryCache, ko)
-	if err != nil {
-		log.Fatalf("temporal-worker: embeddings searcher: %v", err)
-	}
-	aicapabilities.SetKBSearcher(searcher)
-
-	dispatcher := aitools.NewDispatcher(toolsMgr, execRunnerMgr)
-	agentRunner, err := airunner.New(airunner.Opts{
-		Provider:     aiProvider,
-		Agents:       agentsMgr,
-		Resolver:     resolver.New(toolsMgr, nil),
-		Dispatcher:   dispatcher,
-		PresetReg:    aiPresets,
-		Lo:           initLogger(ko, "agent-runner"),
-		Knowledge:    knowledgeMgr,
-		Conversation: conversationMgr,
-		User:         userMgr,
-		Usage:        &workerRunnerUsageAdapter{m: usageMgr},
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: agent runner: %v", err)
-	}
-
-	eventPub, err := runnerevents.NewRedisStreamPublisher(rdb, initLogger(ko, "ai-run-events"), ko.Duration("agent_run.event_ttl"))
-	if err != nil {
-		log.Fatalf("temporal-worker: ai run event publisher: %v", err)
-	}
-
-	return &actairuns.Activities{
-		Runner:     agentRunner,
-		Executions: executionsMgr,
-		Events:     eventPub,
-		Lo:         initLogger(ko, "ai-run-activities"),
-	}
+	return acts
 }
 
-// buildTagClassificationActivities wires the dependency graph for Batch 8
-// AI tag classification. The activity owns the business logic; the workflow
-// on the pipeline queue only delegates to this activity.
-func buildTagClassificationActivities(ko *koanf.Koanf, lo *logf.Logger) *acttagclassification.Activities {
-	_ = lo
-
-	db := openDB(ko)
-	rdb := openRedis(ko)
-	i18nInst := loadI18n()
-
-	aiCatalog, err := loadAIModelCatalog(ko)
-	if err != nil {
-		log.Fatalf("temporal-worker: load AI model catalog: %v", err)
-	}
-	aiPresets, err := loadAIPresetRegistry(ko, aiCatalog)
-	if err != nil {
-		log.Fatalf("temporal-worker: load AI preset registry: %v", err)
-	}
-	aiProvider := buildAnthropicProvider(ko, db, aiPresets, aiCatalog)
-	if aiProvider == nil {
-		log.Fatalf("temporal-worker: Anthropic provider not configured — pipeline queue requires it")
-	}
-
-	usageMgr, err := aiusage.New(aiusage.Opts{
-		DB:      db,
-		Catalog: aiCatalog,
-		Lo:      initLogger(ko, "ai-usage"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai_usage manager: %v", err)
-	}
-
-	aiOperationsMgr, err := aioperations.New(aioperations.Opts{
-		DB: db,
-		Lo: initLogger(ko, "ai-operations"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai_operations manager: %v", err)
-	}
-
-	settingMgr, err := setting.New(setting.Opts{
-		DB:            db,
-		Lo:            initLogger(ko, "setting"),
-		EncryptionKey: ko.MustString("app.encryption_key"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: setting manager: %v", err)
-	}
-	businessHoursMgr, err := businesshours.New(businesshours.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "business-hours"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: business-hours manager: %v", err)
-	}
-	teamMgr, err := team.New(team.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "team"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: team manager: %v", err)
-	}
-	userMgr, err := user.New(i18nInst, user.Opts{
-		DB: db,
-		Lo: initLogger(ko, "user"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: user manager: %v", err)
-	}
-	slaMgr, err := sla.New(
-		sla.Opts{DB: db, Lo: initLogger(ko, "sla"), I18n: i18nInst},
-		teamMgr,
-		settingMgr,
-		businessHoursMgr,
-		nil,
-		userMgr,
-		nil,
-	)
-	if err != nil {
-		log.Fatalf("temporal-worker: sla manager: %v", err)
-	}
-	statusMgr, err := status.New(status.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "status"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: status manager: %v", err)
-	}
-	priorityMgr, err := priority.New(priority.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "priority"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: priority manager: %v", err)
-	}
-	tagMgr, err := tag.New(tag.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "tag"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: tag manager: %v", err)
-	}
-	conversationMgr, err := conversation.New(
-		nil,
-		i18nInst,
-		slaMgr,
-		statusMgr,
-		priorityMgr,
-		nil,
-		userMgr,
-		teamMgr,
-		nil,
-		settingMgr,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		conversation.Opts{
-			DB:               db,
-			Lo:               initLogger(ko, "conversation"),
-			SubjectRefFormat: "#{ref}",
-		},
-	)
-	if err != nil {
-		log.Fatalf("temporal-worker: conversation manager: %v", err)
-	}
-
-	var systemInboxID int
-	if err := db.QueryRow(`SELECT id FROM inboxes WHERE uuid = $1`, migrations.SystemInboxUUID).Scan(&systemInboxID); err != nil {
-		log.Fatalf("temporal-worker: resolve system inbox: %v", err)
-	}
-	systemUser, err := userMgr.GetSystemUser()
-	if err != nil {
-		log.Fatalf("temporal-worker: resolve system user: %v", err)
-	}
-	realtimePub, err := realtime.NewRedisPublisher(rdb)
-	if err != nil {
-		log.Fatalf("temporal-worker: realtime publisher: %v", err)
-	}
-
-	acts, err := acttagclassification.New(&acttagclassification.Activities{
-		DB:              db,
-		Lo:              initLogger(ko, "tag-classification"),
-		LLMProvider:     aiProvider,
-		UsageMgr:        usageMgr,
-		AIOperationsMgr: aiOperationsMgr,
-		TagMgr:          tagMgr,
-		ConversationMgr: conversationMgr,
-		Realtime:        realtimePub,
-		SystemInboxID:   systemInboxID,
-		SystemUser:      systemUser,
-	})
+func buildTagClassificationActivities(deps activitydeps.Dependencies) *acttagclassification.Activities {
+	acts, err := acttagclassification.NewActivities(deps)
 	if err != nil {
 		log.Fatalf("temporal-worker: tag classification activities: %v", err)
 	}
 	return acts
 }
 
-// buildAgentValidationActivities wires the pipeline activity that validates
-// enabled agents against a conversation's detection context.
-func buildAgentValidationActivities(ko *koanf.Koanf, lo *logf.Logger) *actagentvalidation.Activities {
-	_ = lo
-
-	db := openDB(ko)
-	rdb := openRedis(ko)
-	i18nInst := loadI18n()
-
-	aiCatalog, err := loadAIModelCatalog(ko)
-	if err != nil {
-		log.Fatalf("temporal-worker: load AI model catalog: %v", err)
-	}
-	aiPresets, err := loadAIPresetRegistry(ko, aiCatalog)
-	if err != nil {
-		log.Fatalf("temporal-worker: load AI preset registry: %v", err)
-	}
-	aiProvider := buildAnthropicProvider(ko, db, aiPresets, aiCatalog)
-	if aiProvider == nil {
-		log.Fatalf("temporal-worker: Anthropic provider not configured — pipeline queue requires it")
-	}
-
-	usageMgr, err := aiusage.New(aiusage.Opts{
-		DB:      db,
-		Catalog: aiCatalog,
-		Lo:      initLogger(ko, "ai-usage"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai_usage manager: %v", err)
-	}
-	aiOperationsMgr, err := aioperations.New(aioperations.Opts{
-		DB: db,
-		Lo: initLogger(ko, "ai-operations"),
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai_operations manager: %v", err)
-	}
-	agentsMgr, err := aiagents.New(aiagents.Opts{
-		DB:   db,
-		Lo:   initLogger(ko, "ai-agents"),
-		I18n: i18nInst,
-	})
-	if err != nil {
-		log.Fatalf("temporal-worker: ai agents manager: %v", err)
-	}
-	conversationMgr, err := conversation.New(
-		nil, i18nInst, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		conversation.Opts{
-			DB:               db,
-			Lo:               initLogger(ko, "conversation"),
-			SubjectRefFormat: "#{ref}",
-		},
-	)
-	if err != nil {
-		log.Fatalf("temporal-worker: conversation manager: %v", err)
-	}
-
-	var systemInboxID int
-	if err := db.QueryRow(`SELECT id FROM inboxes WHERE uuid = $1`, migrations.SystemInboxUUID).Scan(&systemInboxID); err != nil {
-		log.Fatalf("temporal-worker: resolve system inbox: %v", err)
-	}
-	detectionMgr := detection.New(detection.Opts{
-		Lo:            initLogger(ko, "detection"),
-		LLMProvider:   aiProvider,
-		UsageMgr:      usageMgr,
-		SystemInboxID: systemInboxID,
-	})
-	realtimePub, err := realtime.NewRedisPublisher(rdb)
-	if err != nil {
-		log.Fatalf("temporal-worker: realtime publisher: %v", err)
-	}
-
-	acts, err := actagentvalidation.New(&actagentvalidation.Activities{
-		DB:              db,
-		Lo:              initLogger(ko, "agent-validation"),
-		AgentsMgr:       agentsMgr,
-		ConversationMgr: conversationMgr,
-		DetectionMgr:    detectionMgr,
-		AIOperationsMgr: aiOperationsMgr,
-		Realtime:        realtimePub,
-	})
+func buildAgentValidationActivities(deps activitydeps.Dependencies) *actagentvalidation.Activities {
+	acts, err := actagentvalidation.NewActivities(deps)
 	if err != nil {
 		log.Fatalf("temporal-worker: agent validation activities: %v", err)
+	}
+	return acts
+}
+
+func buildCustomerIdentificationActivities(deps activitydeps.Dependencies) *actcustomeridentification.Activities {
+	acts, err := actcustomeridentification.NewActivities(deps)
+	if err != nil {
+		log.Fatalf("temporal-worker: customer identification activities: %v", err)
 	}
 	return acts
 }
@@ -955,8 +808,10 @@ func buildEmbeddingProvider(reg *aipreset.Registry, ko *koanf.Koanf) embeddings.
 		return nil
 	}
 	p, err := voyageembed.New(voyageembed.Opts{
-		APIKey: apiKey,
-		Lo:     initLogger(ko, "voyage-embeddings"),
+		APIKey:       apiKey,
+		Concurrency:  ko.Int("embeddings.concurrency"),
+		TotalTimeout: ko.Duration("embeddings.total_timeout"),
+		Lo:           initLogger(ko, "voyage-embeddings"),
 	})
 	if err != nil {
 		log.Fatalf("temporal-worker: voyage embeddings provider: %v", err)
@@ -1001,10 +856,7 @@ func buildSearcher(
 	cache *embeddings.QueryEmbeddingCache,
 	ko *koanf.Koanf,
 ) (*embeddings.Searcher, error) {
-	if embed == nil {
-		return nil, nil
-	}
-	return embeddings.NewSearcher(embeddings.SearcherOpts{
+	return embeddings.NewConfiguredSearcher(ko, embeddings.SearcherOpts{
 		Store:    store,
 		Embed:    embed,
 		Reranker: rank,
@@ -1021,6 +873,14 @@ func resolveSystemUserID(db *sqlx.DB) int {
 		systemEmail,
 	).Scan(&id); err != nil {
 		log.Fatalf("temporal-worker: resolve system user: %v", err)
+	}
+	return id
+}
+
+func resolveSystemInboxID(db *sqlx.DB) int {
+	var id int
+	if err := db.QueryRow(`SELECT id FROM inboxes WHERE uuid = $1`, migrations.SystemInboxUUID).Scan(&id); err != nil {
+		log.Fatalf("temporal-worker: resolve system inbox: %v", err)
 	}
 	return id
 }
@@ -1055,6 +915,8 @@ func (a *workerRunnerUsageAdapter) Record(ctx context.Context, in airunner.Usage
 		Outcome:             in.Outcome,
 		ProviderRequestID:   in.ProviderRequestID,
 		ProviderMetadata:    in.ProviderMetadata,
+		RequestPayload:      in.RequestPayload,
+		ResponsePayload:     in.ResponsePayload,
 	})
 }
 

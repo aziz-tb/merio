@@ -39,7 +39,7 @@
               >
                 <SelectTag
                   v-model="action.value"
-                  :items="tagsStore.tagNames.map((tag) => ({ label: tag, value: tag }))"
+                  :items="tagNameOptions"
                   :placeholder="t('placeholders.selectTags')"
                 />
               </div>
@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { toRefs } from 'vue'
+import { computed, toRefs } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import CloseButton from '@main/components/button/CloseButton.vue'
 import { useTagStore } from '../../../stores/tag'
@@ -115,6 +115,13 @@ const { t } = useI18n()
 const emit = defineEmits(['update-actions', 'add-action', 'remove-action'])
 const tagsStore = useTagStore()
 const { conversationActions } = useConversationFilters()
+const tagNameOptions = computed(() =>
+  tagsStore.tags.map((tag) => ({
+    label: tag.name,
+    value: tag.name,
+    color: tag.color || 'grey'
+  }))
+)
 
 const handleFieldChange = (value, index) => {
   actions.value[index].value = []

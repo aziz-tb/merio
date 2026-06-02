@@ -181,7 +181,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, Pencil, Play, RefreshCw, RotateCcw, Send } from 'lucide-vue-next'
 import { Badge } from '@shared-ui/components/ui/badge'
@@ -194,6 +194,7 @@ import {
 import AgentRunResultPanel from '@/features/ai/shared/RunResultPanel.vue'
 import { normalizeExecution } from '@/features/ai/shared/normalizeRunResult.js'
 import { useAgentRunStream } from '@/composables/useAgentRunStream'
+import { useWorkflowCompletion } from '@/composables/useWorkflowCompletion'
 import { useConversationStore } from '@/stores/conversation'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -537,8 +538,7 @@ const triggerValidation = async () => {
   }
 }
 
-const handleAgentValidationCompleted = async (payload) => {
-  if (payload?.conversation_uuid !== props.uuid) return
+const handleAgentValidationCompleted = async () => {
   try {
     await fetchLatestValidation()
   } finally {
@@ -697,12 +697,10 @@ watch(adHocAgentId, (id) => {
   runAgent(agent)
 })
 
-onMounted(() => {
-  emitter.on(EMITTER_EVENTS.AGENT_VALIDATION_COMPLETED, handleAgentValidationCompleted)
-  refresh()
-})
+useWorkflowCompletion('AGENT_VALIDATION_COMPLETED', toRef(props, 'uuid'), handleAgentValidationCompleted)
+
+onMounted(refresh)
 onUnmounted(() => {
-  emitter.off(EMITTER_EVENTS.AGENT_VALIDATION_COMPLETED, handleAgentValidationCompleted)
   clearActiveRun()
 })
 

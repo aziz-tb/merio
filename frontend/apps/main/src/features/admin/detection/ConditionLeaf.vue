@@ -1,5 +1,5 @@
 <template>
-  <div class="grid gap-2 rounded border border-border p-3 md:grid-cols-[1fr_11rem_1fr_auto]">
+  <div class="grid gap-2 rounded md:grid-cols-[1fr_11rem_1fr_auto]">
     <div class="relative">
       <Input
         v-model="displayPathValue"
@@ -57,22 +57,15 @@
     </div>
 
     <Button type="button" variant="ghost" size="icon" @click="$emit('remove')">
-      <X class="h-4 w-4" />
+      <TrashCan class="h-4 w-4" />
     </Button>
 
-    <PathPickerPanel
-      v-model:open="pickerOpen"
-      :available-sources="availableSources"
-      :initial-source="condition.source || 'ticket'"
-      @select="handlePathSelect"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ListTree, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import {
@@ -91,17 +84,18 @@ import {
   TagsInputItemText
 } from '@shared-ui/components/ui/tags-input'
 import { useTagStore } from '@/stores/tag'
-import PathPickerPanel from './PathPickerPanel.vue'
+import { usePathPicker } from '@/composables/usePathPicker'
+import { TrashCan, ListTree } from '@qall/icons'
 
 const condition = defineModel({ required: true })
 defineEmits(['remove'])
-defineProps({
-  availableSources: { type: Array, default: () => ['ticket', 'contact', 'tags'] }
+const props = defineProps({
+  availableSources: { type: Array, default: () => ['ticket', 'customer', 'contract', 'tags'] }
 })
 
 const { t } = useI18n()
 const tagStore = useTagStore()
-const pickerOpen = ref(false)
+const picker = usePathPicker()
 
 const allOperators = ['=', '!=', '>', '>=', '<', '<=', 'contains', 'not contains', 'contains RegEx', 'in', 'not in', 'is null', 'is not null']
 const tagOperators = ['in', 'not in']
@@ -181,13 +175,17 @@ watch(
 )
 
 const openPicker = () => {
-  pickerOpen.value = true
-}
-
-const handlePathSelect = (selection) => {
-  condition.value.source = selection.source
-  condition.value.path = selection.path
-  if (selection.operator) condition.value.operator = selection.operator
-  if (selection.value !== undefined) condition.value.value = selection.value
+  picker.open({
+    conditionId: condition.value.id,
+    currentSource: condition.value.source,
+    currentPath: condition.value.path,
+    availableSources: props.availableSources,
+    onSelect: (selection) => {
+      condition.value.source = selection.source
+      condition.value.path = selection.path
+      if (selection.operator) condition.value.operator = selection.operator
+      if (selection.value !== undefined) condition.value.value = selection.value
+    }
+  })
 }
 </script>

@@ -22,9 +22,7 @@ import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
 import { useNotificationStore } from './stores/notification'
 import { initAudioContext } from '@shared-ui/composables/useNotificationSound'
-import PageHeader from './components/layout/PageHeader.vue'
 import ViewForm from '@/features/view/ViewForm.vue'
-import AdminBanner from '@/components/banner/AdminBanner.vue'
 import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import IconRail from '@main/components/sidebar/IconRail.vue'
@@ -33,9 +31,11 @@ import CreateConversation from '@/features/conversation/CreateConversation.vue'
 import SmallScreenOverlay from '@/components/SmallScreenOverlay.vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { SidebarProvider } from '@shared-ui/components/ui/sidebar'
 import RouteContextHost from '@main/components/layout/RouteContextHost.vue'
+import { TooltipProvider } from '@shared-ui/components/ui/tooltip'
 import api from '@main/api'
+import PathPickerPanel from '@/features/admin/detection/PathPickerPanel.vue'
+import { useAgentRightRail } from '@/composables/useAgentRightRail'
 
 const route = useRoute()
 const emitter = useEmitter()
@@ -52,7 +52,7 @@ function dismissSmallScreen() {
 const isInboxRoute = computed(() => route.path.startsWith('/inboxes'))
 
 // True for routes that render their own multi-panel card frames and
-// must NOT be wrapped in App.vue's outer rounded card + PageHeader.
+// must NOT be wrapped in App.vue's outer rounded card.
 // Inbox qualifies; the agent-edit three-rail layout opts in via
 // meta.fullBleed. Keep this distinct from isInboxRoute — the
 // padding-start logic (ps-[var(--page-space)]) is inbox-specific
@@ -60,6 +60,11 @@ const isInboxRoute = computed(() => route.path.startsWith('/inboxes'))
 const isFullBleedRoute = computed(
   () => isInboxRoute.value || route.matched.some((r) => r.meta?.fullBleed)
 )
+const isAgentEditRoute = computed(() =>
+  route.matched.some((record) => record.meta?.layoutContext === 'ai-agent-edit')
+)
+const rail = useAgentRightRail()
+const showGlobalPathPicker = computed(() => rail.isActive('path-picker') && !isAgentEditRoute.value)
 
 // Open/closed state for the secondary sidebar — shared with Sidebar.vue and PageHeader.vue.
 // When closed, the sidebar slides off-canvas and main content reclaims the 240px.
@@ -205,13 +210,11 @@ const refreshViews = async (data) => {
 <template>
   <SmallScreenOverlay v-if="showSmallScreenOverlay" @dismiss="dismissSmallScreen" />
 
-  <SidebarProvider class="contents">
+  <TooltipProvider :delay-duration="0">
     <RouteContextHost>
       <div class="bg-canvas h-screen text-foreground">
-        <!-- Icon rail (extracted to its own component for clarity) -->
         <IconRail />
 
-        <!-- Secondary sidebar (5 modes, fixed-positioned internally) -->
         <Sidebar
           :userTeams="userStore.teams"
           :userViews="userViews"
@@ -235,22 +238,30 @@ const refreshViews = async (data) => {
               : 'ms-[var(--ld-sidebar-collapsed-width)]'
           ]"
         >
-          <div
-            :class="[
-              'flex flex-col h-full overflow-hidden ',
-              isFullBleedRoute
-                ? ''
-                : 'rounded-lg bg-background border border-input shadow-sm'
-            ]"
-          >
-            <PageHeader v-if="!isFullBleedRoute" />
-            <RouterView class="flex-grow" />
+          <div class="flex h-full gap-1">
+            <div
+              :class="[
+                'flex flex-col h-full overflow-hidden min-w-0',
+                showGlobalPathPicker ? 'flex-1' : 'w-full',
+                isFullBleedRoute
+                  ? ''
+                  : 'rounded-lg bg-background border border-input shadow-sm'
+              ]"
+            >
+              <RouterView class="flex-grow" />
+            </div>
+            <div
+              v-if="showGlobalPathPicker"
+              class="h-full w-[min(420px,35vw)] shrink-0 bg-background border border-input shadow-sm overflow-hidden rounded-lg"
+            >
+              <PathPickerPanel />
+            </div>
           </div>
           <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
         </div>
       </div>
     </RouteContextHost>
-  </SidebarProvider>
+  </TooltipProvider>
 
   <!-- Command box -->
   <Command />

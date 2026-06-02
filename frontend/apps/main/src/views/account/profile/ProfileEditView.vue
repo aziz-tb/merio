@@ -1,4 +1,5 @@
 <template>
+  <PageHeader />
   <div class="h-full">
     <div class="flex flex-col space-y-5">
       <div class="space-y-1">
@@ -63,6 +64,7 @@
 <script setup>
 import { useUserStore } from '../../../stores/user'
 import { Button } from '@shared-ui/components/ui/button'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { ref } from 'vue'
 import VuePictureCropper, { cropper } from 'vue-picture-cropper'

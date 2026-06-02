@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Inbox, Shield, FileLineChart, BookUser, BookOpen, Bot } from 'lucide-vue-next'
+import { AddressBook, BookOpenCover, ChartSimple, Gear, Inboxes, MicrochipAi } from '@qall/icons'
 import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
 import SidebarNavUser from '@main/components/sidebar/SidebarNavUser.vue'
 
@@ -34,10 +34,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/inboxes') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+              class="shrink-0 rounded-md size-9 -p-2 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
             >
               <router-link :to="lastInboxPath || { name: 'inboxes' }">
-                <Inbox class="!size-[18px]" />
+                <Inboxes class="!size-6" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -51,10 +51,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/contacts') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
             >
               <router-link :to="{ name: 'contacts' }">
-                <BookUser class="!size-[18px]" />
+                <AddressBook class="!size-6" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -68,10 +68,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/knowledge') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
             >
               <router-link :to="{ name: 'knowledge-list' }">
-                <BookOpen class="!size-[18px]" />
+                <BookOpenCover class="!size-6" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -85,10 +85,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/ai') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
             >
               <router-link :to="{ name: 'ai-agent-list' }">
-                <Bot class="!size-[18px]" />
+                <MicrochipAi class="!size-6" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -102,10 +102,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/reports') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
             >
               <router-link :to="{ name: 'reports' }">
-                <FileLineChart class="!size-[18px]" />
+                <ChartSimple class="!size-6" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -119,14 +119,14 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/admin') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-primary data-[state=open]:text-primary-foreground hover:text-foreground"
+              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
             >
               <router-link
                 :to="{
-                  name: userStore.can('general_settings:manage') ? 'general' : 'admin'
+                  name: 'admin-home'
                 }"
               >
-                <Shield class="!size-[18px]" />
+                <Gear class="!size-6" />
               </router-link>
             </Button>
           </TooltipTrigger>

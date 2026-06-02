@@ -28,14 +28,14 @@ def _emit(envelope: dict[str, Any]) -> None:
         pass
 
 
-def success(data: dict[str, Any] | None = None) -> None:
+def success(data: Any = None) -> None:
     """
     Report successful completion.
 
     `data` is the structured payload the platform stores as the tool's result.
-    Defaults to {} if not supplied.
+    It may be any JSON-serializable value. Defaults to {} if not supplied.
     """
-    _emit({"kind": "success", "data": data or {}})
+    _emit({"kind": "success", "data": {} if data is None else data})
 
 
 def failure(message: str, code: str | None = None) -> None:

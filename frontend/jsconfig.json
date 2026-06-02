@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@main/*": ["apps/main/src/*"],
       "@widget/*": ["apps/widget/src/*"],

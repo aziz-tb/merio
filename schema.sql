@@ -153,6 +153,8 @@ CREATE TABLE users (
 	api_key TEXT NULL,
 	api_secret TEXT NULL,
 	api_key_last_used_at TIMESTAMPTZ NULL,
+	linked_customer_id TEXT NULL,
+	linked_customer_id_at TIMESTAMPTZ NULL,
     CONSTRAINT constraint_users_on_country CHECK (LENGTH(country) <= 140),
     CONSTRAINT constraint_users_on_phone_number CHECK (LENGTH(phone_number) <= 20),
 	CONSTRAINT constraint_users_on_phone_number_country_code CHECK (LENGTH(phone_number_country_code) <= 10),
@@ -171,6 +173,20 @@ CREATE UNIQUE INDEX index_unique_users_on_ext_id_when_type_is_contact
 CREATE UNIQUE INDEX index_unique_users_on_email_when_no_ext_id_contact
 	ON users (email)
 	WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL;
+
+DROP TABLE IF EXISTS secrets CASCADE;
+CREATE TABLE secrets (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    encrypted_value BYTEA NOT NULL,
+    nonce BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_accessed_at TIMESTAMPTZ,
+    created_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT secrets_name_format CHECK (name ~ '^[a-z][a-z0-9_]{0,63}$')
+);
+CREATE INDEX index_secrets_on_name ON secrets(name);
 
 DROP TABLE IF EXISTS user_roles CASCADE;
 CREATE TABLE user_roles (
@@ -278,6 +294,7 @@ CREATE TABLE conversation_messages (
     "content" TEXT NULL,
 	text_content TEXT NULL,
     source_id TEXT NULL,
+    send_inbox_id INT REFERENCES inboxes(id) ON DELETE RESTRICT ON UPDATE CASCADE NULL,
  	sender_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
     sender_type message_sender_type NOT NULL,
     meta JSONB DEFAULT '{}'::JSONB NULL
@@ -285,7 +302,8 @@ CREATE TABLE conversation_messages (
 CREATE INDEX index_trgm_conversation_messages_on_text_content ON conversation_messages USING GIN (text_content gin_trgm_ops);
 CREATE INDEX index_conversation_messages_on_conversation_id ON conversation_messages (conversation_id);
 CREATE INDEX index_conversation_messages_on_created_at ON conversation_messages (created_at);
-CREATE INDEX index_conversation_messages_on_source_id ON conversation_messages (source_id);
+CREATE UNIQUE INDEX index_unique_conversation_messages_on_source_id ON conversation_messages (source_id) WHERE source_id IS NOT NULL;
+CREATE INDEX index_conversation_messages_on_send_inbox_id ON conversation_messages (send_inbox_id) WHERE send_inbox_id IS NOT NULL;
 CREATE INDEX index_conversation_messages_on_status ON conversation_messages (status);
 CREATE INDEX index_conversation_messages_on_conversation_id_and_created_at ON conversation_messages (conversation_id, created_at);
 
@@ -522,7 +540,7 @@ CREATE TABLE ai_operations (
 	-- in internal/aioperations/payloads/. Empty/partial for failed/skipped.
 	payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 	CONSTRAINT check_ai_operations_triggered_by CHECK (triggered_by IN ('auto', 'manual')),
-	CONSTRAINT check_ai_operations_status CHECK (status IN ('success', 'failed', 'skipped'))
+	CONSTRAINT check_ai_operations_status CHECK (status IN ('running', 'success', 'failed', 'skipped'))
 );
 CREATE INDEX index_ai_operations_on_conversation
 	ON ai_operations(conversation_id, created_at DESC)
@@ -723,21 +741,6 @@ CREATE TABLE webhooks (
 	CONSTRAINT constraint_webhooks_on_events_not_empty CHECK (array_length(events, 1) > 0)
 );
 
-DROP TABLE IF EXISTS context_links CASCADE;
-CREATE TABLE context_links (
-	id SERIAL PRIMARY KEY,
-	created_at TIMESTAMPTZ DEFAULT NOW(),
-	updated_at TIMESTAMPTZ DEFAULT NOW(),
-	name TEXT NOT NULL,
-	url_template TEXT NOT NULL,
-	signing_secret TEXT NOT NULL DEFAULT '',
-	token_expiry_seconds INT NOT NULL DEFAULT 1200,
-	is_active BOOLEAN DEFAULT true,
-	CONSTRAINT constraint_context_links_on_name CHECK (length(name) <= 255),
-	CONSTRAINT constraint_context_links_on_url_template CHECK (length(url_template) <= 2048),
-	CONSTRAINT constraint_context_links_on_signing_secret CHECK (length(signing_secret) <= 500)
-);
-
 DROP TABLE IF EXISTS user_notifications CASCADE;
 CREATE TABLE user_notifications (
 	id SERIAL PRIMARY KEY,
@@ -905,6 +908,7 @@ CREATE INDEX index_articles_index_state_on_stale
 
 DROP TABLE IF EXISTS ai_tools CASCADE;
 DROP TABLE IF EXISTS ai_agents CASCADE;
+DROP TABLE IF EXISTS functions CASCADE;
 CREATE TABLE ai_agents (
 	id                   SERIAL PRIMARY KEY,
 	created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -920,7 +924,7 @@ CREATE TABLE ai_agents (
 	confidence_threshold NUMERIC(4,3) NOT NULL DEFAULT 0.5,
 	max_iterations       INT NOT NULL DEFAULT 5,
 	extended_thinking_enabled BOOL NOT NULL DEFAULT TRUE,
-	min_legitimation     INT NOT NULL DEFAULT 0,
+	min_verification     INT NOT NULL DEFAULT 0,
 	autonomy             JSONB NOT NULL DEFAULT '{}'::jsonb,
 	enabled              BOOL NOT NULL DEFAULT TRUE,
 	CONSTRAINT constraint_ai_agents_on_name              CHECK (length(name) <= 140),
@@ -928,11 +932,270 @@ CREATE TABLE ai_agents (
 	CONSTRAINT constraint_ai_agents_on_description       CHECK (description IS NULL OR length(description) <= 1000),
 	CONSTRAINT constraint_ai_agents_on_threshold         CHECK (confidence_threshold >= 0 AND confidence_threshold <= 1),
 	CONSTRAINT constraint_ai_agents_on_iterations        CHECK (max_iterations > 0 AND max_iterations <= 50),
-	CONSTRAINT constraint_ai_agents_on_min_legitimation  CHECK (min_legitimation >= 0),
+	CONSTRAINT constraint_ai_agents_on_min_verification  CHECK (min_verification >= 0 AND min_verification <= 3),
 	CONSTRAINT constraint_ai_agents_on_name_unique       UNIQUE (name),
 	CONSTRAINT constraint_ai_agents_on_slug_unique       UNIQUE (slug)
 );
 CREATE INDEX index_ai_agents_on_enabled ON ai_agents(enabled) WHERE enabled = TRUE;
+
+-- functions — the single, unified home for every named, sandbox-runnable
+-- code blob (custom AI tools, customer-identification executors, future
+-- domains). Created before ai_tools, which links to it via function_id.
+CREATE TABLE functions (
+    id              BIGSERIAL PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    name            TEXT NOT NULL,
+    domain          TEXT NOT NULL,
+
+    code            TEXT NOT NULL DEFAULT '',
+    language        TEXT NOT NULL DEFAULT 'python',
+    packages        TEXT NOT NULL DEFAULT '',
+    timeout_ms      INT  NOT NULL DEFAULT 30000,
+
+    parameters      JSONB NOT NULL DEFAULT '[]'::jsonb,
+
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+
+    CONSTRAINT constraint_functions_on_name_unique
+        UNIQUE (name),
+    CONSTRAINT check_functions_language
+        CHECK (language IN ('python', 'javascript')),
+    CONSTRAINT check_functions_timeout
+        CHECK (timeout_ms > 0 AND timeout_ms <= 120000),
+    CONSTRAINT check_functions_domain
+        CHECK (domain IN ('ai_tool', 'customer_identification'))
+);
+CREATE INDEX index_functions_on_domain ON functions (domain);
+
+-- Seed the 4 customer-identification executors as functions rows with
+-- starter code and preview parameters. Operators replace TODOs with their
+-- ERP calls. A function is callable once it exists with non-empty code.
+INSERT INTO functions (name, domain, code, language, packages, timeout_ms, parameters)
+VALUES
+    ('search_customer_by_fields', 'customer_identification', $code$
+import sdk
+import requests
+
+# Inputs come from the AI's parameter extraction (configured in
+# the "AI-based identification" admin section). Any subset may be
+# present; absent fields are None.
+contract_id = sdk.input.get("contractId")
+customer_id = sdk.input.get("customerId")
+firstname = sdk.input.get("firstname")
+lastname = sdk.input.get("lastname")
+email = sdk.input.get("email")
+phone = sdk.input.get("phone")
+zip_code = sdk.input.get("zip")
+city = sdk.input.get("city")
+company = sdk.input.get("company")
+ticket_id = sdk.input.get("ticketId")
+
+# Reject calls with no useful inputs.
+if not any([contract_id, customer_id, firstname, lastname, email, phone, company]):
+    sdk.failure("no identifying attributes provided", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: replace with your ERP endpoint + auth.
+# Example shape - adjust to your API.
+try:
+    resp = requests.get(
+        "https://your-erp.example.com/api/customers/search",
+        params={
+            "contractId": contract_id,
+            "customerId": customer_id,
+            "firstName": firstname,
+            "lastName": lastname,
+            "email": email,
+        },
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if resp.status_code == 404:
+    sdk.failure("no customer matched the provided attributes", code="NOT_FOUND")
+    raise SystemExit
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+# Return AT MOST ONE match. If multiple candidates exist, return the
+# most likely one. Empty {} is also a valid "no match" outcome via failure().
+match = resp.json()
+
+# Expected output shape:
+#
+#   {
+#     "contractId": "<external contract id>",   # required
+#     "customerId": "<external customer id>",   # required
+#
+#     # Optional override of the verification flow:
+#     #   "customerVerification": 2,
+#     #   "customerVerificationMessage": "<reason if not 2>",
+#     # When set, the engine uses these values directly and skips
+#     # the rule evaluation. Use sparingly.
+#
+#     # Optional preview shown to operators in the sidebar:
+#     #   "agentPreview": [{"label": "...", "value": "...", "tooltip": null, "url": null}],
+#   }
+
+sdk.success(data=match)
+$code$, 'python', '', 30000, '[
+      {"id":"11111111-1111-4111-8111-000000000001","key":"contractId","value":""},
+      {"id":"11111111-1111-4111-8111-000000000002","key":"customerId","value":""},
+      {"id":"11111111-1111-4111-8111-000000000003","key":"firstname","value":""},
+      {"id":"11111111-1111-4111-8111-000000000004","key":"lastname","value":""},
+      {"id":"11111111-1111-4111-8111-000000000005","key":"email","value":""},
+      {"id":"11111111-1111-4111-8111-000000000006","key":"phone","value":""},
+      {"id":"11111111-1111-4111-8111-000000000007","key":"zip","value":""},
+      {"id":"11111111-1111-4111-8111-000000000008","key":"city","value":""},
+      {"id":"11111111-1111-4111-8111-000000000009","key":"company","value":""},
+      {"id":"11111111-1111-4111-8111-000000000010","key":"ticketId","value":""}
+    ]'::jsonb),
+    ('search_contract_by_id', 'customer_identification', $code$
+import sdk
+import requests
+
+contract_id = sdk.input.get("contractId")
+if not contract_id:
+    sdk.failure("contractId is required", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: fetch the contract from your ERP by ID.
+try:
+    resp = requests.get(
+        f"https://your-erp.example.com/api/contracts/{contract_id}",
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if resp.status_code == 404:
+    sdk.failure(f"contract {contract_id} not found", code="NO_CONTRACT")
+    raise SystemExit
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+contract = resp.json()
+
+# Expected output shape - the full contract record:
+#
+#   {
+#     "id": "<external contract id>",            # required (string or int)
+#     "customerId": "<external customer id>",    # required (FK to the customer)
+#     "business": false,                         # required (true if commercial)
+#     "lastname": "<surname>",                   # required if business=false
+#     "company": "<company name>",               # required if business=true
+#     "firstname": "<given name>",               # optional
+#     "email": "<contact email>",                # optional
+#     "phone": "<contact phone>",                # optional
+#     "deliveryAddress": "<full delivery address>",
+#     "billingAddress": "<full billing address>",
+#     "zip": "<delivery zip>",
+#     "agentPreview": [{"label": "...", "value": "...", "tooltip": null, "url": null}],
+#     "erpUrls": [{"label": "...", "url": "...", "icon": null}],
+#     # Any additional fields are preserved verbatim and available
+#     # to custom criteria via dot-notation (e.g., extra_data.malo).
+#   }
+
+sdk.success(data=contract)
+$code$, 'python', '', 30000, '[
+      {"id":"22222222-2222-4222-8222-000000000001","key":"contractId","value":""}
+    ]'::jsonb),
+    ('search_customer_by_id', 'customer_identification', $code$
+import sdk
+import requests
+
+customer_id = sdk.input.get("customerId")
+if not customer_id:
+    sdk.failure("customerId is required", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: fetch the customer from your ERP by ID.
+try:
+    resp = requests.get(
+        f"https://your-erp.example.com/api/customers/{customer_id}",
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if resp.status_code == 404:
+    sdk.failure(f"customer {customer_id} not found", code="NO_CUSTOMER")
+    raise SystemExit
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+customer = resp.json()
+
+# Expected output shape - the full customer record:
+#
+#   {
+#     "id": "<external customer id>",            # required
+#     "business": false,                         # required (true if commercial)
+#     "lastname": "<surname>",                   # required if business=false
+#     "company": "<company name>",               # required if business=true
+#     "contractIds": ["<id>", "<id>"],           # required; at least one
+#     "firstname": "<given name>",               # optional
+#     "email": "<contact email>",                # optional
+#     "phone": "<contact phone>",                # optional
+#     "deliveryAddress": "<full delivery address>",
+#     "billingAddress": "<full billing address>",
+#   }
+
+sdk.success(data=customer)
+$code$, 'python', '', 30000, '[
+      {"id":"33333333-3333-4333-8333-000000000001","key":"customerId","value":""}
+    ]'::jsonb),
+    ('search_customer_by_free_text', 'customer_identification', $code$
+import sdk
+import requests
+
+q = sdk.input.get("q", "")
+offset = int(sdk.input.get("offset", 0))
+limit = int(sdk.input.get("limit", 10))
+
+if not q.strip():
+    sdk.failure("search query is empty", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: free-text search across customers using q.
+# Used by the agent search bar at the top of the screen.
+try:
+    resp = requests.get(
+        "https://your-erp.example.com/api/customers/search",
+        params={"q": q, "offset": offset, "limit": limit},
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+# Expected output shape - array of partial customer records.
+# libredesk will fetch full details for each via search_customer_by_id,
+# so this only needs to return the IDs:
+#
+#   [ { "id": "<external customer id>" }, ... ]
+
+results = resp.json()
+sdk.success(data=results)
+$code$, 'python', '', 30000, '[
+      {"id":"44444444-4444-4444-8444-000000000001","key":"q","value":""},
+      {"id":"44444444-4444-4444-8444-000000000002","key":"offset","value":"0"},
+      {"id":"44444444-4444-4444-8444-000000000003","key":"limit","value":"10"}
+    ]'::jsonb)
+ON CONFLICT (name) DO NOTHING;
 
 CREATE TABLE ai_tools (
 	id                SERIAL PRIMARY KEY,
@@ -943,18 +1206,16 @@ CREATE TABLE ai_tools (
 	description       TEXT NULL,
 	input_parameters  JSONB NOT NULL DEFAULT '[]'::jsonb,
 	output_schema     JSONB NOT NULL DEFAULT '{}'::jsonb,
-	implementation    JSONB NOT NULL DEFAULT '{}'::jsonb,
 	category          TEXT NOT NULL DEFAULT 'write',
-	min_legitimation  INT NOT NULL DEFAULT 0,
 	timeout_ms        INT NOT NULL DEFAULT 30000,
 	async             BOOL NOT NULL DEFAULT FALSE,
 	enabled           BOOL NOT NULL DEFAULT TRUE,
+	function_id       BIGINT NOT NULL REFERENCES functions(id) ON DELETE RESTRICT,
 	CONSTRAINT constraint_ai_tools_on_name        CHECK (length(name) <= 140),
 	CONSTRAINT constraint_ai_tools_on_slug        CHECK (length(slug) <= 140),
 	CONSTRAINT constraint_ai_tools_on_description CHECK (description IS NULL OR length(description) <= 1000),
 	CONSTRAINT constraint_ai_tools_on_category    CHECK (category IN ('read', 'write')),
-	CONSTRAINT constraint_ai_tools_on_legit       CHECK (min_legitimation >= 0),
-	CONSTRAINT constraint_ai_tools_on_timeout     CHECK (timeout_ms > 0 AND timeout_ms <= 600000),
+	CONSTRAINT constraint_ai_tools_on_timeout     CHECK (timeout_ms > 0 AND timeout_ms <= 120000),
 	CONSTRAINT constraint_ai_tools_on_name_unique UNIQUE (name),
 	CONSTRAINT constraint_ai_tools_on_slug_unique UNIQUE (slug)
 );
@@ -965,7 +1226,7 @@ CREATE INDEX index_ai_tools_on_enabled ON ai_tools(enabled) WHERE enabled = TRUE
 -- in code under internal/ai/tools/builtin/.
 INSERT INTO ai_agents (
 	name, slug, description, prompt, detection, tools, kb_scope,
-	preset_overrides, confidence_threshold, max_iterations, min_legitimation, autonomy, enabled
+	preset_overrides, confidence_threshold, max_iterations, min_verification, autonomy, enabled
 ) VALUES (
 	'Test Agent',
 	'test-agent',
@@ -982,8 +1243,8 @@ INSERT INTO ai_agents (
 	FALSE
 ) ON CONFLICT (slug) DO NOTHING;
 
-DROP TABLE IF EXISTS tool_executions CASCADE;
-CREATE TABLE tool_executions (
+DROP TABLE IF EXISTS function_executions CASCADE;
+CREATE TABLE function_executions (
 	execution_id     TEXT PRIMARY KEY,
 	tool_name        TEXT,
 	invoker_user_id  BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -1001,14 +1262,110 @@ CREATE TABLE tool_executions (
 	trace_id         TEXT,
 	created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_tool_executions_tool_name
-	ON tool_executions(tool_name) WHERE tool_name IS NOT NULL;
-CREATE INDEX idx_tool_executions_conversation_id
-	ON tool_executions(conversation_id) WHERE conversation_id IS NOT NULL;
-CREATE INDEX idx_tool_executions_started_at
-	ON tool_executions(started_at DESC);
-CREATE INDEX idx_tool_executions_invoker_user_id
-	ON tool_executions(invoker_user_id);
+CREATE INDEX idx_function_executions_tool_name
+	ON function_executions(tool_name) WHERE tool_name IS NOT NULL;
+CREATE INDEX idx_function_executions_conversation_id
+	ON function_executions(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX idx_function_executions_started_at
+	ON function_executions(started_at DESC);
+CREATE INDEX idx_function_executions_invoker_user_id
+	ON function_executions(invoker_user_id);
+
+-- Customer / contract identification (Wave 3 Batch 10). customers and
+-- contracts are caches of ERP-resolved records; last_synced_at drives the
+-- TTL. The conversations identification columns are added here (after both
+-- tables exist) to mirror the migration's post-state exactly.
+CREATE TABLE customers (
+    id              BIGSERIAL PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_synced_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    customer_id     TEXT NOT NULL,
+    business        BOOLEAN NOT NULL,
+
+    firstname       TEXT NULL,
+    lastname        TEXT NULL,
+    company         TEXT NULL,
+    email           TEXT NULL,
+    phone           TEXT NULL,
+    zip             TEXT NULL,
+    delivery_address TEXT NULL,
+    billing_address TEXT NULL,
+
+    contract_ids    JSON NOT NULL DEFAULT '[]'::json,
+    extra_data      JSON NOT NULL DEFAULT '{}'::json,
+
+    CONSTRAINT constraint_customers_on_customer_id_unique
+        UNIQUE (customer_id),
+    CONSTRAINT constraint_customers_on_business_consistency
+        CHECK (
+            (business = TRUE  AND company IS NOT NULL) OR
+            (business = FALSE AND lastname IS NOT NULL)
+        )
+);
+CREATE INDEX index_customers_on_email ON customers (email) WHERE email IS NOT NULL;
+CREATE INDEX index_customers_on_phone ON customers (phone) WHERE phone IS NOT NULL;
+CREATE INDEX index_customers_on_zip ON customers (zip) WHERE zip IS NOT NULL;
+CREATE INDEX index_customers_on_last_synced_at ON customers (last_synced_at);
+
+ALTER TABLE users
+    ADD CONSTRAINT users_linked_customer_id_fkey
+    FOREIGN KEY (linked_customer_id)
+    REFERENCES customers(customer_id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL;
+CREATE INDEX index_users_on_linked_customer_id
+    ON users(linked_customer_id)
+    WHERE linked_customer_id IS NOT NULL;
+
+CREATE TABLE contracts (
+    id              BIGSERIAL PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_synced_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    contract_id     TEXT NOT NULL,
+    customer_id     TEXT NOT NULL REFERENCES customers(customer_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    business        BOOLEAN NOT NULL,
+
+    firstname       TEXT NULL,
+    lastname        TEXT NULL,
+    company         TEXT NULL,
+    email           TEXT NULL,
+    phone           TEXT NULL,
+    zip             TEXT NULL,
+    delivery_address TEXT NULL,
+    billing_address TEXT NULL,
+
+    agent_preview   JSONB NOT NULL DEFAULT '[]'::jsonb,
+    erp_urls        JSONB NOT NULL DEFAULT '[]'::jsonb,
+    extra_data      JSON NOT NULL DEFAULT '{}'::json,
+
+    CONSTRAINT constraint_contracts_on_contract_id_unique
+        UNIQUE (contract_id),
+    CONSTRAINT constraint_contracts_on_business_consistency
+        CHECK (
+            (business = TRUE  AND company IS NOT NULL) OR
+            (business = FALSE AND lastname IS NOT NULL)
+        )
+);
+CREATE INDEX index_contracts_on_customer_id ON contracts (customer_id);
+CREATE INDEX index_contracts_on_email ON contracts (email) WHERE email IS NOT NULL;
+CREATE INDEX index_contracts_on_phone ON contracts (phone) WHERE phone IS NOT NULL;
+CREATE INDEX index_contracts_on_zip ON contracts (zip) WHERE zip IS NOT NULL;
+CREATE INDEX index_contracts_on_last_synced_at ON contracts (last_synced_at);
+
+ALTER TABLE conversations
+    ADD COLUMN customer_id          TEXT     NULL REFERENCES customers(customer_id) ON UPDATE CASCADE ON DELETE SET NULL,
+    ADD COLUMN contract_id          TEXT     NULL REFERENCES contracts(contract_id) ON UPDATE CASCADE ON DELETE SET NULL,
+    ADD COLUMN verification_level   SMALLINT NOT NULL DEFAULT 0,
+    ADD COLUMN verification_message TEXT     NULL;
+
+CREATE INDEX index_conversations_on_customer_id
+    ON conversations (customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX index_conversations_on_contract_id
+    ON conversations (contract_id) WHERE contract_id IS NOT NULL;
 
 -- agent_executions — immutable record of every agent run on a
 -- conversation. agent_execution_outcomes — at-most-one commitment per
@@ -1209,11 +1566,60 @@ VALUES
     ('notification.email.max_msg_retries', '3'::jsonb),
     ('notification.email.enabled', 'false'::jsonb);
 
+-- Customer / contract identification settings (Wave 3 Batch 10). 8 rows
+-- under the customer_identification.* namespace. Operators populate
+-- regexes, excluded domains, and rules via the admin UI on install.
+INSERT INTO settings ("key", value)
+VALUES
+    ('customer_identification.pattern_detection_enabled', 'true'::jsonb),
+    ('customer_identification.contract_number_regex', '""'::jsonb),
+    ('customer_identification.customer_number_regex', '""'::jsonb),
+    ('customer_identification.llm_extraction_enabled', 'true'::jsonb),
+    ('customer_identification.erp_cache_ttl_minutes', '60'::jsonb),
+    ('customer_identification.excluded_email_domains', '[]'::jsonb),
+    ('customer_identification.search_parameters', '{
+        "contractId":   { "type": "string", "description": "Contract number — typically alphanumeric, may be prefixed with VN- or C-." },
+        "customerId":   { "type": "string", "description": "Customer number — typically alphanumeric, may be prefixed with K- or C-." },
+        "firstname":    { "type": "string", "description": "First name of the customer if mentioned." },
+        "lastname":     { "type": "string", "description": "Last name of the customer if mentioned." },
+        "company":      { "type": "string", "description": "Company name if the customer is a business." },
+        "email":        { "type": "string", "description": "Email address mentioned in the message body (not necessarily the sender)." },
+        "phone":        { "type": "string", "description": "Phone number mentioned in the message." },
+        "meterNumber":  { "type": "string", "description": "Meter number — typically alphanumeric." },
+        "address":      { "type": "string", "description": "Street address mentioned in the message." },
+        "postalCode":   { "type": "string", "description": "Postal/ZIP code mentioned in the message." },
+        "city":         { "type": "string", "description": "City mentioned in the message." }
+    }'::jsonb),
+    ('customer_identification.verification_rules_async', '{
+        "email": {
+            "groups": [
+                {
+                    "label": "ID mentioned",
+                    "min_count": 1,
+                    "criteria": [
+                        {"type": "standard", "name": "contract_id_mentioned"},
+                        {"type": "standard", "name": "customer_id_mentioned"}
+                    ],
+                    "custom_criteria": []
+                },
+                {
+                    "label": "Sender email matches",
+                    "min_count": 1,
+                    "criteria": [
+                        {"type": "standard", "name": "sender_email_matches_erp"}
+                    ],
+                    "custom_criteria": []
+                }
+            ]
+        }
+    }'::jsonb);
+
 -- Default conversation priorities
 INSERT INTO conversation_priorities (name) VALUES
 ('Low'),
 ('Medium'),
-('High');
+('High'),
+('Urgent');
 
 -- Default conversation statuses
 INSERT INTO conversation_statuses (name, category) VALUES
@@ -1229,7 +1635,7 @@ VALUES
 	(
 		'Agent',
 		'Role for all agents with limited access to conversations.',
-		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,worklog:view_own,knowledge:read}'
+		'{conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,worklog:view_own,knowledge:read,customers:assign,customers:search}'
 	);
 
 INSERT INTO
@@ -1238,7 +1644,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,context_links:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,tags:view_private,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,worklog:view_own,worklog:view_team,worklog:view_all,knowledge:read,knowledge:write,knowledge:publish,knowledge:delete,tools:call,ai_agents:manage,ai_agents:run,ai_tools:manage,ai_tools:invoke}'
+		'{webhooks:manage,activity_logs:manage,custom_attributes:manage,contacts:read_all,contacts:read,contacts:write,contacts:block,contact_notes:read,contact_notes:write,contact_notes:delete,conversations:write,ai:manage,general_settings:manage,notification_settings:manage,oidc:manage,conversations:read_all,conversations:read_unassigned,conversations:read_assigned,conversations:read_team_inbox,conversations:read_team_all,conversations:read,conversations:update_user_assignee,conversations:update_team_assignee,conversations:update_priority,conversations:update_status,conversations:update_tags,messages:read,messages:write,view:manage,shared_views:manage,status:manage,tags:manage,tags:view_private,macros:manage,users:manage,teams:manage,automations:manage,inboxes:manage,roles:manage,reports:manage,templates:manage,business_hours:manage,sla:manage,worklog:view_own,worklog:view_team,worklog:view_all,knowledge:read,knowledge:write,knowledge:publish,knowledge:delete,tools:call,ai_agents:manage,ai_agents:run,ai_tools:manage,ai_tools:invoke,customers:assign,customers:search,customers:manage,functions:manage,secrets:manage}'
 	);
 
 

@@ -7,6 +7,8 @@ package hello
 import (
 	"context"
 	"fmt"
+
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 )
 
 // SayHelloInput is the activity input. Pointer-to-struct is the
@@ -30,6 +32,11 @@ type Activities struct{}
 // New returns an Activities ready to be registered with a worker.
 func New() *Activities {
 	return &Activities{}
+}
+
+func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
+	_ = deps
+	return New(), nil
 }
 
 // SayHello is the canonical smoke activity. Used by the hello-world

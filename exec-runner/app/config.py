@@ -65,8 +65,8 @@ class Config:
         cfg = cls(
             service_token=_env_str("SERVICE_TOKEN", required=True),
             service_port=_env_int("SERVICE_PORT", 8090),
-            warm_pool_size_python=_env_int("WARM_POOL_SIZE_PYTHON", 10),
-            warm_pool_size_js=_env_int("WARM_POOL_SIZE_JS", 5),
+            warm_pool_size_python=_env_int("WARM_POOL_SIZE_PYTHON", 2),
+            warm_pool_size_js=_env_int("WARM_POOL_SIZE_JS", 0),
             default_memory_mb=_env_int("DEFAULT_MEMORY_MB", 256),
             default_timeout_seconds=_env_int("DEFAULT_TIMEOUT_SECONDS", 60),
             max_concurrent_executions=_env_int("MAX_CONCURRENT_EXECUTIONS", 64),

@@ -46,6 +46,13 @@ type UserCompact struct {
 	Total int `db:"total" json:"-"`
 }
 
+type LinkedContact struct {
+	ID        int         `db:"id" json:"id"`
+	Email     null.String `db:"email" json:"email"`
+	FirstName string      `db:"first_name" json:"first_name"`
+	LastName  string      `db:"last_name" json:"last_name"`
+}
+
 type User struct {
 	ID                     int                  `db:"id" json:"id"`
 	CreatedAt              time.Time            `db:"created_at" json:"created_at"`
@@ -68,6 +75,8 @@ type User struct {
 	Meta                   json.RawMessage      `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage      `db:"custom_attributes" json:"custom_attributes"`
 	ExternalUserID         null.String          `db:"external_user_id" json:"external_user_id"`
+	LinkedCustomerID       null.String          `db:"linked_customer_id" json:"linked_customer_id"`
+	LinkedCustomerIDAt     null.Time            `db:"linked_customer_id_at" json:"linked_customer_id_at"`
 	Teams                  tmodels.TeamsCompact `db:"teams" json:"teams"`
 	ContactChannelID       int                  `db:"contact_channel_id" json:"contact_channel_id,omitempty"`
 	NewPassword            string               `db:"-" json:"new_password,omitempty"`

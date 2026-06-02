@@ -16,7 +16,8 @@ services:
       - "9000:9000"
     environment:
       LIBREDESK_SYSTEM_USER_PASSWORD: ${LIBREDESK_SYSTEM_USER_PASSWORD:-}
-      LIBREDESK_EXEC__SANDBOX_URL: http://host.docker.internal:8090/v1/execute
+      LIBREDESK_SECRETS_KEK: ${LIBREDESK_SECRETS_KEK:?set LIBREDESK_SECRETS_KEK to openssl rand -base64 32}
+      LIBREDESK_EXEC__SANDBOX_URL: http://host.docker.internal:8090
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

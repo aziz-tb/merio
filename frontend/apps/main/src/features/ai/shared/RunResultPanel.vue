@@ -365,7 +365,7 @@
               v-if="item.type === 'tool' && expandedEventId === item.id"
               class="rounded-md border border-input bg-background px-3 py-2 text-xs space-y-2"
             >
-              <div v-if="item.input && Object.keys(item.input).length">
+              <div v-if="item.phase !== 'completed' && item.input && Object.keys(item.input).length">
                 <div class="mb-1 text-muted-foreground">{{ $t('globals.terms.inputParameters') }}</div>
                 <pre class="font-mono whitespace-pre-wrap">{{ shortJson(item.input) }}</pre>
               </div>

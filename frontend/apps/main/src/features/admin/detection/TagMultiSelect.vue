@@ -17,7 +17,7 @@
           class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
         >
           <Checkbox :checked="selected.includes(tag.name)" @update:checked="toggle(tag.name)" />
-          <span>{{ tag.name }}</span>
+          <TagPill :tag="tag" />
         </label>
       </div>
     </div>
@@ -29,6 +29,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Input } from '@shared-ui/components/ui/input'
+import TagPill from '@shared-ui/components/TagPill.vue'
 import { useTagStore } from '@/stores/tag'
 
 const selected = defineModel({ required: false, default: () => [] })

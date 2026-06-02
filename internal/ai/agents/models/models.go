@@ -39,7 +39,7 @@ type Agent struct {
 	ConfidenceThreshold     float64         `db:"confidence_threshold" json:"confidence_threshold"`
 	MaxIterations           int             `db:"max_iterations" json:"max_iterations"`
 	ExtendedThinkingEnabled bool            `db:"extended_thinking_enabled" json:"extended_thinking_enabled"`
-	MinLegitimation         int             `db:"min_legitimation" json:"min_legitimation"`
+	MinVerification         int             `db:"min_verification" json:"min_verification"`
 	Autonomy                json.RawMessage `db:"autonomy" json:"autonomy"`
 	Enabled                 bool            `db:"enabled" json:"enabled"`
 }

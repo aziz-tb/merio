@@ -7,7 +7,9 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/ai/llm"
 	"github.com/abhinavxd/libredesk/internal/ai/usage"
+	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	tagmodels "github.com/abhinavxd/libredesk/internal/tag/models"
 	"github.com/lib/pq"
@@ -65,13 +67,13 @@ func (a *Activities) ClassifyTagsActivity(ctx context.Context, input Input) (Out
 		if err != nil {
 			return Output{}, fmt.Errorf("persist skipped classification: %w", err)
 		}
-		if err := a.publishTagsUpdate(ctx, conv.UUID, classificationStatusSkipped, id); err != nil {
-			a.Lo.Warn("publish skipped tag classification update failed", "conversation_uuid", conv.UUID, "error", err)
+		if err := a.publishTagsCompleted(ctx, conv.UUID, classificationStatusSkipped, traceID, ""); err != nil {
+			a.Lo.Warn("publish skipped tag classification completed failed", "conversation_uuid", conv.UUID, "error", err)
 		}
 		return Output{AIOperationID: id, Status: classificationStatusSkipped}, nil
 	}
 
-	ec := detection.EvaluationContext{Conversation: conv, Tags: conv.TagSlugs()}
+	ec := a.detectionContext(ctx, conv, traceID)
 	matchedTagIDs, aiCandidates, candidateIDs := a.prefilterTags(tags, ec)
 
 	var aiResult Result
@@ -134,8 +136,8 @@ func (a *Activities) ClassifyTagsActivity(ctx context.Context, input Input) (Out
 	}
 
 	a.applyTagSideEffects(conv, toApply, tags)
-	if err := a.publishTagsUpdate(ctx, conv.UUID, classificationStatusSuccess, aiOperationID); err != nil {
-		a.Lo.Warn("publish tag classification update failed", "conversation_uuid", conv.UUID, "error", err)
+	if err := a.publishTagsCompleted(ctx, conv.UUID, classificationStatusSuccess, traceID, ""); err != nil {
+		a.Lo.Warn("publish tag classification completed failed", "conversation_uuid", conv.UUID, "error", err)
 	}
 	if len(aiCandidates) > 0 && aiResult.Model != "" {
 		a.recordAIUsage(ctx, conv.ID, traceID, aiResult, aiLatencyMs)
@@ -150,6 +152,31 @@ func (a *Activities) ClassifyTagsActivity(ctx context.Context, input Input) (Out
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
 	return Output{AIOperationID: aiOperationID, AppliedTagIDs: toApply, RemovedTagIDs: toRemove, Status: classificationStatusSuccess}, nil
+}
+
+func (a *Activities) detectionContext(ctx context.Context, conv cmodels.Conversation, traceID string) detection.EvaluationContext {
+	ec := detection.EvaluationContext{
+		Conversation: conv,
+		Tags:         conv.TagSlugs(),
+		TraceID:      traceID,
+	}
+	if conv.CustomerID.Valid && a.CustomerMgr != nil {
+		customer, err := a.CustomerMgr.GetFreshByCustomerID(ctx, conv.CustomerID.String, customerpkg.FreshOptions{})
+		if err != nil {
+			a.Lo.Warn("tagclassification: failed to hydrate customer for detection", "conversation_uuid", conv.UUID, "customer_id", conv.CustomerID.String, "error", err)
+		} else {
+			ec.Customer = customer
+		}
+	}
+	if conv.ContractID.Valid && a.ContractMgr != nil {
+		contract, err := a.ContractMgr.GetFreshByContractID(ctx, conv.ContractID.String, contractpkg.FreshOptions{})
+		if err != nil {
+			a.Lo.Warn("tagclassification: failed to hydrate contract for detection", "conversation_uuid", conv.UUID, "contract_id", conv.ContractID.String, "error", err)
+		} else {
+			ec.Contract = contract
+		}
+	}
+	return ec
 }
 
 func (a *Activities) prefilterTags(tags []tagmodels.Tag, ec detection.EvaluationContext) ([]int, []tagmodels.Tag, []int) {

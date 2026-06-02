@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/zerodha/logf"
 
 	"github.com/abhinavxd/libredesk/internal/ai/reranker"
 )
+
+const rerankerCandidateChunks = 3
 
 // SearchInput is the unified query interface for hybrid search.
 type SearchInput struct {
@@ -62,10 +66,12 @@ type SearchResult struct {
 
 // MatchedChunk is the per-chunk excerpt surfaced inside a SearchResult.
 type MatchedChunk struct {
-	ChunkIndex int     `json:"chunk_index"`
-	ChunkText  string  `json:"chunk_text"`
-	SourcePath string  `json:"source_path,omitempty"`
-	Similarity float64 `json:"similarity,omitempty"`
+	ChunkIndex     int     `json:"chunk_index"`
+	ChunkText      string  `json:"chunk_text"`
+	ChunkChars     int     `json:"chunk_chars"`
+	ChunkTruncated bool    `json:"chunk_truncated"`
+	SourcePath     string  `json:"source_path,omitempty"`
+	Similarity     float64 `json:"similarity,omitempty"`
 }
 
 // Searcher coordinates the three-stage hybrid pipeline. One per app —
@@ -81,9 +87,8 @@ type Searcher struct {
 }
 
 // SearcherOpts wires dependencies. The two threshold fields default to
-// zero (no filter); callers are responsible for supplying tuned values
-// — production defaulting lives in cmd/init.go so config-level "0 means
-// disabled" survives intact.
+// zero (no filter); callers are responsible for supplying tuned values.
+// Use NewConfiguredSearcher when building from the shared app config.
 type SearcherOpts struct {
 	Store                 *Store
 	Embed                 Provider
@@ -195,11 +200,7 @@ func (s *Searcher) Search(ctx context.Context, in SearchInput) ([]SearchResult, 
 
 	candidateTexts := make([]string, len(fused))
 	for i, c := range fused {
-		excerpt := c.Title
-		if len(c.MatchedChunks) > 0 {
-			excerpt += "\n" + c.MatchedChunks[0].ChunkText
-		}
-		candidateTexts[i] = excerpt
+		candidateTexts[i] = rerankerCandidateText(c)
 	}
 	rr, err := s.reranker.Rerank(ctx, in.Query, candidateTexts, in.TopK)
 	if err != nil {
@@ -297,10 +298,12 @@ func reciprocalRankFusion(semantic []candidateRow, keyword []keywordRow, k float
 			res.SemanticRank = rank + 1
 		}
 		res.MatchedChunks = append(res.MatchedChunks, MatchedChunk{
-			ChunkIndex: c.ChunkIndex,
-			ChunkText:  truncate(c.ChunkText, 600),
-			SourcePath: c.SourcePath,
-			Similarity: c.Similarity,
+			ChunkIndex:     c.ChunkIndex,
+			ChunkText:      c.ChunkText,
+			ChunkChars:     utf8.RuneCountInString(c.ChunkText),
+			ChunkTruncated: false,
+			SourcePath:     c.SourcePath,
+			Similarity:     c.Similarity,
 		})
 	}
 	for rank, c := range keyword {
@@ -331,11 +334,16 @@ func reciprocalRankFusion(semantic []candidateRow, keyword []keywordRow, k float
 	return out
 }
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
+func rerankerCandidateText(result SearchResult) string {
+	var b strings.Builder
+	b.WriteString(result.Title)
+
+	limit := min(rerankerCandidateChunks, len(result.MatchedChunks))
+	for i := 0; i < limit; i++ {
+		b.WriteString("\n---\n")
+		b.WriteString(result.MatchedChunks[i].ChunkText)
 	}
-	return s[:n] + "…"
+	return b.String()
 }
 
 func min(a, b int) int {

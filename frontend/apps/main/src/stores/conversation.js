@@ -6,12 +6,15 @@ import { deepMerge } from '@shared-ui/utils/object.js'
 import { computeRecipientsFromMessage } from '../utils/email-recipients'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { INBOX_CHANNEL } from '../constants/inbox'
 import { subscribeToConversation, sendTypingIndicator } from '@main/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 import MessageCache from '../utils/conversation-message-cache'
 import { getI18n } from '../i18n'
 import { useThrottleFn } from '@vueuse/core'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '@/constants/conversation'
+import { getPriorityVisual } from '@/utils/priorityVisuals'
+import { useInboxStore } from './inbox'
 import api from '../api'
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -36,7 +39,14 @@ export const useConversationStore = defineStore('conversation', () => {
 
   // Options for select fields
   const priorityOptions = computed(() => {
-    return priorities.value.map(p => ({ label: p.name, value: p.id }))
+    return priorities.value.map(p => {
+      const visual = getPriorityVisual(p.name)
+      return {
+        label: p.name,
+        value: p.id,
+        icon: visual.icon
+      }
+    })
   })
   const statusOptions = computed(() => {
     return statuses.value.map(s => ({ label: s.name, value: s.id }))
@@ -307,6 +317,33 @@ export const useConversationStore = defineStore('conversation', () => {
     currentBCC.value = bcc
   })
 
+  function recomputeRecipientsForInbox (inboxId) {
+    const conv = conversation.data
+    if (!conv) return
+
+    const inboxStore = useInboxStore()
+    const inbox = inboxStore.inboxes.find((i) => Number(i.id) === Number(inboxId))
+    if (!inbox || inbox.channel !== INBOX_CHANNEL.EMAIL) return
+
+    const latestMessage = messages.data.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true, { excludeAutomated: true })
+    if (!latestMessage) {
+      currentTo.value = []
+      currentCC.value = []
+      currentBCC.value = []
+      return
+    }
+
+    const { to, cc, bcc } = computeRecipientsFromMessage(
+      latestMessage,
+      conv.contact?.email || '',
+      inbox.from || '',
+      inbox.reply_to || inbox.config?.reply_to || ''
+    )
+    currentTo.value = to
+    currentCC.value = cc
+    currentBCC.value = bcc
+  }
+
   async function fetchConversation (uuid) {
     conversation.loading = true
     try {
@@ -541,9 +578,10 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function updatePriority (v) {
+  async function updatePriority (v, uuid = conversation.data?.uuid) {
+    if (!uuid) return
     try {
-      await api.updateConversationPriority(conversation.data.uuid, { priority: v })
+      await api.updateConversationPriority(uuid, { priority: v })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -552,9 +590,10 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function updateStatus (v) {
+  async function updateStatus (v, uuid = conversation.data?.uuid) {
+    if (!uuid) return
     try {
-      await api.updateConversationStatus(conversation.data.uuid, { status: v })
+      await api.updateConversationStatus(uuid, { status: v })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -563,9 +602,10 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function snoozeConversation (snoozeDuration) {
+  async function snoozeConversation (snoozeDuration, uuid = conversation.data?.uuid) {
+    if (!uuid) return
     try {
-      await api.updateConversationStatus(conversation.data.uuid, { status: CONVERSATION_DEFAULT_STATUSES.SNOOZED, snoozed_until: snoozeDuration })
+      await api.updateConversationStatus(uuid, { status: CONVERSATION_DEFAULT_STATUSES.SNOOZED, snoozed_until: snoozeDuration })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -585,9 +625,10 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function updateAssignee (type, v) {
+  async function updateAssignee (type, v, uuid = conversation.data?.uuid) {
+    if (!uuid) return
     try {
-      await api.updateAssignee(conversation.data.uuid, type, v)
+      await api.updateAssignee(uuid, type, v)
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -596,10 +637,13 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function removeAssignee (type) {
+  async function removeAssignee (type, uuid = conversation.data?.uuid) {
+    if (!uuid) return
     try {
-      await api.removeAssignee(conversation.data.uuid, type)
-      conversation.data[`assigned_${type}_id`] = null
+      await api.removeAssignee(uuid, type)
+      if (conversation.data?.uuid === uuid) {
+        conversation.data[`assigned_${type}_id`] = null
+      }
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -765,21 +809,12 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function mergeConversationUpdate (update) {
-    const classificationUpdate = update?.tag_classification
-    const fields = classificationUpdate ? { ...update } : update
-    if (classificationUpdate) {
-      delete fields.tag_classification
-    }
-
     if (conversation.data?.uuid === update.uuid) {
-      deepMerge(conversation.data, fields)
+      deepMerge(conversation.data, update)
     }
     const existing = conversations?.data?.find(c => c.uuid === update.uuid)
     if (existing) {
-      deepMerge(existing, fields)
-    }
-    if (classificationUpdate) {
-      emitter.emit(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, update)
+      deepMerge(existing, update)
     }
   }
 
@@ -799,6 +834,14 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function emitAgentValidationCompleted (payload) {
     emitter.emit(EMITTER_EVENTS.AGENT_VALIDATION_COMPLETED, payload)
+  }
+
+  function emitTagClassificationCompleted (payload) {
+    emitter.emit(EMITTER_EVENTS.TAG_CLASSIFICATION_COMPLETED, payload)
+  }
+
+  function emitCustomerIdentificationCompleted (payload) {
+    emitter.emit(EMITTER_EVENTS.CUSTOMER_IDENTIFICATION_COMPLETED, payload)
   }
 
   // Clears the list and pagination state so the next fetch starts fresh (removes stale rows).
@@ -933,10 +976,13 @@ export const useConversationStore = defineStore('conversation', () => {
     currentTo,
     currentBCC,
     currentCC,
+    recomputeRecipientsForInbox,
     isConversationInList,
     addPendingNotification,
     mergeConversationUpdate,
     emitAgentValidationCompleted,
+    emitTagClassificationCompleted,
+    emitCustomerIdentificationCompleted,
     mergeContactUpdate,
     addNewConversation,
     getContactFullName,

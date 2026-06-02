@@ -15,7 +15,8 @@ reference_number AS (
     SELECT generate_reference_number($7) AS reference_number
 )
 INSERT INTO conversations
-(contact_id, status_id, inbox_id, last_message, last_message_at, subject, reference_number, meta, custom_attributes)
+(contact_id, status_id, inbox_id, last_message, last_message_at, subject, reference_number, meta, custom_attributes,
+ customer_id, contract_id, verification_level)
 SELECT
    $1,
    (SELECT id FROM status_id),
@@ -28,7 +29,19 @@ SELECT
    END,
    (SELECT reference_number FROM reference_number),
    $9,
-   $10
+   $10,
+   (SELECT linked_customer_id FROM users WHERE id = $1),
+   (
+      SELECT c.contract_id
+      FROM contracts c
+      WHERE c.customer_id = (SELECT linked_customer_id FROM users WHERE id = $1)
+      ORDER BY c.created_at ASC
+      LIMIT 1
+   ),
+   CASE
+      WHEN (SELECT linked_customer_id FROM users WHERE id = $1) IS NOT NULL THEN 1
+      ELSE 0
+   END
 WHERE $12::int = 0 OR (SELECT COUNT(*) FROM conversations WHERE contact_id = $1 AND created_at >= $11) < $12::int
 RETURNING id, uuid;
 
@@ -64,6 +77,22 @@ SELECT
     conversations.last_interaction_sender,
     conversations.next_sla_deadline_at,
     conversations.priority_id,
+    conversations.assigned_user_id,
+    conversations.assigned_team_id,
+    (SELECT COALESCE(
+        (SELECT json_agg(t.name)
+        FROM tags t
+        INNER JOIN conversation_tags ct ON ct.tag_id = t.id
+        WHERE ct.conversation_id = conversations.id),
+        '[]'::json
+    )) AS tags,
+    (SELECT COALESCE(
+        (SELECT json_agg(t.id)
+        FROM tags t
+        INNER JOIN conversation_tags ct ON ct.tag_id = t.id
+        WHERE ct.conversation_id = conversations.id),
+        '[]'::json
+    )) AS tag_ids,
     (
     SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
     FROM (
@@ -184,12 +213,18 @@ SELECT
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
    ct.external_user_id as "contact.external_user_id",
+   ct.linked_customer_id as "contact.linked_customer_id",
+   ct.linked_customer_id_at as "contact.linked_customer_id_at",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
-   c.last_continuity_email_sent_at
+   c.last_continuity_email_sent_at,
+   c.customer_id,
+   c.contract_id,
+   c.verification_level,
+   c.verification_message
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
@@ -243,6 +278,42 @@ JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
 ORDER BY c.created_at DESC
 LIMIT $2;
+
+-- name: get-conversations-by-contact
+SELECT
+    c.uuid,
+    c.subject,
+    c.last_message_at,
+    c.created_at,
+    s.name AS status,
+    NULL::TEXT AS status_color,
+    (
+        SELECT cm.text_content
+        FROM conversation_messages cm
+        WHERE cm.conversation_id = c.id
+          AND cm.type = 'incoming'
+          AND cm.sender_type = 'contact'
+          AND cm.private = false
+        ORDER BY cm.created_at DESC
+        LIMIT 1
+    ) AS last_contact_message,
+    NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS assignee_name,
+    u.avatar_url AS assignee_avatar_url,
+    p.name AS priority_name
+FROM conversations c
+LEFT JOIN conversation_statuses s ON c.status_id = s.id
+LEFT JOIN users u ON u.id = c.assigned_user_id
+LEFT JOIN conversation_priorities p ON p.id = c.priority_id
+WHERE c.contact_id = $1
+  AND ($2 = '' OR c.uuid::TEXT != $2)
+ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+LIMIT $3 OFFSET $4;
+
+-- name: count-conversations-by-contact
+SELECT COUNT(*)
+FROM conversations
+WHERE contact_id = $1
+  AND ($2 = '' OR uuid::TEXT != $2);
 
 -- name: get-chat-conversation
 SELECT
@@ -565,6 +636,7 @@ SELECT
     m.private,
     m.sender_type,
     m.sender_id,
+    m.send_inbox_id,
     m.meta,
     c.uuid as conversation_uuid,
     m.content_type,
@@ -573,7 +645,7 @@ SELECT
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'cc')) AS cc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'bcc')) AS bcc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'to')) AS to,
-    c.inbox_id,
+    COALESCE(m.send_inbox_id, c.inbox_id) AS inbox_id,
     c.uuid as conversation_uuid,
     c.subject,
     c.contact_id as message_receiver_id,
@@ -598,6 +670,7 @@ SELECT
     m.private,
     m.sender_type,
     m.sender_id,
+    m.send_inbox_id,
     m.meta,
     c.uuid as conversation_uuid,
     u.id AS "author.id",
@@ -647,6 +720,7 @@ SELECT
    m.private,
    m.sender_id,
    m.sender_type,
+   m.send_inbox_id,
    m.meta,
    $1::uuid AS conversation_uuid,
    u.id AS "author.id",
@@ -693,11 +767,11 @@ inserted_msg AS (
    INSERT INTO conversation_messages (
        "type", status, conversation_id, "content",
        text_content, sender_id, sender_type, private,
-       content_type, source_id, meta
+       content_type, source_id, meta, send_inbox_id
    )
    VALUES (
        $1, $2, (SELECT id FROM conversation_id),
-       $5, $6, $7, $8, $9, $10, $11, $12
+       $5, $6, $7, $8, $9, $10, $11, $12, $13
    )
    RETURNING *
 )

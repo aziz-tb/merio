@@ -93,6 +93,12 @@ export class WebSocketClient {
         [WS_EVENT.AGENT_VALIDATION_COMPLETED]: () => {
           this.convStore.emitAgentValidationCompleted(data.data)
         },
+        [WS_EVENT.TAG_CLASSIFICATION_COMPLETED]: () => {
+          this.convStore.emitTagClassificationCompleted(data.data)
+        },
+        [WS_EVENT.CUSTOMER_IDENTIFICATION_COMPLETED]: () => {
+          this.convStore.emitCustomerIdentificationCompleted(data.data)
+        },
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)
         },

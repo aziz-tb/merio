@@ -36,9 +36,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/exec/runner/models"
 	tokenpkg "github.com/abhinavxd/libredesk/internal/exec/token"
 	tokenmodels "github.com/abhinavxd/libredesk/internal/exec/token/models"
-	"github.com/abhinavxd/libredesk/internal/exec/runner/models"
+	"github.com/abhinavxd/libredesk/internal/secret"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 )
@@ -94,6 +95,11 @@ type Opts struct {
 	// uses this when no human invoker is available, and stores it on
 	// each token so the auth middleware can resolve system=True calls.
 	SystemUserID int
+
+	// Secrets injects operator-managed secrets into the SDK bundle. Nil is
+	// accepted for tests and deployments that have not enabled the secrets
+	// table yet; production app startup wires this manager explicitly.
+	Secrets *secret.Manager
 
 	// OPTIONAL overrides:
 
@@ -238,11 +244,18 @@ func (m *Manager) Execute(ctx context.Context, req models.Request) (*models.Resu
 		}
 	}()
 
+	secretValues, err := m.loadSecrets(ctx, req)
+	if err != nil {
+		m.recordAuditError(ctx, executionID, req, startedAt, err)
+		m.breaker.recordFailure()
+		return nil, err
+	}
+
 	// Build the exec-runner payload.
-	payload := buildSandboxPayload(req, executionID, prefixedToken, m.opts.PlatformBaseURL)
+	payload := buildSandboxPayload(req, executionID, prefixedToken, m.opts.PlatformBaseURL, secretValues)
 
 	// Call exec-runner with retry on transient errors.
-	resp, err := m.callSandbox(ctx, payload, req.TimeoutSeconds)
+	resp, err := m.callSandbox(ctx, payload, req.TimeoutSeconds, secretValues)
 	if err != nil {
 		// Record audit row even on failure so we have an observability
 		// trail. Non-fatal — log if audit fails but return the original
@@ -285,12 +298,32 @@ func (m *Manager) validateRequest(req *models.Request) error {
 	return nil
 }
 
+func (m *Manager) loadSecrets(ctx context.Context, req models.Request) (map[string]string, error) {
+	if m.opts.Secrets == nil {
+		return nil, nil
+	}
+	conversationID := 0
+	if req.ConversationID != nil {
+		conversationID = *req.ConversationID
+	}
+	values, err := m.opts.Secrets.LoadAll(ctx, secret.AccessContext{
+		FunctionName:   req.ToolName,
+		ConversationID: conversationID,
+		TraceID:        req.TraceID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("runner: load secrets: %w", err)
+	}
+	return values, nil
+}
+
 // callSandbox does the actual HTTP exchange with retry on retryable
 // errors. Returns the parsed sandbox response or a typed error.
 func (m *Manager) callSandbox(
 	ctx context.Context,
 	payload sandboxRequest,
 	scriptTimeoutSeconds int,
+	secretValues map[string]string,
 ) (*sandboxResponse, error) {
 	url := m.opts.SandboxURL + "/v1/execute"
 
@@ -308,7 +341,7 @@ func (m *Manager) callSandbox(
 	var lastErr error
 	for attempt := 1; attempt <= 2; attempt++ {
 		callCtx, cancel := context.WithTimeout(ctx, httpTimeout)
-		resp, err := m.singleCall(callCtx, url, body)
+		resp, err := m.singleCall(callCtx, url, body, secretValues)
 		cancel()
 
 		if err == nil {
@@ -340,6 +373,7 @@ func (m *Manager) singleCall(
 	ctx context.Context,
 	url string,
 	body []byte,
+	secretValues map[string]string,
 ) (*sandboxResponse, error) {
 	httpReq, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, url, bytes.NewReader(body),
@@ -361,7 +395,6 @@ func (m *Manager) singleCall(
 		return nil, fmt.Errorf("runner: read response: %w: %w",
 			ErrSandboxTransient, err)
 	}
-
 	switch httpResp.StatusCode {
 	case http.StatusOK:
 		var sr sandboxResponse
@@ -385,6 +418,9 @@ func (m *Manager) singleCall(
 		return nil, fmt.Errorf("runner: sandbox auth failed (check EXEC_RUNNER_TOKEN)")
 
 	default:
+		if rt, ok := parseRuntimeError(respBytes); ok {
+			return nil, rt
+		}
 		// 4xx (validation errors from us) and unexpected 5xx — don't retry.
 		return nil, fmt.Errorf(
 			"runner: sandbox returned %d: %s",
@@ -410,14 +446,21 @@ func (m *Manager) recordAudit(
 ) {
 	// Fold stderr into the JSONB blob on failure paths so the audit row
 	// carries the debug surface alongside the rest of the result data.
-	dataMap := map[string]any{}
-	for k, v := range result.Data {
-		dataMap[k] = v
-	}
+	dataForAudit := result.Data
 	if result.Stderr != "" && result.Kind == models.KindError {
-		dataMap["_stderr"] = result.Stderr
+		dataMap := map[string]json.RawMessage{}
+		if len(result.Data) > 0 && string(result.Data) != "null" {
+			if err := json.Unmarshal(result.Data, &dataMap); err != nil {
+				dataMap["value"] = result.Data
+			}
+		}
+		stderrJSON, _ := json.Marshal(result.Stderr)
+		dataMap["_stderr"] = stderrJSON
+		dataForAudit, _ = json.Marshal(dataMap)
 	}
-	dataJSON, _ := json.Marshal(dataMap)
+	if len(dataForAudit) == 0 || string(dataForAudit) == "null" {
+		dataForAudit = json.RawMessage(`{}`)
+	}
 	if err := m.queries.insertExecution(ctx, executionRow{
 		ExecutionID:    executionID,
 		ToolName:       nullableString(req.ToolName),
@@ -431,7 +474,7 @@ func (m *Manager) recordAudit(
 		Kind:           string(result.Kind),
 		ResultCode:     nullableString(result.Code),
 		Message:        nullableString(result.Message),
-		Data:           dataJSON,
+		Data:           dataForAudit,
 		WarmPoolHit:    resp.WarmPoolHit,
 		TraceID:        nullableString(req.TraceID),
 	}); err != nil {
@@ -440,7 +483,7 @@ func (m *Manager) recordAudit(
 	}
 }
 
-// RecordInternalAudit writes a tool_executions row for an
+// RecordInternalAudit writes a function_executions row for an
 // internal-capability invocation. Used by the unified dispatcher's
 // internal-kind path so audit rows for in-process Go calls share the
 // same table + column shape as Python sandbox runs. Language is fixed
@@ -511,39 +554,47 @@ func (m *Manager) recordAuditError(
 // sandboxRequest is the JSON we POST to exec-runner /v1/execute.
 // Fields/names exactly match the Python service's ExecuteRequest model.
 type sandboxRequest struct {
-	Code             string          `json:"code"`
-	Language         string          `json:"language"`
-	Input            map[string]any  `json:"input,omitempty"`
-	ConversationData json.RawMessage `json:"conversation_data,omitempty"`
-	CustomerData     json.RawMessage `json:"customer_data,omitempty"`
-	ContractData     json.RawMessage `json:"contract_data,omitempty"`
-	CallbackToken    string          `json:"callback_token"`
-	CallbackBaseURL  string          `json:"callback_base_url"`
-	ExecutionID      string          `json:"execution_id"`
-	ToolDepth        int             `json:"tool_depth"`
-	TimeoutSeconds   int             `json:"timeout_seconds"`
-	MemoryMB         int             `json:"memory_mb"`
-	Packages         []string        `json:"packages,omitempty"`
-	AllowedDomains   []string        `json:"allowed_domains,omitempty"`
-	TraceID          string          `json:"trace_id,omitempty"`
+	Code             string            `json:"code"`
+	Language         string            `json:"language"`
+	Input            map[string]any    `json:"input,omitempty"`
+	ConversationData json.RawMessage   `json:"conversation_data,omitempty"`
+	CustomerData     json.RawMessage   `json:"customer_data,omitempty"`
+	ContractData     json.RawMessage   `json:"contract_data,omitempty"`
+	Secrets          map[string]string `json:"secrets,omitempty"`
+	CallbackToken    string            `json:"callback_token"`
+	CallbackBaseURL  string            `json:"callback_base_url"`
+	ExecutionID      string            `json:"execution_id"`
+	ToolDepth        int               `json:"tool_depth"`
+	TimeoutSeconds   int               `json:"timeout_seconds"`
+	MemoryMB         int               `json:"memory_mb"`
+	Packages         []string          `json:"packages,omitempty"`
+	AllowedDomains   []string          `json:"allowed_domains,omitempty"`
+	TraceID          string            `json:"trace_id,omitempty"`
 }
 
 // sandboxResponse is the JSON we read back from exec-runner /v1/execute.
 type sandboxResponse struct {
-	ExitCode    int            `json:"exit_code"`
-	Stdout      string         `json:"stdout"`
-	Stderr      string         `json:"stderr"`
+	ExitCode    int             `json:"exit_code"`
+	Stdout      string          `json:"stdout"`
+	Stderr      string          `json:"stderr"`
 	Result      *resultEnvelope `json:"result"`
-	DurationMs  int            `json:"duration_ms"`
-	WarmPoolHit bool           `json:"warm_pool_hit"`
+	DurationMs  int             `json:"duration_ms"`
+	WarmPoolHit bool            `json:"warm_pool_hit"`
 }
 
 type resultEnvelope struct {
-	Kind      string         `json:"kind"`
-	Data      map[string]any `json:"data,omitempty"`
-	Message   string         `json:"message,omitempty"`
-	Code      string         `json:"code,omitempty"`
-	Retryable bool           `json:"retryable,omitempty"`
+	Kind      string          `json:"kind"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	Message   string          `json:"message,omitempty"`
+	Code      string          `json:"code,omitempty"`
+	Retryable bool            `json:"retryable,omitempty"`
+}
+
+type runtimeErrorResponse struct {
+	Kind      string `json:"kind"`
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Traceback string `json:"traceback,omitempty"`
 }
 
 // buildSandboxPayload turns a Request into the wire shape exec-runner
@@ -551,6 +602,7 @@ type resultEnvelope struct {
 func buildSandboxPayload(
 	req models.Request,
 	executionID, callbackToken, platformBase string,
+	secretValues map[string]string,
 ) sandboxRequest {
 	return sandboxRequest{
 		Code:             req.Code,
@@ -559,6 +611,7 @@ func buildSandboxPayload(
 		ConversationData: req.ConversationData,
 		CustomerData:     req.CustomerData,
 		ContractData:     req.ContractData,
+		Secrets:          secretValues,
 		CallbackToken:    callbackToken,
 		CallbackBaseURL:  platformBase,
 		ExecutionID:      executionID,
@@ -723,6 +776,42 @@ var (
 	// loop in callSandbox uses this to decide whether to retry.
 	ErrSandboxTransient = errors.New("runner: sandbox transient error")
 )
+
+// RuntimeError is returned when exec-runner itself failed after accepting a
+// request, before a script-level result could be produced.
+type RuntimeError struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Traceback string `json:"traceback,omitempty"`
+}
+
+func (e *RuntimeError) Error() string {
+	if e == nil {
+		return "runner: runtime error"
+	}
+	if e.Code != "" && e.Message != "" {
+		return fmt.Sprintf("runner: runtime error: %s: %s", e.Code, e.Message)
+	}
+	if e.Message != "" {
+		return "runner: runtime error: " + e.Message
+	}
+	if e.Code != "" {
+		return "runner: runtime error: " + e.Code
+	}
+	return "runner: runtime error"
+}
+
+func parseRuntimeError(body []byte) (*RuntimeError, bool) {
+	var out runtimeErrorResponse
+	if err := json.Unmarshal(body, &out); err != nil || out.Kind != "runtime_error" {
+		return nil, false
+	}
+	return &RuntimeError{
+		Code:      out.Code,
+		Message:   out.Message,
+		Traceback: out.Traceback,
+	}, true
+}
 
 // isRetryable returns true if err is or wraps a retryable category.
 func isRetryable(err error) bool {

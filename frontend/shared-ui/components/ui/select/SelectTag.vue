@@ -48,7 +48,13 @@
                 :value="item.value"
                 @select="handleSelect"
               >
-                {{ item.label }}
+                <TagPill
+                  v-if="item.color"
+                  :label="item.label"
+                  :color="item.color"
+                  size="xs"
+                />
+                <span v-else>{{ item.label }}</span>
               </CommandItem>
             </CommandGroup>
           </CommandList>
@@ -76,6 +82,7 @@ import {
 } from 'radix-vue'
 import { computed, ref } from 'vue'
 import { useField } from 'vee-validate'
+import TagPill from '../../TagPill.vue'
 
 const RENDER_CAP = 200
 

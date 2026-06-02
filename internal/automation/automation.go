@@ -13,7 +13,11 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/automation/models"
+	"github.com/abhinavxd/libredesk/internal/contract"
+	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/customer"
+	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -55,6 +59,8 @@ type Engine struct {
 	lo                *logf.Logger
 	i18n              *i18n.I18n
 	conversationStore conversationStore
+	customerStore     customerStore
+	contractStore     contractStore
 	taskQueue         chan ConversationTask
 	closed            bool
 	closedMu          sync.RWMutex
@@ -66,12 +72,22 @@ type Opts struct {
 	Lo           *logf.Logger
 	I18n         *i18n.I18n
 	DetectionMgr *detection.Manager
+	Customer     customerStore
+	Contract     contractStore
 }
 
 type conversationStore interface {
 	ApplyAction(action models.RuleAction, conversation cmodels.Conversation, user umodels.User) error
 	GetConversation(teamID int, uuid, refNum string) (cmodels.Conversation, error)
 	GetConversationsCreatedAfter(time.Time) ([]cmodels.Conversation, error)
+}
+
+type customerStore interface {
+	GetFreshByCustomerID(context.Context, string, customer.FreshOptions) (*customermodels.Customer, error)
+}
+
+type contractStore interface {
+	GetFreshByContractID(context.Context, string, contract.FreshOptions) (*contractmodels.Contract, error)
 }
 
 type queries struct {
@@ -94,10 +110,12 @@ func New(opt Opts) (*Engine, error) {
 	var (
 		q queries
 		e = &Engine{
-			lo:           opt.Lo,
-			i18n:         opt.I18n,
-			taskQueue:    make(chan ConversationTask, MaxQueueSize),
-			detectionMgr: opt.DetectionMgr,
+			lo:            opt.Lo,
+			i18n:          opt.I18n,
+			taskQueue:     make(chan ConversationTask, MaxQueueSize),
+			detectionMgr:  opt.DetectionMgr,
+			customerStore: opt.Customer,
+			contractStore: opt.Contract,
 		}
 	)
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opt.DB, efs); err != nil {
@@ -387,6 +405,22 @@ func (e *Engine) handleTimeTrigger() {
 func (e *Engine) evalConversationRules(rules []models.Rule, conv cmodels.Conversation) {
 	tags := extractTagSlugs(conv)
 	ec := detection.EvaluationContext{Conversation: conv, Tags: tags}
+	if conv.CustomerID.Valid && e.customerStore != nil {
+		customer, err := e.customerStore.GetFreshByCustomerID(context.Background(), conv.CustomerID.String, customer.FreshOptions{})
+		if err != nil {
+			e.lo.Warn("automation: failed to hydrate customer for detection", "conversation_uuid", conv.UUID, "customer_id", conv.CustomerID.String, "error", err)
+		} else {
+			ec.Customer = customer
+		}
+	}
+	if conv.ContractID.Valid && e.contractStore != nil {
+		contract, err := e.contractStore.GetFreshByContractID(context.Background(), conv.ContractID.String, contract.FreshOptions{})
+		if err != nil {
+			e.lo.Warn("automation: failed to hydrate contract for detection", "conversation_uuid", conv.UUID, "contract_id", conv.ContractID.String, "error", err)
+		} else {
+			ec.Contract = contract
+		}
+	}
 
 	for _, rule := range rules {
 		result, err := e.detectionMgr.Evaluate(context.Background(), rule.Detection, ec)

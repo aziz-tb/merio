@@ -127,6 +127,7 @@ def _build_env(req: ExecuteRequest) -> dict[str, str]:
         "_CUSTOMER_DATA": json.dumps(req.customer_data, default=str)
         if req.customer_data is not None
         else "null",
+        "_SECRETS_DATA": json.dumps(req.secrets, default=str),
         "_CALLBACK_TOKEN": req.callback_token,
         "_CALLBACK_BASE_URL": req.callback_base_url,
         "_EXECUTION_ID": req.execution_id,
@@ -311,7 +312,7 @@ async def _execute_inside_gate(
     if parsed is not None:
         result_envelope = ExecuteResultEnvelope(
             kind=parsed["kind"],
-            data=parsed.get("data") or {},
+            data=parsed.get("data"),
             message=parsed.get("message"),
             code=parsed.get("code"),
             retryable=bool(parsed.get("retryable", False)),

@@ -5,7 +5,11 @@
   collapsibles per the F9 navigation proposal.
 -->
 <template>
-  <AgentEditSidebar v-if="isAgentEditRoute" :agent-id="agentId" />
+  <AgentEditSidebar
+    v-if="isAgentEditRoute"
+    :agent-id="agentId"
+    :is-create-mode="isCreateMode"
+  />
 
   <div v-else class="flex flex-col h-full">
     <SidebarHeader>
@@ -25,7 +29,7 @@
           <SidebarMenuItem v-for="item in filteredAiNavItems" :key="item.titleKey">
             <SidebarMenuButton :isActive="isActive(item.href)" asChild>
               <router-link :to="item.href">
-                <component :is="navIconMap[item.icon]" v-if="item.icon" />
+                <component :is="item.icon" v-if="item.icon" />
                 <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
               </router-link>
             </SidebarMenuButton>
@@ -40,7 +44,6 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Bot, Wrench } from 'lucide-vue-next'
 import {
   SidebarContent,
   SidebarGroup,
@@ -57,11 +60,14 @@ const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 
-const navIconMap = { Bot, Wrench }
-const agentId = computed(() => Number(route.params.id))
+const agentId = computed(() => {
+  const id = Number(route.params.id)
+  return Number.isFinite(id) && id > 0 ? id : null
+})
 const isAgentEditRoute = computed(() =>
   route.matched.some((record) => record.meta?.layoutContext === 'ai-agent-edit')
 )
+const isCreateMode = computed(() => isAgentEditRoute.value && !agentId.value)
 
 const filteredAiNavItems = computed(() =>
   aiNavItems.filter((item) => !item.permission || userStore.can(item.permission))

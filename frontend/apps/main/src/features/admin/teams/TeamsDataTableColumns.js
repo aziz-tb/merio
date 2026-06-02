@@ -1,69 +1,53 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
-import TeamDataTableDropdown from '@/features/admin/teams/TeamDataTableDropdown.vue'
-import { format } from 'date-fns'
-import { getI18n } from '@/i18n'
+import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
+import { actionsCol, dateTimeCol } from '@/components/datatable/helpers.js'
 
-const t = () => getI18n().global.t
+export const createColumns = (t, { onDelete } = {}) => {
+  const actionColumn = actionsCol()
 
-export const columns = [
-  {
-    accessorKey: 'name',
-    header: function () {
-      return h('div', { class: 'text-center' }, t()('globals.terms.name', 1))
-    },
-    cell: function ({ row }) {
-      const emoji = row.original.emoji
-      return h('div', { class: 'text-center' },
-        h(RouterLink,
+  return [
+    {
+      accessorKey: 'name',
+      header: () => t('globals.terms.name', 1),
+      cell: ({ row }) => {
+        const emoji = row.original.emoji
+        return h(RouterLink,
           {
             to: { name: 'edit-team', params: { id: row.original.id } },
             class: 'text-primary hover:underline'
           },
           () => [emoji ? `${emoji} ` : '', row.getValue('name')]
         )
-      )
-    }
-  },
-  {
-    accessorKey: 'created_at',
-    header: function () {
-      return h('div', { class: 'text-center' }, t()('globals.terms.createdAt'))
+      }
     },
-    cell: function ({ row }) {
-      return h(
-        'div',
-        { class: 'text-center' },
-        format(row.getValue('created_at'), 'PPpp')
-      )
+    dateTimeCol(t, 'created_at'),
+    dateTimeCol(t, 'updated_at'),
+    {
+      ...actionColumn,
+      size: 72,
+      meta: {
+        ...actionColumn.meta,
+        align: 'right',
+        width: 72
+      },
+      cell: ({ row }) =>
+        h('div', { class: 'flex justify-end' },
+          h(DataTableRowActions, {
+            items: [
+              {
+                label: t('globals.messages.edit'),
+                to: { name: 'edit-team', params: { id: row.original.id } }
+              },
+              {
+                label: t('globals.messages.delete'),
+                destructive: true,
+                confirm: t('confirm.deleteTeam'),
+                onClick: () => onDelete?.(row.original)
+              }
+            ]
+          })
+        )
     }
-  },
-  {
-    accessorKey: 'updated_at',
-    header: function () {
-      return h('div', { class: 'text-center' }, t()('globals.terms.updatedAt'))
-    },
-    cell: function ({ row }) {
-      return h(
-        'div',
-        { class: 'text-center' },
-        format(row.getValue('updated_at'), 'PPpp')
-      )
-    }
-  },
-  {
-    id: 'actions',
-    enableHiding: false,
-    enableSorting: false,
-    cell: ({ row }) => {
-      const team = row.original
-      return h(
-        'div',
-        { class: 'relative' },
-        h(TeamDataTableDropdown, {
-          team
-        })
-      )
-    }
-  }
-]
+  ]
+}

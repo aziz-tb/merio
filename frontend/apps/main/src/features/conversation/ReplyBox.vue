@@ -1,3 +1,4 @@
+<!-- frontend/apps/main/src/features/conversation/ReplyBox.vue-->
 <template>
   <AlertDialog :open="showContactEmailWarning" @update:open="showContactEmailWarning = $event">
     <AlertDialogContent>
@@ -75,7 +76,7 @@
     </DialogContent>
   </Dialog>
 
-  <div class="text-foreground bg-background">
+  <div class="text-foreground bg-background ">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
@@ -99,8 +100,10 @@
           v-model:bcc="bcc"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
+          v-model:selectedInboxId="selectedInboxId"
           v-model:showCc="showCc"
           v-model:showBcc="showBcc"
+          v-model:isRecipientsExpanded="isRecipientsExpanded"
           v-model:forwardedSources="forwardedSources"
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
@@ -109,18 +112,38 @@
           @filesDropped="uploadFiles"
           @fileDelete="handleFileDelete"
           @aiPromptSelected="handleAiPromptSelected"
+          @composerOverlayChange="setComposerOverlayOpen"
+          @suppressOutsideCollapse="suppressNextOutsideCollapse"
           class="h-full flex-grow"
         />
       </DialogContent>
     </Dialog>
 
-    <!-- Main Editor non-fullscreen -->
+    <!-- Main composer (non-fullscreen). The same wrapper renders both the collapsed
+         placeholder and the expanded editor; click-outside / Escape collapse it when
+         empty, and clicking anywhere inside expands it. -->
     <div
-      class="bg-background text-card-foreground border border-border rounded-lg shadow-sm overflow-hidden mx-4 mb-4 mt-2 px-2 pt-2 flex flex-col"
-      :class="{ '!bg-private': messageType === 'private_note' }"
+      ref="composerRoot"
+      class="bg-background shadow-[0_0_8px_rgba(0,0,0,0.05)] text-card-foreground border border-border rounded-lg shadow-md overflow-visible mx-4 mb-4 mt-2 flex flex-col transition-all"
+      :class="[
+        isComposerExpanded ? 'px-2 pt-2' : 'cursor-text',
+        { '!bg-private': isComposerExpanded && messageType === 'private_note' }
+      ]"
       v-if="!isEditorFullscreen"
+      @click="onComposerClick"
+      @keydown.esc="onEscape"
     >
+      <!-- Collapsed placeholder. Two lines tall, no chrome, no mode dropdown. -->
+      <div
+        v-if="!isComposerExpanded"
+        class="flex h-16 items-center px-4 text-sm text-muted-foreground"
+      >
+        {{ $t('replyBox.collapsedPlaceholder') }}
+      </div>
+
+      <!-- Expanded composer. -->
       <ReplyBoxContent
+        v-else
         ref="replyBoxContentRef"
         :isFullscreen="false"
         :aiPrompts="aiPrompts"
@@ -135,8 +158,10 @@
         v-model:bcc="bcc"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
+        v-model:selectedInboxId="selectedInboxId"
         v-model:showCc="showCc"
         v-model:showBcc="showBcc"
+        v-model:isRecipientsExpanded="isRecipientsExpanded"
         v-model:forwardedSources="forwardedSources"
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
@@ -145,17 +170,20 @@
         @filesDropped="uploadFiles"
         @fileDelete="handleFileDelete"
         @aiPromptSelected="handleAiPromptSelected"
+        @composerOverlayChange="setComposerOverlayOpen"
+        @suppressOutsideCollapse="suppressNextOutsideCollapse"
       />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, computed, toRaw } from 'vue'
-import { useStorage } from '@vueuse/core'
+import { ref, watch, computed, toRaw, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { useStorage, onClickOutside } from '@vueuse/core'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { INBOX_CHANNEL } from '@main/constants/inbox'
 import { useUserStore } from '@main/stores/user'
 import { useDraftManager } from '@main/composables/useDraftManager'
 import api from '@main/api'
@@ -225,13 +253,15 @@ const {
 
 // Setup draft management composable
 const currentDraftKey = computed(() => conversationStore.current?.uuid || null)
+const selectedInboxId = ref(conversationStore.current?.inbox_id || null)
 const {
   htmlContent,
   textContent,
   isLoading: isDraftLoading,
   clearDraft,
   loadedAttachments,
-  loadedMacroActions
+  loadedMacroActions,
+  sendInboxId
 } = useDraftManager(currentDraftKey, mediaFiles)
 
 // Rest of existing state
@@ -251,10 +281,164 @@ const showBcc = ref(false)
 const forwardedSources = ref([])
 const emailErrors = ref([])
 const aiPrompts = ref([])
+const composerRoot = ref(null)
 const replyBoxContentRef = ref(null)
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
 const mentions = ref([])
+
+const isComposerExpanded = ref(false)
+const isRecipientsExpanded = ref(false)
+const composerOverlayStates = ref({})
+const suppressOutsideCollapseUntil = ref(0)
+const OUTSIDE_COLLAPSE_SUPPRESSION_MS = 150
+
+const hasComposerOverlayOpen = computed(() =>
+  Object.values(composerOverlayStates.value).some(Boolean)
+)
+
+const setComposerOverlayOpen = (name, open) => {
+  composerOverlayStates.value = {
+    ...composerOverlayStates.value,
+    [name]: open
+  }
+}
+
+const clearComposerOverlayStates = () => {
+  composerOverlayStates.value = {}
+  suppressOutsideCollapseUntil.value = 0
+}
+
+const suppressNextOutsideCollapse = () => {
+  suppressOutsideCollapseUntil.value = Date.now() + OUTSIDE_COLLAPSE_SUPPRESSION_MS
+}
+
+const shouldIgnoreOutsideCollapse = () => {
+  if (showContactEmailWarning.value || showMissingTagsWarning.value || openAIKeyPrompt.value) {
+    return true
+  }
+  if (hasComposerOverlayOpen.value) return true
+  if (Date.now() <= suppressOutsideCollapseUntil.value) {
+    suppressOutsideCollapseUntil.value = 0
+    return true
+  }
+  return false
+}
+
+const defaultInboxId = computed(() => conversationStore.current?.inbox_id || null)
+const selectedInboxOverrideId = computed(() => {
+  if (!selectedInboxId.value || !defaultInboxId.value) return null
+  return Number(selectedInboxId.value) !== Number(defaultInboxId.value)
+    ? Number(selectedInboxId.value)
+    : null
+})
+
+const resetSelectedInbox = () => {
+  selectedInboxId.value = defaultInboxId.value
+}
+
+// "Has work in progress" — any of these keeps the composer expanded
+// even when the user clicks outside.
+const hasWorkInProgress = computed(() => {
+  if (isSending.value) return true
+  if (messageType.value === 'forward') return true
+  if (forwardedSources.value.length > 0) return true
+  if (textContent.value && textContent.value.trim().length > 0) return true
+  if (htmlContent.value && htmlContent.value.trim().length > 0) return true
+  if (mediaFiles.value.length > 0) return true
+  if (uploadingFiles.value.length > 0) return true
+  if (conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions?.length > 0) return true
+  return false
+})
+
+const expandComposer = async () => {
+  if (isComposerExpanded.value) return
+  isComposerExpanded.value = true
+  await nextTick()
+  replyBoxContentRef.value?.focus?.()
+}
+
+const collapseComposer = () => {
+  if (!isComposerExpanded.value) return
+  if (hasWorkInProgress.value) return
+  isComposerExpanded.value = false
+  isRecipientsExpanded.value = false
+  clearComposerOverlayStates()
+  // Reset mode to reply on collapse — the user picks Note / Forward
+  // each time they engage, so a stale "private note" doesn't bleed
+  // into the next interaction.
+  if (messageType.value !== 'reply') {
+    messageType.value = 'reply'
+  }
+}
+
+const onComposerClick = () => {
+  if (!isComposerExpanded.value) expandComposer()
+}
+
+const onEscape = () => {
+  if (hasComposerOverlayOpen.value) return
+  collapseComposer()
+}
+
+// Click outside the composer root: collapse if there's no work to lose.
+onClickOutside(
+  composerRoot,
+  () => {
+    if (shouldIgnoreOutsideCollapse()) return
+    collapseComposer()
+  },
+  {
+    ignore: [
+      // Reka portals dropdown / select / popover content outside the
+      // composer's DOM tree. Treat clicks inside any of these as still
+      // "inside" the composer so opening a menu doesn't collapse it.
+      '[role="menu"]',
+      '[role="listbox"]',
+      '[role="dialog"]',
+      '[data-radix-popper-content-wrapper]'
+    ]
+  }
+)
+
+// `r` keyboard shortcut: expand the composer if it's idle. Skips when
+// the user is already typing into another input / editor so we don't
+// hijack the key during normal use. The shortcut is intentionally
+// scoped to the document so it works while reading the message thread.
+const onGlobalKeydown = (event) => {
+  if (event.key !== 'r' && event.key !== 'R') return
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  if (isComposerExpanded.value) return
+
+  const active = document.activeElement
+  if (active) {
+    const tag = active.tagName?.toLowerCase()
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+    if (active.isContentEditable) return
+  }
+
+  event.preventDefault()
+  expandComposer()
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', onGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onGlobalKeydown)
+})
+
+// If work-in-progress appears (e.g. a draft restored, a macro applied
+// from the sidebar, forward mode entered) auto-expand so the user
+// always sees the work.
+watch(hasWorkInProgress, (value) => {
+  if (value && !isComposerExpanded.value) {
+    expandComposer()
+  }
+})
+
+watch(isEditorFullscreen, clearComposerOverlayStates)
 
 /**
  * Fetches AI prompts from the server.
@@ -363,6 +547,7 @@ const processForward = async () => {
   const blocks = forwardedSources.value.map(buildForwardSourceHTML).join('')
   const body = note + blocks
   const messageUUIDs = forwardedSources.value.map((s) => s.uuid)
+  const sendInboxIdToSend = selectedInboxOverrideId.value
 
   isSending.value = true
   try {
@@ -372,7 +557,8 @@ const processForward = async () => {
       bcc: parseList(bcc.value),
       message_uuids: messageUUIDs,
       body,
-      skip_quote: true
+      skip_quote: true,
+      ...(sendInboxIdToSend != null && { send_inbox_id: sendInboxIdToSend })
     })
     // Reset state: editor body, recipients, draft, then flip back to reply mode.
     htmlContent.value = ''
@@ -386,6 +572,11 @@ const processForward = async () => {
     clearDraft(currentDraftKey.value)
     clearMediaFiles()
     messageType.value = 'reply'
+    resetSelectedInbox()
+    // Collapse after a successful forward — nothing left to edit.
+    isComposerExpanded.value = false
+    isRecipientsExpanded.value = false
+    clearComposerOverlayStates()
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -414,6 +605,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
   const hasContent = hasTextContent.value > 0 || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
   const isPrivate = messageType.value === 'private_note'
+  const sendInboxIdToSend = !isPrivate ? selectedInboxOverrideId.value : null
 
   const currentInbox = inboxStore.inboxes.find(
     (i) => i.id === conversationStore.current.inbox_id
@@ -517,7 +709,8 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
         cc: parsedCC,
         bcc: parsedBCC,
         to: parsedTo,
-        echo_id: isPrivate ? '' : tempUUID
+        echo_id: isPrivate ? '' : tempUUID,
+        ...(sendInboxIdToSend != null && { send_inbox_id: sendInboxIdToSend })
       })
 
       // Private notes are sent immediately so replace immediately.
@@ -552,13 +745,20 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
     }
   }
 
-  // Clear state on success.
+  // Clear state on success and collapse the composer back to its idle
+  // placeholder. Mode resets to reply so a private note doesn't bleed
+  // into the next interaction.
   if (!hasMessageSendingErrored) {
     clearDraft(currentDraftKey.value)
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
     clearMediaFiles()
     emailErrors.value = []
     mentions.value = []
+    messageType.value = 'reply'
+    resetSelectedInbox()
+    isComposerExpanded.value = false
+    isRecipientsExpanded.value = false
+    clearComposerOverlayStates()
   }
   isSending.value = false
 }
@@ -567,14 +767,17 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
  * Watches for changes in the conversation's macro id and update message content.
  */
 watch(
-  () => conversationStore.getMacro('reply').id,
+  () => conversationStore.getMacro(MACRO_CONTEXT.REPLY).id,
   (newId) => {
     // No macro set.
     if (!newId) return
 
+    const macro = conversationStore.getMacro(MACRO_CONTEXT.REPLY)
+    if (macro?._inserted_from_editor) return
+
     // If macro has message content, set it in the editor.
-    if (conversationStore.getMacro('reply').message_content) {
-      htmlContent.value = conversationStore.getMacro('reply').message_content
+    if (macro.message_content) {
+      htmlContent.value = macro.message_content
     }
   },
   { deep: true }
@@ -604,6 +807,25 @@ watch(
     }
   },
   { deep: true }
+)
+
+watch(
+  sendInboxId,
+  (newVal) => {
+    selectedInboxId.value = newVal != null ? Number(newVal) : defaultInboxId.value
+  },
+  { immediate: true }
+)
+
+watch(
+  selectedInboxId,
+  (newVal, oldVal) => {
+    if (!newVal || Number(newVal) === Number(oldVal)) return
+    if (conversationStore.current?.inbox_channel === INBOX_CHANNEL.EMAIL) {
+      conversationStore.recomputeRecipientsForInbox(newVal)
+    }
+    sendInboxId.value = selectedInboxOverrideId.value
+  }
 )
 
 // Initialize to, cc, and bcc fields with the current conversation's values.
@@ -647,6 +869,7 @@ watch(
   () => {
     clearMediaFiles()
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+    resetSelectedInbox()
     // Forward state is conversation-scoped: dropping it on switch avoids stale quoted blocks
     // from conversation A leaking into conversation B's composer.
     if (messageType.value === 'forward') {
@@ -659,10 +882,12 @@ watch(
       showBcc.value = false
       forwardedSources.value = []
     }
-    // Focus editor on conversation change
-    setTimeout(() => {
-      replyBoxContentRef.value?.focus()
-    }, 100)
+    // Collapse on conversation switch so the new conversation starts
+    // idle. If a draft exists for the new conversation the
+    // hasWorkInProgress watcher above will auto-expand.
+    isComposerExpanded.value = false
+    isRecipientsExpanded.value = false
+    clearComposerOverlayStates()
   }
 )
 </script>

@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <div class="space-y-6">
     <div v-if="currentStep === 1" class="space-y-4 mt-10">
       <h3 class="font-semibold text-lg">{{ $t('admin.inbox.chooseChannel') }}</h3>
@@ -47,7 +45,7 @@
 import { ref, onMounted } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Mail, MessageCircle } from 'lucide-vue-next'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
@@ -65,10 +63,6 @@ const availableLanguages = ref([])
 const currentStep = ref(1)
 const selectedChannel = ref(null)
 const router = useRouter()
-const breadcrumbLinks = [
-  { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
-  { path: '', label: t('inbox.newInbox') }
-]
 
 const selectChannel = (channel) => {
   selectedChannel.value = channel

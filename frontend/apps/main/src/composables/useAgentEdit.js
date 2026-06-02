@@ -1,12 +1,12 @@
 // useAgentEdit — agent record + dirty tracking + Save action for the
-// three-rail Edit Agent layout.
+// three-rail Agent editor layout.
 //
 // Owns:
 //   - `agent` ref: the live, mutable record. Tabs mutate it directly.
 //   - `original` ref: deep-clone snapshot of the last-saved state.
 //   - `isDirty` computed: deep-equal compare of agent vs original.
-//   - `saving` ref + `save()` action: PUT /api/v1/ai/agents/:id, then
-//     refresh the snapshot.
+//   - `saving` ref + `save()` action: POST for drafts, PUT for existing
+//     agents, then refresh the snapshot.
 //   - Browser-close guard via `beforeunload`. Registered in onMounted,
 //     unregistered in onUnmounted so it doesn't leak across navigations.
 //
@@ -15,13 +15,14 @@
 // via `AGENT_EDIT_KEY` so every tab and the shared sidebar mutate the
 // same live instance.
 //
-// Save POST shape mirrors the existing CreateOrEditAgent.vue form:
-// kb_scope, tools, autonomy, preset_overrides, detection are all
-// embedded directly on the agent record so a single PUT covers
-// everything. No per-tab partial saves.
+// Save payload shape mirrors the legacy monolithic form: kb_scope,
+// tools, autonomy, preset_overrides, detection are all embedded directly
+// on the agent record so one save action covers every tab. No per-tab
+// partial saves.
 
 import { computed, onMounted, onUnmounted, ref, toValue } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -56,7 +57,7 @@ function buildSavePayload(agent) {
 
   const confidenceThreshold = Number(agent.confidence_threshold)
   const maxIterations = Number(agent.max_iterations)
-  const minLegitimation = Number(agent.min_legitimation ?? 0)
+  const verificationFloor = Number(agent.min_verification ?? 0)
 
   return {
     name: agent.name,
@@ -74,14 +75,36 @@ function buildSavePayload(agent) {
     confidence_threshold: Number.isFinite(confidenceThreshold) ? confidenceThreshold : 0.5,
     extended_thinking_enabled: agent.extended_thinking_enabled !== false,
     max_iterations: Number.isFinite(maxIterations) ? maxIterations : 5,
-    min_legitimation: Number.isFinite(minLegitimation) ? minLegitimation : 0,
+    min_verification: Number.isFinite(verificationFloor) ? verificationFloor : 0,
     enabled: !!agent.enabled
+  }
+}
+
+function createEmptyAgent() {
+  return {
+    id: null,
+    name: '',
+    slug: '',
+    description: '',
+    prompt: '',
+    detection: {},
+    tools: [],
+    kb_scope: { folder_ids: [], article_ids: [] },
+    preset_overrides: {},
+    confidence_threshold: 0.5,
+    max_iterations: 5,
+    extended_thinking_enabled: true,
+    min_verification: 0,
+    autonomy: {},
+    enabled: false
   }
 }
 
 export function useAgentEdit(agentId) {
   const emitter = useEmitter()
   const { t } = useI18n()
+  const route = useRoute()
+  const router = useRouter()
 
   const agent = ref(null)
   const original = ref(null)
@@ -89,7 +112,12 @@ export function useAgentEdit(agentId) {
   const saving = ref(false)
   const loadError = ref(null)
 
-  const resolveAgentID = () => Number(toValue(agentId))
+  const rawAgentID = computed(() => route.params.id ?? toValue(agentId))
+  const resolveAgentID = () => {
+    const id = Number(rawAgentID.value)
+    return Number.isFinite(id) && id > 0 ? id : null
+  }
+  const isCreateMode = computed(() => !resolveAgentID())
 
   // Deep clone via JSON round-trip. The agent payload is JSON-only —
   // no Date instances, no circular refs — so this is the simplest
@@ -103,9 +131,17 @@ export function useAgentEdit(agentId) {
 
   async function load() {
     const id = resolveAgentID()
-    if (!Number.isFinite(id) || id <= 0) {
-      agent.value = null
-      original.value = null
+    if (!id) {
+      const draft = createEmptyAgent()
+      agent.value = draft
+      original.value = clone(draft)
+      loadError.value = null
+      loading.value = false
+      return
+    }
+
+    if (agent.value?.id && Number(agent.value.id) === id) {
+      original.value = clone(agent.value)
       loadError.value = null
       return
     }
@@ -126,26 +162,40 @@ export function useAgentEdit(agentId) {
 
   async function save() {
     const id = resolveAgentID()
-    if (!agent.value || saving.value || !Number.isFinite(id) || id <= 0) return
+    if (!agent.value || saving.value) return
     saving.value = true
     try {
-      // Rebuild the legacy form payload explicitly so nested JSON fields
+      // Rebuild the form payload explicitly so nested JSON fields
       // like kb_scope and tools land in the exact shape the backend
       // expects, instead of trusting the live reactive record blindly.
       const payload = buildSavePayload(agent.value)
-      await api.updateAIAgent(id, payload)
-      // Snapshot after success so isDirty reads false until the next
-      // edit. Keep agent.value as-is (don't re-fetch) so the UI
-      // doesn't flicker.
-      agent.value = { ...agent.value, ...clone(payload) }
+      if (id) {
+        await api.updateAIAgent(id, payload)
+        // Snapshot after success so isDirty reads false until the next
+        // edit. Keep agent.value as-is (don't re-fetch) so the UI
+        // doesn't flicker.
+        agent.value = { ...agent.value, ...clone(payload), id }
+        original.value = clone(agent.value)
+        emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+          description: t('globals.messages.savedSuccessfully')
+        })
+        return
+      }
+
+      const resp = await api.createAIAgent(payload)
+      const created = resp.data?.data
+      agent.value = created
       original.value = clone(agent.value)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully'),
+        description: t('admin.ai.agent.created')
       })
+      if (created?.id) {
+        await router.replace({ name: 'edit-ai-agent-identity', params: { id: created.id } })
+      }
     } catch (err) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: handleHTTPError(err).message,
+        description: handleHTTPError(err).message
       })
     } finally {
       saving.value = false
@@ -181,14 +231,12 @@ export function useAgentEdit(agentId) {
     window.removeEventListener('keydown', onKeyDown)
   })
 
-  // Helper for the tab-switch / route-leave guards (used by the
-  // layout's onBeforeRouteUpdate / onBeforeRouteLeave handlers).
+  // Helper for the route-leave guard. Tab switches inside the editor do
+  // not prompt; leaving the editor still asks the operator to confirm.
   // Returns true when the navigation is OK, false to cancel.
   function confirmDiscardIfDirty() {
     if (!isDirty.value) return true
-    return window.confirm(
-      t('admin.ai.agent.unsavedChanges')
-    )
+    return window.confirm(t('admin.ai.agent.unsavedChanges'))
   }
 
   return {
@@ -198,8 +246,9 @@ export function useAgentEdit(agentId) {
     loading,
     saving,
     loadError,
+    isCreateMode,
     load,
     save,
-    confirmDiscardIfDirty,
+    confirmDiscardIfDirty
   }
 }

@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <Spinner v-if="formLoading"></Spinner>
   <div v-else>
     <EmailInboxForm
@@ -25,7 +23,7 @@ import { onMounted, ref } from 'vue'
 import api from '../../../api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
@@ -39,10 +37,6 @@ const formLoading = ref(false)
 const isLoading = ref(false)
 const inbox = ref({})
 const availableLanguages = ref([])
-const breadcrumbLinks = [
-  { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
-  { path: '', label: t('inbox.edit') }
-]
 
 const submitForm = (values) => {
   let payload

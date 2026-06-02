@@ -20,7 +20,8 @@
 -->
 <template>
   <div class="flex flex-col h-full">
-    <div class="flex-1 overflow-auto px-6 py-4">
+    <PageHeader />
+    <div class="flex-1 overflow-auto">
       <DataTable
         :columns="columns"
         :data="articles"
@@ -115,7 +116,6 @@
             <Button
               variant="secondary"
               size="sm"
-              @click="onUnpublish(selected[0])"
             >
               <FolderInput class="w-3.5 h-3.5" />
               {{ t('admin.knowledge.actions.moveToFolder') }}
@@ -193,6 +193,7 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import DataTable from '@main/components/datatable/DataTable.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import {

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '../composables/useEmitter'
 import { EMITTER_EVENTS } from '../constants/emitterEvents'
+import { INBOX_CHANNEL } from '../constants/inbox'
 import api from '../api'
 
 export const useInboxStore = defineStore('inbox', () => {
@@ -15,6 +16,9 @@ export const useInboxStore = defineStore('inbox', () => {
   const emailOptions = computed(() => inboxes.value
     .filter(inb => inb.channel === 'email')
     .map(inb => ({ label: inb.name, value: String(inb.id) }))
+  )
+  const emailInboxesEnabled = computed(() =>
+    inboxes.value.filter(inb => inb.enabled && inb.channel === INBOX_CHANNEL.EMAIL)
   )
   const fetchInboxes = async (force = false) => {
     if (!force && inboxes.value.length) return
@@ -32,6 +36,7 @@ export const useInboxStore = defineStore('inbox', () => {
     inboxes,
     options,
     emailOptions,
+    emailInboxesEnabled,
     fetchInboxes,
   }
 })

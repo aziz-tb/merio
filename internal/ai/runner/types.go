@@ -8,7 +8,7 @@
 // or the composer; those wrap it later. What it does:
 //
 //  1. Loads an agent (ai_agents row) by id.
-//  2. Resolves agent.tools to ResolvedTools (internal + custom, legitimation-filtered).
+//  2. Resolves agent.tools to ResolvedTools (internal + custom).
 //  3. Translates ResolvedTools to provider-agnostic llm.ToolDef.
 //  4. Builds the initial messages (system prompt + caller-supplied context + inbound).
 //  5. Loops with the LLM provider, dispatching tool_use blocks through the
@@ -135,9 +135,9 @@ type RunRequest struct {
 	// Usage.Record when zero, but the run itself still proceeds.
 	InboxID int
 
-	// LegitimationLevel gates tool resolution (legitimation filter)
-	// and PII surfacing inside capabilities like get_customer_data.
-	LegitimationLevel int
+	// VerificationLevel gates agent execution upstream and controls PII
+	// surfacing inside capabilities like get_customer_data.
+	VerificationLevel int
 
 	// MaxIterations caps the agent loop. Defaults to agent.max_iterations
 	// (which itself defaults to 5 per the F9 schema).
@@ -223,7 +223,7 @@ type RunResponse struct {
 	AgentUpdatedAt time.Time `json:"agent_updated_at,omitempty"`
 
 	// Drops is non-nil when the resolver dropped tools at run time
-	// (legitimation filter, unknown id, disabled custom tool).
+	// (unknown id, empty kb_scope, disabled custom tool).
 	// Surfaced so the operator can see why a tool the agent declared
 	// wasn't available.
 	Drops map[int]string `json:"drops,omitempty"`
@@ -315,7 +315,7 @@ type ToolCallLog struct {
 	// error — surfaces "the tool's implementation has a bug" to ops.
 	Recovered bool `json:"recovered,omitempty"`
 
-	// ExecutionID is the `tool_executions.execution_id` value that
+	// ExecutionID is the `function_executions.execution_id` value that
 	// audit row writes; lets ops join the trace with the audit table.
 	ExecutionID string `json:"execution_id,omitempty"`
 }

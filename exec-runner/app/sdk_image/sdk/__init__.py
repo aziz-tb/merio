@@ -24,6 +24,9 @@ Public surface:
     Tool composition:
         sdk.tools.call(name, args)
 
+    Secrets:
+        sdk.secret.get(name)
+
     Errors (catch with `except sdk.NotFoundError:` etc.):
         sdk.SdkError              base class
         sdk.ApiError              base for all HTTP failures
@@ -58,6 +61,7 @@ from ._output import error, failure, noop, success
 
 # Sub-modules accessed via attribute (sdk.api.get, sdk.tools.call)
 from . import _api as api
+from . import _secret as secret
 from . import _tools as tools
 
 __all__ = [
@@ -73,6 +77,7 @@ __all__ = [
     "noop",
     # Sub-modules
     "api",
+    "secret",
     "tools",
     # Errors
     "SdkError",

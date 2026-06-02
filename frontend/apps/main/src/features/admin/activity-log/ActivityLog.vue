@@ -103,8 +103,8 @@ import { ListFilter, ArrowDownWideNarrow } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useActivityLogFilters } from '../../../composables/useActivityLogFilters'
 import { useI18n } from 'vue-i18n'
-import { format } from 'date-fns'
 import PaginationBar from '@main/components/pagination/PaginationBar.vue'
+import { formatDateTimeWithSeconds } from '@main/utils/date'
 import api from '../../../api'
 
 const activityLogs = ref([])
@@ -146,10 +146,9 @@ async function fetchActivityLogs() {
     totalCount.value = resp.data.data.count
     totalPages.value = resp.data.data.total_pages
 
-    // Format the created_at field
     activityLogs.value = activityLogs.value.map((log) => ({
       ...log,
-      created_at: format(new Date(log.created_at), 'PPpp')
+      created_at: formatDateTimeWithSeconds(log.created_at)
     }))
   } catch (err) {
     console.error('Error fetching activity logs:', err)

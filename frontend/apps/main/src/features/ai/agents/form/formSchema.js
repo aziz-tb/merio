@@ -31,10 +31,11 @@ export const createAgentFormSchema = (t) =>
         .max(50)
         .default(5),
       enabled: z.boolean().default(true),
-      min_legitimation: z
+      min_verification: z
         .number({ invalid_type_error: t('globals.messages.required') })
         .int()
         .min(0)
+        .max(3)
         .default(0),
       kb_scope: z
         .object({

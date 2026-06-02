@@ -109,6 +109,15 @@ type ChatMessage struct {
 	Meta             json.RawMessage        `json:"meta"`
 }
 
+// PreparedMessage is a normalized projection of an inbound conversation
+// message for AI workflows and rule evaluators.
+type PreparedMessage struct {
+	SenderEmail string   `json:"sender_email"`
+	Subject     string   `json:"subject"`
+	Body        string   `json:"body"`
+	BodyEmails  []string `json:"body_emails"`
+}
+
 // ConversationListItem represents a conversation in list views
 type ConversationListItem struct {
 	Total                 int                     `db:"total" json:"-"`
@@ -134,6 +143,10 @@ type ConversationListItem struct {
 	LastInteractionSender null.String             `db:"last_interaction_sender" json:"last_interaction_sender"`
 	NextSLADeadlineAt     null.Time               `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
+	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
+	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
+	Tags                  null.JSON               `db:"tags" json:"tags"`
+	TagIDs                null.JSON               `db:"tag_ids" json:"tag_ids"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`
@@ -198,6 +211,10 @@ type Conversation struct {
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
+	CustomerID                null.String            `db:"customer_id" json:"customer_id"`
+	ContractID                null.String            `db:"contract_id" json:"contract_id"`
+	VerificationLevel         int                    `db:"verification_level" json:"verification_level"`
+	VerificationMessage       null.String            `db:"verification_message" json:"verification_message"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
 }
 
@@ -231,6 +248,8 @@ type ConversationContact struct {
 	LastActiveAt           null.Time       `db:"last_active_at" json:"last_active_at"`
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
+	LinkedCustomerID       null.String     `db:"linked_customer_id" json:"linked_customer_id"`
+	LinkedCustomerIDAt     null.Time       `db:"linked_customer_id_at" json:"linked_customer_id_at"`
 }
 
 func (c *ConversationContact) FullName() string {
@@ -249,6 +268,58 @@ type PreviousConversation struct {
 	Contact       PreviousConversationContact `db:"contact" json:"contact"`
 	LastMessage   null.String                 `db:"last_message" json:"last_message"`
 	LastMessageAt null.Time                   `db:"last_message_at" json:"last_message_at"`
+}
+
+type ContactConversationHistoryItem struct {
+	UUID               string      `db:"uuid" json:"uuid"`
+	Subject            null.String `db:"subject" json:"subject"`
+	LastContactMessage null.String `db:"last_contact_message" json:"last_contact_message"`
+	LastMessageAt      null.Time   `db:"last_message_at" json:"last_message_at"`
+	Status             null.String `db:"status" json:"status"`
+	StatusColor        null.String `db:"status_color" json:"status_color"`
+	AssigneeName       null.String `db:"assignee_name" json:"-"`
+	AssigneeAvatarURL  null.String `db:"assignee_avatar_url" json:"-"`
+	PriorityName       null.String `db:"priority_name" json:"priority_name"`
+	CreatedAt          time.Time   `db:"created_at" json:"created_at"`
+}
+
+type ContactConversationHistoryAssignee struct {
+	Name      null.String `json:"name"`
+	AvatarURL null.String `json:"avatar_url"`
+}
+
+func (i ContactConversationHistoryItem) MarshalJSON() ([]byte, error) {
+	type contactConversationHistoryItem struct {
+		UUID               string                              `json:"uuid"`
+		Subject            null.String                         `json:"subject"`
+		LastContactMessage null.String                         `json:"last_contact_message"`
+		LastMessageAt      null.Time                           `json:"last_message_at"`
+		Status             null.String                         `json:"status"`
+		StatusColor        null.String                         `json:"status_color"`
+		Assignee           *ContactConversationHistoryAssignee `json:"assignee"`
+		PriorityName       null.String                         `json:"priority_name"`
+		CreatedAt          time.Time                           `json:"created_at"`
+	}
+
+	var assignee *ContactConversationHistoryAssignee
+	if i.AssigneeName.Valid || i.AssigneeAvatarURL.Valid {
+		assignee = &ContactConversationHistoryAssignee{
+			Name:      i.AssigneeName,
+			AvatarURL: i.AssigneeAvatarURL,
+		}
+	}
+
+	return json.Marshal(contactConversationHistoryItem{
+		UUID:               i.UUID,
+		Subject:            i.Subject,
+		LastContactMessage: i.LastContactMessage,
+		LastMessageAt:      i.LastMessageAt,
+		Status:             i.Status,
+		StatusColor:        i.StatusColor,
+		Assignee:           assignee,
+		PriorityName:       i.PriorityName,
+		CreatedAt:          i.CreatedAt,
+	})
 }
 
 type PreviousConversationContact struct {
@@ -306,6 +377,7 @@ type Message struct {
 	SenderID          int                    `db:"sender_id" json:"sender_id"`
 	SenderType        string                 `db:"sender_type" json:"sender_type"`
 	InboxID           int                    `db:"inbox_id" json:"-"`
+	SendInboxID       null.Int               `db:"send_inbox_id" json:"send_inbox_id"`
 	Meta              json.RawMessage        `db:"meta" json:"meta"`
 	Attachments       attachment.Attachments `db:"attachments" json:"attachments"`
 	From              string                 `db:"from"  json:"-"`

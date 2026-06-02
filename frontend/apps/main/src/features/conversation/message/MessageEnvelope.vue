@@ -5,7 +5,7 @@
         <span class="text-muted-foreground">From:</span>
         <template v-for="(addr, i) in message.meta.from" :key="addr">
           <router-link
-            v-if="contactId && userStore.can('contacts:read')"
+            v-if="contactId && userStore.can('contacts:read') && message.type === 'incoming'"
             :to="{ name: 'contact-detail', params: { id: contactId } }"
             class="hover:underline"
           >{{ addr }}</router-link>

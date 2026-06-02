@@ -78,8 +78,6 @@ func (g *getConversationHistoryCapability) OutputSchema() map[string]any {
 
 func (g *getConversationHistoryCapability) Category() string { return "read" }
 
-func (g *getConversationHistoryCapability) MinLegitimation() int { return 0 }
-
 // ConversationHistoryEntry is the per-conversation shape returned. Subset
 // of conversation/models.PreviousConversation tailored for LLM consumption.
 type ConversationHistoryEntry struct {

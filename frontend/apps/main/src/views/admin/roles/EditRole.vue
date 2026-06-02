@@ -1,16 +1,14 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <Spinner v-if="isLoading"></Spinner>
   <RoleForm :initial-values="role" :submitForm="submitForm" :isLoading="formLoading" v-else />
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import RoleForm from '@/features/admin/roles/RoleForm.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import api from '../../../api'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
@@ -43,11 +41,6 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
-
-const breadcrumbLinks = [
-  { path: 'role-list', label: t('globals.terms.role', 2) },
-  { path: '', label: t('role.edit') }
-]
 
 const submitForm = async (values) => {
   try {

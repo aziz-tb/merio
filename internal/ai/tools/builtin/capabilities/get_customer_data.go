@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
+	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
 )
 
 func init() {
@@ -13,12 +14,12 @@ func init() {
 
 // getCustomerDataCapability returns the contact attached to a
 // conversation. PII fields (phone, custom attributes, country) are
-// redacted unless the caller's legitimation level is at least
-// piiLegitimationLevel; the agent runtime sets that level from the
-// conversation's legitimation state in the inbound pipeline (F3+).
+// redacted unless the caller's verification level is at least
+// piiVerificationLevel; the agent runtime sets that level from the
+// conversation's verification state in the inbound pipeline (F3+).
 type getCustomerDataCapability struct{}
 
-const piiLegitimationLevel = 1
+const piiVerificationLevel = verificationmodels.VerificationLevelPartial
 
 func (g *getCustomerDataCapability) ID() string   { return "get_customer_data" }
 func (g *getCustomerDataCapability) Name() string { return "Get the conversation's customer" }
@@ -26,7 +27,7 @@ func (g *getCustomerDataCapability) Name() string { return "Get the conversation
 func (g *getCustomerDataCapability) Description() string {
 	return "Fetch the contact (customer) attached to a conversation. " +
 		"Returns the contact's id, first and last name, email, account status, and timezone. " +
-		"PII fields (phone number, country, custom attributes) are returned only when the caller's legitimation level is 1 or higher.\n\n" +
+		"PII fields (phone number, country, custom attributes) are returned only when the caller's verification level is 1 or higher.\n\n" +
 		"Use this to address the customer by name, check whether their account is enabled, " +
 		"or look up details needed to draft an accurate reply. " +
 		"By default resolves the contact for the conversation currently in scope; pass `conversation_id` to look up a different conversation explicitly."
@@ -66,10 +67,8 @@ func (g *getCustomerDataCapability) OutputSchema() map[string]any {
 
 func (g *getCustomerDataCapability) Category() string { return "read" }
 
-func (g *getCustomerDataCapability) MinLegitimation() int { return 0 }
-
 // CustomerData is the typed envelope returned by this capability. PII
-// fields are populated only when the caller's legitimation level is high
+// fields are populated only when the caller's verification level is high
 // enough; pii_redacted=true on the response when they were dropped.
 type CustomerData struct {
 	ContactID        int            `json:"contact_id"`
@@ -124,7 +123,7 @@ func (g *getCustomerDataCapability) Execute(ctx context.Context, params map[stri
 		out.Email = u.Email.String
 	}
 
-	if rt.LegitimationLevel >= piiLegitimationLevel {
+	if rt.VerificationLevel >= int(piiVerificationLevel) {
 		if u.PhoneNumber.Valid {
 			out.PhoneNumber = u.PhoneNumber.String
 		}

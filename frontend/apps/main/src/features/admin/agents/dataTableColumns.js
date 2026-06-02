@@ -1,95 +1,58 @@
 import { h } from 'vue'
-import { RouterLink } from 'vue-router'
-import UserDataTableDropDown from '@/features/admin/agents/dataTableDropdown.vue'
-import { format } from 'date-fns'
+import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
+import { actionsCol, dateTimeCol, linkCol } from '@/components/datatable/helpers.js'
 
-export const createColumns = (t) => [
-  {
-    accessorKey: 'first_name',
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.firstName'))
+export const createColumns = (t, { onDelete } = {}) => {
+  const actionColumn = actionsCol()
+
+  return [
+    linkCol(t, 'first_name', {
+      headerKey: 'globals.terms.firstName',
+      to: (row) => ({ name: 'edit-agent', params: { id: row.id } })
+    }),
+    {
+      accessorKey: 'last_name',
+      header: () => t('globals.terms.lastName'),
+      cell: ({ row }) => row.getValue('last_name')
     },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
-        h(RouterLink,
-          {
-            to: { name: 'edit-agent', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
-          },
-          () => row.getValue('first_name')
+    {
+      accessorKey: 'enabled',
+      enableGlobalFilter: false,
+      header: () => t('globals.terms.enabled'),
+      cell: ({ row }) => row.getValue('enabled') ? t('globals.messages.yes') : t('globals.messages.no')
+    },
+    {
+      accessorKey: 'email',
+      header: () => t('globals.terms.email'),
+      cell: ({ row }) => row.getValue('email')
+    },
+    dateTimeCol(t, 'created_at'),
+    dateTimeCol(t, 'updated_at'),
+    {
+      ...actionColumn,
+      size: 72,
+      meta: {
+        ...actionColumn.meta,
+        align: 'right',
+        width: 72
+      },
+      cell: ({ row }) =>
+        h('div', { class: 'flex justify-end' },
+          h(DataTableRowActions, {
+            items: [
+              {
+                label: t('globals.messages.edit'),
+                to: { name: 'edit-agent', params: { id: row.original.id } }
+              },
+              {
+                label: t('globals.messages.delete'),
+                destructive: true,
+                confirm: t('admin.agent.deleteConfirmation'),
+                onClick: () => onDelete?.(row.original)
+              }
+            ]
+          })
         )
-      )
     }
-  },
-  {
-    accessorKey: 'last_name',
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.lastName'))
-    },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('last_name'))
-    }
-  },
-  {
-    accessorKey: 'enabled',
-    enableGlobalFilter: false,
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.enabled'))
-    },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('enabled') ? t('globals.messages.yes') : t('globals.messages.no'))
-    }
-  },
-  {
-    accessorKey: 'email',
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.email'))
-    },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('email'))
-    }
-  },
-  {
-    accessorKey: 'created_at',
-    enableGlobalFilter: false,
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
-    },
-    cell: function ({ row }) {
-      return h(
-        'div',
-        { class: 'text-center' },
-        format(row.getValue('created_at'), 'PPpp')
-      )
-    }
-  },
-  {
-    accessorKey: 'updated_at',
-    enableGlobalFilter: false,
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
-    },
-    cell: function ({ row }) {
-      return h(
-        'div',
-        { class: 'text-center' },
-        format(row.getValue('updated_at'), 'PPpp')
-      )
-    }
-  },
-  {
-    id: 'actions',
-    enableHiding: false,
-    enableSorting: false,
-    cell: ({ row }) => {
-      const user = row.original
-      return h(
-        'div',
-        { class: 'relative' },
-        h(UserDataTableDropDown, {
-          user
-        })
-      )
-    }
-  }
-]
+  ]
+}

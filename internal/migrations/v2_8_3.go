@@ -46,7 +46,7 @@ func V2_8_3(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			error_message TEXT,
 			payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 			CONSTRAINT check_ai_operations_triggered_by CHECK (triggered_by IN ('auto', 'manual')),
-			CONSTRAINT check_ai_operations_status CHECK (status IN ('success', 'failed', 'skipped'))
+			CONSTRAINT check_ai_operations_status CHECK (status IN ('running', 'success', 'failed', 'skipped'))
 		);
 		CREATE INDEX IF NOT EXISTS index_ai_operations_on_conversation
 			ON ai_operations(conversation_id, created_at DESC) WHERE conversation_id IS NOT NULL;

@@ -1,14 +1,12 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <MacroForm :submitForm="onSubmit" :isLoading="formLoading" />
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import MacroForm from '@main/features/admin/macros/MacroForm.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -22,13 +20,6 @@ const emit = useEmitter()
 const { t } = useI18n()
 const macroStore = useMacroStore()
 const formLoading = ref(false)
-const breadcrumbLinks = [
-  { path: 'macro-list', label: t('globals.terms.macro', 2) },
-  {
-    path: '',
-    label: t('macro.new')
-  }
-]
 
 const onSubmit = (values) => {
   createMacro(values)

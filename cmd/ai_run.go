@@ -12,6 +12,9 @@ import (
 	executionmodels "github.com/abhinavxd/libredesk/internal/ai/executions/models"
 	"github.com/abhinavxd/libredesk/internal/ai/runner"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	itemporal "github.com/abhinavxd/libredesk/internal/temporal"
 	wfairuns "github.com/abhinavxd/libredesk/internal/workflows/airuns"
@@ -24,7 +27,7 @@ type runAIAgentReq struct {
 	Context             map[string]any               `json:"context"`
 	ConversationID      int                          `json:"conversation_id"`
 	ConversationHistory []runner.ConversationMessage `json:"conversation_history"`
-	LegitimationLevel   int                          `json:"legitimation_level"`
+	VerificationLevel   int                          `json:"verification_level"`
 	MaxIterations       int                          `json:"max_iterations"`
 	TotalTokenBudget    int                          `json:"total_token_budget"`
 	DeadlineMs          int                          `json:"deadline_ms"`
@@ -66,9 +69,25 @@ func handleRunAIAgent(r *fastglue.Request) error {
 	inboxID := app.systemInboxID
 	if body.ConversationID > 0 {
 		conv, convErr := app.conversation.GetConversation(body.ConversationID, "", "")
-		if convErr == nil && conv.InboxID > 0 {
-			inboxID = conv.InboxID
+		if convErr == nil {
+			if conv.InboxID > 0 {
+				inboxID = conv.InboxID
+			}
+			body.VerificationLevel = conv.VerificationLevel
+			body.Context = hydrateAgentRunCustomerContext(r.RequestCtx, app, body.Context, conv)
+		} else if convErr != nil {
+			app.lo.Warn("failed to hydrate conversation for agent run",
+				"agent_id", id,
+				"conversation_id", body.ConversationID,
+				"error", convErr)
 		}
+	}
+	if agent, agentErr := app.aiAgents.Get(id); agentErr == nil && body.VerificationLevel < agent.MinVerification {
+		reason := "agent requires a verified customer; conversation is not sufficiently verified"
+		return r.SendErrorEnvelope(fasthttp.StatusConflict, reason, map[string]any{
+			"error":  "agent_verification_insufficient",
+			"reason": reason,
+		}, envelope.ConflictError)
 	}
 
 	if body.ConversationID > 0 {
@@ -97,7 +116,7 @@ func handleRunAIAgent(r *fastglue.Request) error {
 		ConversationID:    body.ConversationID,
 		Context:           body.Context,
 		InboxID:           inboxID,
-		LegitimationLevel: body.LegitimationLevel,
+		VerificationLevel: body.VerificationLevel,
 		MaxIterations:     body.MaxIterations,
 		TotalTokenBudget:  body.TotalTokenBudget,
 		DeadlineMs:        body.DeadlineMs,
@@ -147,6 +166,41 @@ func handleRunAIAgent(r *fastglue.Request) error {
 		TraceID: traceID,
 		Status:  "accepted",
 	})
+}
+
+func hydrateAgentRunCustomerContext(ctx context.Context, app *App, current map[string]any, conv cmodels.Conversation) map[string]any {
+	if current == nil {
+		current = map[string]any{}
+	}
+	if conv.CustomerID.Valid && app.customer != nil {
+		customer, err := app.customer.GetFreshByCustomerID(ctx, conv.CustomerID.String, customerpkg.FreshOptions{})
+		if err != nil {
+			app.lo.Warn("failed to hydrate customer for agent run",
+				"conversation_id", conv.ID,
+				"customer_id", conv.CustomerID.String,
+				"error", err)
+			if cached, cacheErr := app.customer.GetByCustomerID(conv.CustomerID.String); cacheErr == nil {
+				current["customer"] = customerToAPIResponse(cached, nil)
+			}
+		} else if customer != nil {
+			current["customer"] = customerToAPIResponse(*customer, nil)
+		}
+	}
+	if conv.ContractID.Valid && app.contract != nil {
+		contract, err := app.contract.GetFreshByContractID(ctx, conv.ContractID.String, contractpkg.FreshOptions{})
+		if err != nil {
+			app.lo.Warn("failed to hydrate contract for agent run",
+				"conversation_id", conv.ID,
+				"contract_id", conv.ContractID.String,
+				"error", err)
+			if cached, cacheErr := app.contract.GetByContractID(conv.ContractID.String); cacheErr == nil {
+				current["contract"] = contractToAPIResponse(cached)
+			}
+		} else if contract != nil {
+			current["contract"] = contractToAPIResponse(*contract)
+		}
+	}
+	return current
 }
 
 func publishRunEnqueued(ctx context.Context, app *App, traceID string, params wfairuns.AgentRunWorkflowParams) {

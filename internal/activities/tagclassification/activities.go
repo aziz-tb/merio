@@ -3,10 +3,13 @@ package tagclassification
 import (
 	"fmt"
 
+	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
 	"github.com/abhinavxd/libredesk/internal/ai/llm"
 	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
 	"github.com/abhinavxd/libredesk/internal/ai/usage"
+	"github.com/abhinavxd/libredesk/internal/contract"
 	"github.com/abhinavxd/libredesk/internal/conversation"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/realtime"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -23,6 +26,8 @@ type Activities struct {
 	AIOperationsMgr *aioperations.Manager
 	TagMgr          *tag.Manager
 	ConversationMgr *conversation.Manager
+	CustomerMgr     *customer.Manager
+	ContractMgr     *contract.Manager
 	Realtime        realtime.Publisher
 	SystemInboxID   int
 	SystemUser      umodels.User
@@ -63,4 +68,21 @@ func New(a *Activities) (*Activities, error) {
 		return nil, fmt.Errorf("tagclassification: SystemUser required")
 	}
 	return a, nil
+}
+
+func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
+	return New(&Activities{
+		DB:              deps.DB,
+		Lo:              deps.Logger("tag-classification"),
+		LLMProvider:     deps.LLMProvider,
+		UsageMgr:        deps.Usage,
+		AIOperationsMgr: deps.AIOperations,
+		TagMgr:          deps.Tags,
+		ConversationMgr: deps.Conversation,
+		CustomerMgr:     deps.Customers,
+		ContractMgr:     deps.Contracts,
+		Realtime:        deps.Realtime,
+		SystemInboxID:   deps.SystemInboxID,
+		SystemUser:      deps.SystemUser,
+	})
 }

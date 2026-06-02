@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
 )
 
 // Detection mode constants.
@@ -19,9 +21,10 @@ const (
 
 // Source constants.
 const (
-	SourceTicket  = "ticket"
-	SourceContact = "contact"
-	SourceTags    = "tags"
+	SourceTicket   = "ticket"
+	SourceCustomer = "customer"
+	SourceContract = "contract"
+	SourceTags     = "tags"
 )
 
 // Logical operators used in ConditionTree.Op.
@@ -73,7 +76,7 @@ type ConditionNode struct {
 // All string operators are case-insensitive; use OpContainsRegex with
 // explicit flags for case-sensitive matching.
 type Condition struct {
-	Source   string `json:"source"` // ticket | contact | tags
+	Source   string `json:"source"` // ticket | customer | contract | tags
 	Path     string `json:"path"`   // dotted path; empty for SourceTags
 	Operator string `json:"operator"`
 	Value    any    `json:"value"` // typed per operator
@@ -92,6 +95,8 @@ type AIClassifier struct {
 type EvaluationContext struct {
 	Conversation cmodels.Conversation
 	Tags         []string
+	Customer     *customermodels.Customer
+	Contract     *contractmodels.Contract
 	TraceID      string
 }
 

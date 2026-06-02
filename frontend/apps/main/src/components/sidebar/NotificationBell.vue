@@ -5,10 +5,10 @@
         type="button"
         class="relative inline-flex items-center justify-center size-9 rounded-md hover:bg-accent hover:text-foreground"
       >
-        <Bell class="h-5 w-5" />
+        <Bell class="!size-[18px]" />
         <span
           v-if="notificationStore.unreadCount > 0"
-          class="absolute top-0.5 right-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-destructive-foreground"
+          class="absolute top-0.5 right-0.5 inline-flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-destructive-foreground"
         >
           {{ notificationStore.unreadCount > 99 ? '99' : notificationStore.unreadCount }}
         </span>
@@ -22,7 +22,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { Bell } from 'lucide-vue-next'
+import { Bell } from '@qall/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useNotificationStore } from '@main/stores/notification'
 import NotificationPanel from './NotificationPanel.vue'

@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <LoadingOverlay :loading="isLoading">
     <SLAForm
       :initial-values="slaData"
@@ -17,7 +15,7 @@ import api from '../../../api'
 import SLAForm from '@/features/admin/sla/SLAForm.vue'
 import { useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { useI18n } from 'vue-i18n'
@@ -60,15 +58,6 @@ const submitForm = async (values) => {
     formLoading.value = false
   }
 }
-
-const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
-}
-
-const breadcrumbLinks = [
-  { path: 'sla-list', label: t('globals.terms.sla') },
-  { path: '', label: breadCrumLabel() }
-]
 
 onMounted(async () => {
   if (props.id) {

@@ -16,13 +16,15 @@ import (
 // operation type ships without a schema migration. Keep these in sync
 // with the payload structs under internal/aioperations/payloads/.
 const (
-	TypeTagClassification = "tag_classification"
-	TypeAgentValidation   = "agent_validation"
+	TypeTagClassification      = "tag_classification"
+	TypeAgentValidation        = "agent_validation"
+	TypeCustomerIdentification = "customer_identification"
 	// Future: TypeSummarizeMessage, TypeOCRExtract, TypeSentimentAnalyze, …
 )
 
 // status values. Mirrors the CHECK constraint on ai_operations.status.
 const (
+	StatusRunning = "running"
 	StatusSuccess = "success"
 	StatusFailed  = "failed"
 	StatusSkipped = "skipped"

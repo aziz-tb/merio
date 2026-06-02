@@ -58,6 +58,9 @@ curl -LO https://github.com/abhinavxd/libredesk/raw/main/config.sample.toml
 # Copy the config.sample.toml to config.toml and edit it as needed.
 cp config.sample.toml config.toml
 
+# Configure the Secrets Manager KEK used for operator-managed function secrets.
+export LIBREDESK_SECRETS_KEK="$(openssl rand -base64 32)"
+
 # Run the services in the background.
 docker compose up -d
 
@@ -74,6 +77,7 @@ __________________
 ### Binary
 - Download the [latest release](https://github.com/abhinavxd/libredesk/releases) and extract the libredesk binary.
 - Edit config.toml as needed.
+- Set `LIBREDESK_SECRETS_KEK` to a base64-encoded 32-byte AES key (`openssl rand -base64 32`).
 - `./libredesk --install` to setup the Postgres DB.
 - Run `./libredesk --set-system-user-password` to set the password for the System user.
 - Run `./libredesk` and visit `http://localhost:9000` and login with email `System` and the password you set using the --set-system-user-password command.

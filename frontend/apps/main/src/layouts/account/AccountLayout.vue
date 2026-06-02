@@ -1,7 +1,7 @@
 <template>
   <div class="overflow-y-auto h-screen">
-    <div class="p-6 sm:p-8 min-h-full flex flex-col">
-      <router-view class="flex-grow" />
+    <div class="px-6 py-6 sm:px-8">
+      <router-view />
     </div>
   </div>
 </template>

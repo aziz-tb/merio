@@ -243,6 +243,7 @@ func handleSendAgentExecution(r *fastglue.Request) error {
 	message, err := app.conversation.QueueReply(
 		[]mmodels.Media{}, conv.InboxID, user.ID, conv.ContactID,
 		uuid, body, toList, nil, nil, map[string]any{},
+		nil,
 	)
 	if err != nil {
 		app.lo.Error("send: QueueReply failed", "execution_id", execID, "error", err)

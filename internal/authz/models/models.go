@@ -50,9 +50,6 @@ const (
 	// Webhooks
 	PermWebhooksManage = "webhooks:manage"
 
-	// Context Links
-	PermContextLinksManage = "context_links:manage"
-
 	// Templates
 	PermTemplatesManage = "templates:manage"
 
@@ -114,6 +111,13 @@ const (
 	PermAIAgentsRun   = "ai_agents:run"
 	PermAIToolsManage = "ai_tools:manage"
 	PermAIToolsInvoke = "ai_tools:invoke"
+
+	// Customer identification
+	PermCustomersAssign = "customers:assign"
+	PermCustomersSearch = "customers:search"
+	PermCustomersManage = "customers:manage"
+	PermFunctionsManage = "functions:manage"
+	PermSecretsManage   = "secrets:manage"
 )
 
 var validPermissions = map[string]struct{}{
@@ -161,7 +165,6 @@ var validPermissions = map[string]struct{}{
 	PermContactNotesDelete:              {},
 	PermActivityLogsManage:              {},
 	PermWebhooksManage:                  {},
-	PermContextLinksManage:              {},
 	PermWorklogViewOwn:                  {},
 	PermWorklogViewTeam:                 {},
 	PermWorklogViewAll:                  {},
@@ -174,6 +177,11 @@ var validPermissions = map[string]struct{}{
 	PermAIAgentsRun:                     {},
 	PermAIToolsManage:                   {},
 	PermAIToolsInvoke:                   {},
+	PermCustomersAssign:                 {},
+	PermCustomersSearch:                 {},
+	PermCustomersManage:                 {},
+	PermFunctionsManage:                 {},
+	PermSecretsManage:                   {},
 }
 
 // PermissionExists returns true if the permission exists else false

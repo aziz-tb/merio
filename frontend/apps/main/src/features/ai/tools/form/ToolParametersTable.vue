@@ -1,13 +1,21 @@
 <template>
   <div class="space-y-2">
-    <table class="w-full text-sm border-collapse">
+    <table class="w-full text-sm table-fixed">
       <thead>
-        <tr class="text-left text-muted-foreground border-b">
-          <th class="py-1 pr-2 font-medium">{{ $t('admin.ai.tool.params.key') }}</th>
-          <th class="py-1 pr-2 font-medium">{{ $t('admin.ai.tool.params.type') }}</th>
-          <th class="py-1 pr-2 font-medium">{{ $t('admin.ai.tool.params.required') }}</th>
-          <th class="py-1 pr-2 font-medium">{{ $t('admin.ai.tool.params.description') }}</th>
-          <th class="py-1 w-8"></th>
+        <tr class="text-left text-muted-foreground">
+          <th class="py-1 px-2 w-[20%] font-medium">
+            {{ $t('admin.ai.tool.params.key') }}
+          </th>
+          <th class="py-1 px-2 w-[140px] font-medium">
+            {{ $t('admin.ai.tool.params.type') }}
+          </th>
+          <th class="py-1 px-2 font-medium">
+            {{ $t('admin.ai.tool.params.description') }}
+          </th>
+          <th class="py-1 px-2 w-20 text-center font-medium">
+            {{ $t('admin.ai.tool.params.required') }}
+          </th>
+          <th class="py-1 w-10"></th>
         </tr>
       </thead>
       <tbody>
@@ -16,7 +24,7 @@
             {{ $t('admin.ai.tool.params.empty') }}
           </td>
         </tr>
-        <tr v-for="(row, idx) in rows" :key="idx" class="border-b">
+        <tr v-for="(row, idx) in rows" :key="idx">
           <td class="py-1 pr-2">
             <Input
               v-model="row.key"
@@ -24,9 +32,9 @@
               @input="emitRows"
             />
           </td>
-          <td class="py-1 pr-2">
+          <td class="py-1 px-2">
             <Select :model-value="row.type || 'string'" @update:modelValue="(v) => onTypeChange(row, v)">
-              <SelectTrigger class="w-[140px]">
+              <SelectTrigger class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -34,27 +42,30 @@
               </SelectContent>
             </Select>
           </td>
-          <td class="py-1 pr-2">
-            <Checkbox :checked="!!row.required" @update:checked="(v) => onRequiredChange(row, v)" />
-          </td>
-          <td class="py-1 pr-2">
+          <td class="py-1 px-2">
             <Input v-model="row.description" @input="emitRows" />
           </td>
-          <td class="py-1">
-            <button
+          <td class="py-1 px-2 text-center">
+            <Checkbox :checked="!!row.required" @update:checked="(v) => onRequiredChange(row, v)" />
+          </td>
+          <td class="py-1 text-center">
+            <Button
               type="button"
-              class="text-muted-foreground hover:text-destructive text-xs"
-              :title="$t('globals.messages.remove')"
+              variant="ghost"
+              size="icon"
+              class="text-muted-foreground hover:text-foreground"
               @click="removeRow(idx)"
             >
-              ✕
-            </button>
+              <TrashCan class="size-4" />
+            </Button>
           </td>
         </tr>
       </tbody>
     </table>
-    <Button type="button" variant="secondary" size="sm" @click="addRow">
-      {{ $t('admin.ai.tool.params.add') }}
+
+    <Button type="button" variant="outline" size="sm" @click="addRow">
+      <Plus class="size-4" />
+      {{ t('admin.ai.function.addParameter') }}
     </Button>
   </div>
 </template>
@@ -78,6 +89,10 @@ import {
   SelectContent,
   SelectItem
 } from '@shared-ui/components/ui/select'
+import { TrashCan, Plus } from '@qall/icons'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const TYPE_OPTIONS = ['string', 'integer', 'number', 'boolean', 'date', 'array', 'object']
 

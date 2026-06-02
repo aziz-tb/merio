@@ -1,7 +1,5 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <TeamForm :initial-values="{}" :submitForm="submitForm" :isLoading="formLoading" :isNewForm="true" />
 </template>
 
@@ -11,7 +9,7 @@ import TeamForm from '@/features/admin/teams/TeamForm.vue'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { useRouter } from 'vue-router'
 import api from '../../../api'
 import { useI18n } from 'vue-i18n'
@@ -20,10 +18,6 @@ const { t } = useI18n()
 const formLoading = ref(false)
 const router = useRouter()
 const emitter = useEmitter()
-const breadcrumbLinks = [
-  { path: 'team-list', label: t('globals.terms.team', 2) },
-  { path: '', label: t('globals.messages.new') }
-]
 
 const submitForm = (values) => {
   createTeam(values)

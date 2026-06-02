@@ -25,7 +25,7 @@ const detection = defineModel({ required: true })
 defineProps({
   availableSources: {
     type: Array,
-    default: () => ['ticket', 'contact', 'tags']
+    default: () => ['ticket', 'customer', 'contract', 'tags']
   }
 })
 

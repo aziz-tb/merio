@@ -6,7 +6,10 @@ import (
 	"strings"
 	"time"
 
+	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
+	"github.com/abhinavxd/libredesk/internal/customerdata"
 )
 
 // ResolvePath returns the value at the source/path in ctx.
@@ -20,12 +23,24 @@ func ResolvePath(ctx EvaluationContext, source, path string) (any, bool) {
 			return nil, false
 		}
 		return navigatePath(ticketJSON, parsePath(path))
-	case SourceContact:
-		contactJSON, err := BuildContactJSON(ctx.Conversation.Contact)
+	case SourceCustomer:
+		if ctx.Customer == nil {
+			return nil, false
+		}
+		customerJSON, err := BuildCustomerJSON(*ctx.Customer)
 		if err != nil {
 			return nil, false
 		}
-		return navigatePath(contactJSON, parsePath(path))
+		return navigatePath(customerJSON, parsePath(path))
+	case SourceContract:
+		if ctx.Contract == nil {
+			return nil, false
+		}
+		contractJSON, err := BuildContractJSON(*ctx.Contract)
+		if err != nil {
+			return nil, false
+		}
+		return navigatePath(contractJSON, parsePath(path))
 	}
 	return nil, false
 }
@@ -45,18 +60,16 @@ func BuildTicketJSON(conv cmodels.Conversation) (map[string]any, error) {
 	return m, nil
 }
 
-// BuildContactJSON marshals a conversation contact into a navigable map.
-func BuildContactJSON(contact cmodels.ConversationContact) (map[string]any, error) {
-	raw, err := json.Marshal(contact)
-	if err != nil {
-		return nil, err
-	}
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, err
-	}
-	rehydrateRawJSONFields(m, []string{"custom_attributes"})
-	return m, nil
+// BuildCustomerJSON marshals a cached customer into the same flat shape exposed
+// by customer APIs, including Zone 2 pass-through fields.
+func BuildCustomerJSON(customer customermodels.Customer) (map[string]any, error) {
+	return customerdata.CustomerToMap(customer, nil)
+}
+
+// BuildContractJSON marshals a cached contract into the same flat shape exposed
+// by contract APIs, including Zone 2 pass-through fields.
+func BuildContractJSON(contract contractmodels.Contract) (map[string]any, error) {
+	return customerdata.ContractToMap(contract)
 }
 
 // ComputeTicketFields returns synthetic time-based fields exposed at

@@ -30,22 +30,84 @@
                 :is-active="kb.selectedFolderId === null"
                 @click="kb.selectedFolderId = null"
               >
+                <Folders class="size-3 inline-block mr-1 text-foreground" />
                 <span>{{ t('admin.knowledge.allFolders') }}</span>
               </SidebarMenuButton>
+              <SidebarMenuAction
+                show-on-hover
+                type="button"
+                :title="t('admin.knowledge.actions.newFolder')"
+                @click.stop="onNewRoot"
+              >
+                <Plus class="size-4" />
+              </SidebarMenuAction>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem v-if="visibleFolderRows.length">
+              <SidebarMenuSub>
+                <SidebarMenuSubItem v-for="row in visibleFolderRows" :key="row.folder.id">
+                  <SidebarMenuButton
+                    as="div"
+                    variant="child"
+                    size="sm"
+                    class="cursor-pointer"
+                    :is-active="kb.selectedFolderId === row.folder.id"
+                    @click="kb.selectedFolderId = row.folder.id"
+                  >
+                    <span
+                      v-if="row.depth"
+                      class="shrink-0"
+                      :style="{ width: `${row.depth * 12}px` }"
+                    />
+                    <Folder class="size-4 shrink-0 text-foreground" />
+                    <span class="flex-1 truncate" :title="row.folder.name">
+                      {{ row.folder.name }}
+                    </span>
+                    <button
+                      v-if="row.hasChildren"
+                      type="button"
+                      class="size-4 flex shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                      @click.stop="toggleFolderOpen(row.folder.id)"
+                    >
+                      <ChevronRight
+                        :class="[
+                          'size-3 transition-transform',
+                          isFolderOpen(row.folder.id) && 'rotate-90'
+                        ]"
+                      />
+                    </button>
+                  </SidebarMenuButton>
+
+                  <SidebarMenuAction
+                    show-on-hover
+                    type="button"
+                    class="mr-2"
+                    @click.stop
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger as-child>
+                        <EllipsisVertical />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem @click="onNewSubfolder(row.folder.id)">
+                          {{ t('admin.knowledge.actions.newSubfolder') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem @click="onRename(row.folder)">
+                          {{ t('admin.knowledge.actions.rename') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem @click="onMoveFolder(row.folder)">
+                          {{ t('admin.knowledge.actions.move') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem @click="onDeleteFolder(row.folder)">
+                          {{ t('globals.messages.delete') }}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </SidebarMenuAction>
+                </SidebarMenuSubItem>
+              </SidebarMenuSub>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup>
-        <SidebarGroup class="pt-0">
-          <FolderTree
-            :folders="kb.folders"
-            :selected-id="kb.selectedFolderId"
-            :hide-header="true"
-            @select="(id) => (kb.selectedFolderId = id)"
-            @new-subfolder="onNewSubfolder"
-            @rename="onRename"
-            @move="onMoveFolder"
-            @delete="onDeleteFolder"
-          />
         </SidebarGroup>
       </template>
 
@@ -158,14 +220,6 @@
         </SidebarGroup>
       </template>
     </SidebarContent>
-
-    <!-- Footer: list-mode "+ New folder" button -->
-    <div v-if="isListRoute" class="border-t border-border p-2">
-      <Button variant="outline" size="sm" class="w-full" @click="onNewRoot">
-        <Plus class="size-4 mr-1" />
-        {{ t('admin.knowledge.actions.newFolder') }}
-      </Button>
-    </div>
   </div>
 
   <!-- ====================================================================
@@ -229,8 +283,11 @@ import {
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem
 } from '@shared-ui/components/ui/sidebar'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Badge } from '@shared-ui/components/ui/badge'
@@ -252,7 +309,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog/index.js'
-import FolderTree from '@/features/knowledge/FolderTree.vue'
 import FolderDialog from '@/features/knowledge/FolderDialog.vue'
 import FolderPicker from '@/features/knowledge/FolderPicker.vue'
 import { useKnowledgeStore } from '@main/stores/knowledge'
@@ -260,6 +316,13 @@ import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@/api/index.js'
+import { ChevronRight, EllipsisVertical, Folder, Folders } from '@qall/icons'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@shared-ui/components/ui/dropdown-menu'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -278,6 +341,57 @@ const folderDialog = ref({
 })
 const moveFolderDialog = ref({ open: false, folderId: null, targetParentId: null })
 const deleteFolderAlert = ref({ open: false, folderId: null })
+const collapsedFolderIds = ref(new Set())
+
+const sortedFolders = computed(() =>
+  [...kb.folders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+)
+
+const folderChildrenByParent = computed(() => {
+  const groups = new Map()
+  for (const folder of sortedFolders.value) {
+    const parentId = folder.parent_id ?? null
+    if (!groups.has(parentId)) groups.set(parentId, [])
+    groups.get(parentId).push(folder)
+  }
+  return groups
+})
+
+const isFolderOpen = (folderId) => !collapsedFolderIds.value.has(folderId)
+
+const toggleFolderOpen = (folderId) => {
+  const nextCollapsedIds = new Set(collapsedFolderIds.value)
+  if (nextCollapsedIds.has(folderId)) {
+    nextCollapsedIds.delete(folderId)
+  } else {
+    nextCollapsedIds.add(folderId)
+  }
+  collapsedFolderIds.value = nextCollapsedIds
+}
+
+const visibleFolderRows = computed(() => {
+  const rows = []
+
+  const appendRows = (parentId, depth) => {
+    const folders = folderChildrenByParent.value.get(parentId) || []
+
+    for (const folder of folders) {
+      const children = folderChildrenByParent.value.get(folder.id) || []
+      rows.push({
+        folder,
+        depth,
+        hasChildren: children.length > 0
+      })
+
+      if (children.length && isFolderOpen(folder.id)) {
+        appendRows(folder.id, depth + 1)
+      }
+    }
+  }
+
+  appendRows(null, 0)
+  return rows
+})
 
 const moveExcludeIds = computed(() => {
   if (!moveFolderDialog.value.folderId) return []

@@ -22,6 +22,10 @@ Naming notes
   don't exist in v1. The slots are present so tool authors can write
   `sdk.contract_data.get(...)` today and have it work later when the
   executor system lands. v1 always sets them to None.
+
+- secrets: operator-managed plaintext secrets passed by the platform for
+  this execution. The public SDK exposes read-only access through
+  sdk.secret.get(name), not as a top-level data object.
 """
 from __future__ import annotations
 
@@ -68,3 +72,4 @@ input: dict[str, Any] = _load_dict("_INPUT_DATA", allow_null=False) or {}
 conversation_data: dict[str, Any] | None = _load_dict("_CONVERSATION_DATA", allow_null=True)
 contract_data: dict[str, Any] | None = _load_dict("_CONTRACT_DATA", allow_null=True)
 customer_data: dict[str, Any] | None = _load_dict("_CUSTOMER_DATA", allow_null=True)
+secrets: dict[str, Any] = _load_dict("_SECRETS_DATA", allow_null=False) or {}

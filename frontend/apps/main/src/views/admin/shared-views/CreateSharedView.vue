@@ -1,14 +1,12 @@
 <template>
-  <div class="mb-5">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-  </div>
+  <PageHeader />
   <SharedViewForm :submitForm="onSubmit" :isLoading="formLoading" />
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import SharedViewForm from '@/features/admin/shared-views/SharedViewForm.vue'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@/composables/useEmitter'
@@ -22,13 +20,6 @@ const emit = useEmitter()
 const { t } = useI18n()
 const sharedViewStore = useSharedViewStore()
 const formLoading = ref(false)
-const breadcrumbLinks = [
-  { path: 'shared-view-list', label: t('globals.terms.sharedView', 2) },
-  {
-    path: '',
-    label: t('sharedView.new')
-  }
-]
 
 const onSubmit = (values) => {
   createSharedView(values)

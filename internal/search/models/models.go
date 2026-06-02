@@ -7,11 +7,14 @@ import (
 )
 
 type ConversationResult struct {
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
-	UUID            string    `db:"uuid" json:"uuid"`
-	ReferenceNumber string    `db:"reference_number" json:"reference_number"`
-	Subject         string    `db:"subject" json:"subject"`
-	Status          string    `db:"status" json:"status"`
+	CreatedAt          time.Time `db:"created_at" json:"created_at"`
+	UUID               string    `db:"uuid" json:"uuid"`
+	ReferenceNumber    string    `db:"reference_number" json:"reference_number"`
+	Subject            string    `db:"subject" json:"subject"`
+	ContactName        string    `db:"contact_name" json:"contact_name"`
+	ContactEmail       string    `db:"contact_email" json:"contact_email"`
+	LastMessageSnippet string    `db:"last_message_snippet" json:"last_message_snippet"`
+	Status             string    `db:"status" json:"status"`
 }
 
 type MessageResult struct {

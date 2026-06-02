@@ -4,15 +4,16 @@
     <div class="h-14 flex-shrink-0 px-4 border-b border-border flex items-center justify-between gap-3">
       <!-- Left: contact name + optional subject -->
       <div class="flex flex-col min-w-0">
-        <span v-if="!conversationStore.conversation.loading" class="text-base font-semibold truncate">
-          {{ conversationStore.currentContactName }}
+        <span v-if="conversationStore.current?.subject" class="text-base font-semibold truncate">
+          
+          {{ conversationStore.current.subject }}
         </span>
         <Skeleton class="w-[130px] h-5" v-else />
         <span
-          v-if="conversationStore.current?.subject"
+          v-if="!conversationStore.conversation.loading" 
           class="text-xs text-muted-foreground truncate"
         >
-          {{ conversationStore.current.subject }}
+        {{ conversationStore.currentContactName }}
         </span>
       </div>
 

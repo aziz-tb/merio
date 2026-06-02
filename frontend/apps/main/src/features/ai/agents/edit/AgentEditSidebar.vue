@@ -1,12 +1,13 @@
 <!--
-  AgentEditSidebar — left rail of the Edit Agent layout.
+  AgentEditSidebar — left rail of the Agent editor layout.
 
   Two grouped sections:
-    CONFIGURE → Identity, Instructions, Tools, Knowledge, Detection
-    OPERATE   → History
+    CONFIGURE → Identity in create mode; all edit tabs once saved
+    OPERATE   → History in edit mode
 
   Active state from `route.name` (not path) — child routes are named
-  edit-ai-agent-{identity,instructions,…} for direct comparison.
+  edit-ai-agent-{identity,instructions,…} or agent-create-identity for
+  direct comparison.
 
   Header: back link to /ai/agents, agent name. The slug / enabled
   subtitle was removed — slug is a developer-facing field surfaced
@@ -27,16 +28,20 @@
       >
         <ChevronLeft class="w-3.5 h-3.5" />
       </router-link>
-        <span  class="text-md font-semibold text-foreground truncate">{{ agent?.name || '…' }}</span>
-      <div>
-        
-      </div>
+      <span class="text-md font-semibold text-foreground truncate">
+        {{ sidebarTitle }}
+      </span>
     </div>
 
     <!-- Scrollable groups -->
     <div class="flex-1 overflow-auto py-2">
-      <SidebarGroup label="Configure" :items="configureItems" :agent-id="agentId" />
-      <SidebarGroup label="Operate" :items="operateItems" :agent-id="agentId" />
+      <SidebarGroup label="Configure" :items="configureItems" :agent-id="props.agentId" />
+      <SidebarGroup
+        v-if="operateItems.length"
+        label="Operate"
+        :items="operateItems"
+        :agent-id="props.agentId"
+      />
     </div>
   </nav>
 </template>
@@ -44,41 +49,43 @@
 <script setup>
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  ChevronLeft,
-  IdCard,
-  MessageCircle,
-  Wrench,
-  BookOpen,
-  Filter,
-  History,
-} from 'lucide-vue-next'
 import SidebarGroup from './AgentEditSidebarGroup.vue'
 import { AGENT_EDIT_KEY } from '@/composables/useAgentEdit.js'
-
-defineProps({
-  agentId: { type: Number, required: true },
-})
-
+import { Comment, Wrench, AddressCard, BookOpen, ChevronLeft, Filter, ClockRotateLeft } from "@qall/icons"
 const { t } = useI18n()
 
 // Live agent record from useAgentEdit (provided by AgentEditLayout).
 // .value because useAgentEdit returns { agent: ref, ... }.
 const edit = inject(AGENT_EDIT_KEY)
 const agent = computed(() => edit?.agent.value)
+const props = defineProps({
+  agentId: { type: Number, default: null },
+  isCreateMode: { type: Boolean, default: false },
+})
+const sidebarTitle = computed(() =>
+  props.isCreateMode ? t('admin.ai.agent.newAgent') : agent.value?.name || '…'
+)
 
 // Configure / Operate group items. Each carries the i18n key, the
 // route name to navigate to, the lucide icon component, and an
 // optional badge slot (e.g., tool count) that the group renders.
-const configureItems = computed(() => [
-  { key: 'identity',     labelKey: 'admin.ai.agent.tab.identity',     icon: IdCard,        routeName: 'edit-ai-agent-identity' },
-  { key: 'instructions', labelKey: 'admin.ai.agent.tab.instructions', icon: MessageCircle, routeName: 'edit-ai-agent-instructions' },
-  { key: 'tools',        labelKey: 'admin.ai.agent.tab.tools',        icon: Wrench,        routeName: 'edit-ai-agent-tools' },
-  { key: 'knowledge',    labelKey: 'admin.ai.agent.tab.knowledge',    icon: BookOpen,      routeName: 'edit-ai-agent-knowledge' },
-  { key: 'detection',   labelKey: 'admin.ai.agent.tab.detection',   icon: Filter,        routeName: 'edit-ai-agent-detection' },
-])
+const configureItems = computed(() => {
+  const identity = { key: 'identity', labelKey: 'admin.ai.agent.tab.identity', icon: AddressCard, routeName: props.isCreateMode ? 'agent-create-identity' : 'edit-ai-agent-identity' }
 
-const operateItems = computed(() => [
-  { key: 'history', labelKey: 'admin.ai.agent.tab.history', icon: History, routeName: 'edit-ai-agent-history' },
-])
+  if (props.isCreateMode) return [identity]
+
+  return [
+    identity,
+    { key: 'instructions', labelKey: 'admin.ai.agent.tab.instructions', icon: Comment, routeName: 'edit-ai-agent-instructions' },
+    { key: 'tools',        labelKey: 'admin.ai.agent.tab.tools',        icon: Wrench,        routeName: 'edit-ai-agent-tools' },
+    { key: 'knowledge',    labelKey: 'admin.ai.agent.tab.knowledge',    icon: BookOpen,      routeName: 'edit-ai-agent-knowledge' },
+    { key: 'detection',    labelKey: 'admin.ai.agent.tab.detection',    icon: Filter,        routeName: 'edit-ai-agent-detection' },
+  ]
+})
+
+const operateItems = computed(() =>
+  props.isCreateMode
+    ? []
+    : [{ key: 'history', labelKey: 'admin.ai.agent.tab.history', icon: ClockRotateLeft, routeName: 'edit-ai-agent-history' }]
+)
 </script>

@@ -1,15 +1,16 @@
+<!-- frontend/apps/main/src/features/conversation/MacroActionsPreview.vue -->
 <template>
   <div class="flex flex-wrap">
     <div class="flex flex-wrap gap-2">
       <div
         v-for="action in actions"
         :key="action.type"
-        class="flex items-center border bg-background rounded transition-colors duration-150 hover:bg-accent/50 group gap-2"
+        class="flex items-center border bg-background rounded p-1 transition-colors duration-150 hover:bg-accent/50 group"
       >
         <div class="flex items-center space-x-2 px-2">
           <component
             :is="getIcon(action.type)"
-            size="16"
+            size="14"
             class="text-muted-foreground"
           />
           <Tooltip>
@@ -25,11 +26,12 @@
           </Tooltip>
         </div>
         <button
+          v-if="!readonly && onRemove"
           @click.prevent="onRemove(action)"
-          class="p-2 text-muted-foreground hover:text-destructive focus:outline-none rounded transition-colors duration-150"
+          class="p-1 rounded-md text-muted-foreground hover:text-destructive focus:outline-none transition-colors duration-150"
           title="Remove action"
         >
-          <X size="14" />
+          <X size="10" />
         </button>
       </div>
     </div>
@@ -37,7 +39,7 @@
 </template>
 
 <script setup>
-import { X, Users, User, MessageSquare, Tags, Flag } from 'lucide-vue-next'
+import { X, Users, User, Message, Tags, Flag } from '@qall/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 
@@ -48,7 +50,11 @@ defineProps({
   },
   onRemove: {
     type: Function,
-    required: true
+    default: null
+  },
+  readonly: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -57,7 +63,7 @@ const getIcon = (type) =>
   ({
     assign_team: Users,
     assign_user: User,
-    set_status: MessageSquare,
+    set_status: Message,
     set_priority: Flag,
     add_tags: Tags,
     set_tags: Tags,

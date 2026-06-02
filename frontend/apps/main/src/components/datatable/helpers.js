@@ -9,21 +9,23 @@ import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import { format, formatDistanceToNow, differenceInCalendarDays } from 'date-fns'
 import { Badge } from '@shared-ui/components/ui/badge'
+import { formatDateTime, formatDateTimeWithSeconds } from '@/utils/date'
 
 /**
  * linkCol — first-column router link.
  *
  *   linkCol(t, 'name', { to: (row) => ({ name: 'edit-webhook', params: { id: row.id } }) })
  */
-export function linkCol(t, key, { to, headerKey, ...rest } = {}) {
+export function linkCol(t, key, { to, headerKey, meta, ...rest } = {}) {
   const label = t(headerKey || `globals.terms.${key}`)
+  const align = alignClass(meta?.align)
   return {
     accessorKey: key,
-    header: () => h('div', { class: 'text-center' }, label),
+    header: () => h('div', { class: align }, label),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        { class: align },
         h(
           RouterLink,
           {
@@ -33,7 +35,7 @@ export function linkCol(t, key, { to, headerKey, ...rest } = {}) {
           () => row.getValue(key)
         )
       ),
-    meta: { label },
+    meta: { label, ...meta },
     ...rest,
   }
 }
@@ -45,22 +47,23 @@ export function linkCol(t, key, { to, headerKey, ...rest } = {}) {
  *   textCol(t, 'locale', { headerKey: 'admin.knowledge.locale.label',
  *     formatter: (v) => v?.toUpperCase() ?? '—' })
  */
-export function textCol(t, key, { headerKey, formatter, ...rest } = {}) {
+export function textCol(t, key, { headerKey, formatter, meta, ...rest } = {}) {
   const label = t(headerKey || `globals.terms.${snakeToCamel(key)}`)
+  const align = alignClass(meta?.align)
   return {
     accessorKey: key,
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, label),
+    header: () => h('div', { class: align }, label),
     cell: ({ row }) => {
       const v = row.getValue(key)
       const display = formatter ? formatter(v, t) : v ?? '—'
       return h(
         'div',
-        { class: 'text-center text-sm text-muted-foreground' },
+        { class: `${align} text-sm text-muted-foreground` },
         display
       )
     },
-    meta: { label },
+    meta: { label, ...meta },
     ...rest,
   }
 }
@@ -70,16 +73,17 @@ export function textCol(t, key, { headerKey, formatter, ...rest } = {}) {
  * for <7 days, absolute beyond, full timestamp on hover tooltip.
  * Date columns are excluded from global search by default.
  */
-export function dateCol(t, key, { mode = 'smart', headerKey, ...rest } = {}) {
+export function dateCol(t, key, { mode = 'smart', headerKey, meta, ...rest } = {}) {
   const label = t(headerKey || `globals.terms.${snakeToCamel(key)}`)
+  const align = alignClass(meta?.align)
   return {
     accessorKey: key,
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, label),
+    header: () => h('div', { class: align }, label),
     cell: ({ row }) => {
       const v = row.getValue(key)
       if (!v) {
-        return h('div', { class: 'text-center text-muted-foreground' }, '—')
+        return h('div', { class: `${align} text-muted-foreground` }, '—')
       }
       const d = new Date(v)
       const display =
@@ -88,14 +92,14 @@ export function dateCol(t, key, { mode = 'smart', headerKey, ...rest } = {}) {
           : mode === 'relative'
             ? formatDistanceToNow(d, { addSuffix: true })
             : smartFormat(d)
-      const tooltip = format(d, 'PPpp')
+      const tooltip = formatDateTime(d)
       return h(
         'div',
-        { class: 'text-center text-muted-foreground', title: tooltip },
+        { class: `${align} text-muted-foreground`, title: tooltip },
         display
       )
     },
-    meta: { label },
+    meta: { label, ...meta },
     ...rest,
   }
 }
@@ -108,15 +112,51 @@ function smartFormat(d) {
 }
 
 /**
- * badgeCol — status / boolean column rendered as a Badge. Excluded
- * from global search.
+ * dateTimeCol — absolute date+time column.
+ * Renders as "May 9, 2026, 14:45".
  */
-export function badgeCol(t, key, { variant, label: labelFn, headerKey, ...rest } = {}) {
-  const headerLabel = t(headerKey || `globals.terms.${key}`)
+export function dateTimeCol(t, key, { headerKey, meta, formatter = formatDateTime, ...rest } = {}) {
+  const label = t(headerKey || `globals.terms.${snakeToCamel(key)}`)
+  const align = alignClass(meta?.align)
   return {
     accessorKey: key,
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, headerLabel),
+    header: () => h('div', { class: align }, label),
+    cell: ({ row }) => {
+      const display = formatter(row.getValue(key))
+      return h(
+        'div',
+        { class: `${align} text-muted-foreground` },
+        display || '—'
+      )
+    },
+    meta: { label, ...meta },
+    ...rest,
+  }
+}
+
+/**
+ * dateTimeWithSecondsCol — audit/security date+time column.
+ * Renders as "May 9, 2026, 14:45:35".
+ */
+export function dateTimeWithSecondsCol(t, key, options = {}) {
+  return dateTimeCol(t, key, {
+    ...options,
+    formatter: options.formatter || formatDateTimeWithSeconds
+  })
+}
+
+/**
+ * badgeCol — status / boolean column rendered as a Badge. Excluded
+ * from global search.
+ */
+export function badgeCol(t, key, { variant, label: labelFn, headerKey, meta, ...rest } = {}) {
+  const headerLabel = t(headerKey || `globals.terms.${key}`)
+  const align = alignClass(meta?.align)
+  return {
+    accessorKey: key,
+    enableGlobalFilter: false,
+    header: () => h('div', { class: align }, headerLabel),
     cell: ({ row }) => {
       const v = row.getValue(key)
       const resolvedVariant =
@@ -125,7 +165,7 @@ export function badgeCol(t, key, { variant, label: labelFn, headerKey, ...rest }
         typeof labelFn === 'function' ? labelFn(v, t) : String(v ?? '')
       return h(
         'div',
-        { class: 'text-center' },
+        { class: align },
         h(
           Badge,
           { variant: resolvedVariant, class: 'text-xs' },
@@ -133,7 +173,7 @@ export function badgeCol(t, key, { variant, label: labelFn, headerKey, ...rest }
         )
       )
     },
-    meta: { label: headerLabel },
+    meta: { label: headerLabel, ...meta },
     ...rest,
   }
 }
@@ -158,4 +198,10 @@ export function actionsCol() {
 
 function snakeToCamel(s) {
   return String(s).replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+}
+
+function alignClass(align) {
+  if (align === 'right') return 'text-right'
+  if (align === 'center') return 'text-center'
+  return 'text-left'
 }

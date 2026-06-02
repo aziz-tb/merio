@@ -1,58 +1,50 @@
 import { h } from 'vue'
-import { RouterLink } from 'vue-router'
-import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
+import { actionsCol, dateTimeCol, linkCol } from '@/components/datatable/helpers.js'
+import { Roles } from '@/constants/user'
 
-export const createColumns = (t) => [
-  {
-    accessorKey: 'name',
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+export const createColumns = (t, { onDelete } = {}) => {
+  const actionColumn = actionsCol()
+
+  return [
+    linkCol(t, 'name', {
+      to: (row) => ({ name: 'edit-role', params: { id: row.id } })
+    }),
+    {
+      accessorKey: 'description',
+      header: () => t('globals.terms.description'),
+      cell: ({ row }) => row.getValue('description')
     },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
-        h(RouterLink,
+    dateTimeCol(t, 'created_at'),
+    {
+      ...actionColumn,
+      size: 72,
+      meta: {
+        ...actionColumn.meta,
+        align: 'right',
+        width: 72
+      },
+      cell: ({ row }) => {
+        const items = [
           {
-            to: { name: 'edit-role', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
-          },
-          () => row.getValue('name')
+            label: t('globals.messages.edit'),
+            to: { name: 'edit-role', params: { id: row.original.id } }
+          }
+        ]
+
+        if (!Roles.includes(row.original.name)) {
+          items.push({
+            label: t('globals.messages.delete'),
+            destructive: true,
+            confirm: t('role.deletionConfirmation'),
+            onClick: () => onDelete?.(row.original)
+          })
+        }
+
+        return h('div', { class: 'flex justify-end' },
+          h(DataTableRowActions, { items })
         )
-      )
+      }
     }
-  },
-  {
-    accessorKey: 'description',
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.description'))
-    },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('description'))
-    }
-  },
-  {
-    accessorKey: 'created_at',
-    enableGlobalFilter: false,
-    header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
-    },
-    cell: function ({ row }) {
-      return h('div', { class: 'text-center text-sm' }, format(row.getValue('created_at'), 'PPpp'))
-    }
-  },
-  {
-    id: 'actions',
-    enableHiding: false,
-    enableSorting: false,
-    cell: ({ row }) => {
-      const role = row.original
-      return h(
-        'div',
-        { class: 'relative' },
-        h(dropdown, {
-          role
-        })
-      )
-    }
-  }
-]
+  ]
+}

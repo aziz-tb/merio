@@ -2,7 +2,7 @@
   <div class="flex flex-col h-full">
     <Tabs default-value="details" class="flex flex-col h-full">
       <!-- Tab bar -->
-      <div class="flex items-center px-8 border-b border-border h-14 shrink-0">
+      <div class="flex items-center justify-between gap-3 pl-8 pr-3 border-b border-border h-14 shrink-0">
         <TabsList class="bg-transparent h-14 rounded-none  p-0 gap-5">
           <TabsTrigger
             value="details"
@@ -17,70 +17,116 @@
             {{ $t('composer.tabTitle') }}
           </TabsTrigger>
         </TabsList>
+
+        <div v-if="isConversationDrawerOpen" class="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7 text-muted-foreground hover:text-foreground [&_svg]:size-3.25"
+            :title="t('conversation.table.viewColumns')"
+            @click.stop="expandConversationDrawer"
+          >
+            <UpRightFromSquare class="mb-0.5" />
+            <span class="sr-only">{{ t('conversation.table.viewColumns') }}</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7 text-muted-foreground hover:text-foreground [&_svg]:size-[1.07rem]"
+            :title="t('globals.messages.close')"
+            @click.stop="closeConversationDrawer"
+          >
+            <LayoutRight />
+            <span class="sr-only">{{ t('globals.messages.close') }}</span>
+          </Button>
+        </div>
       </div>
 
       <!-- Details tab -->
       <TabsContent value="details" class="flex-1 overflow-y-auto m-0 p-4 space-y-3">
-        <!-- Contact mini-card -->
-        <ConversationSideBarContact class="pb-2" />
-
         <!-- Actions: agent, team, priority, tags -->
-        <Collapsible defaultOpen class="group/section border-t border-border pt-3">
-          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
-            <span>{{ t('globals.terms.action', 2) }}</span>
-            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
-          </CollapsibleTrigger>
-          <CollapsibleContent class="pt-3 space-y-3">
+        <div class="space-y-0 pb-1">
+          <SidebarField :label="t('conversation.sidebar.assignee')">
             <SelectComboBox
               v-model="conversationStore.current.assigned_user_id"
-              :items="[{ value: 'none', label: t('globals.terms.none') }, ...usersStore.options]"
-              :placeholder="t('placeholders.selectAgent')"
+              :items="[{ value: 'none', label: t('globals.terms.unassigned') }, ...usersStore.options]"
+              :placeholder="t('globals.terms.unassigned')"
               @select="selectAgent"
               type="user"
+              trigger-variant="inline"
+              button-class="px-0 py-0.5"
             />
+          </SidebarField>
+          <SidebarField :label="t('conversation.sidebar.teamInbox')">
             <SelectComboBox
               v-model="conversationStore.current.assigned_team_id"
-              :items="[{ value: 'none', label: t('globals.terms.none') }, ...teamsStore.options]"
-              :placeholder="t('placeholders.selectTeam')"
+              :items="[{ value: 'none', label: t('globals.terms.unassigned') }, ...teamsStore.options]"
+              :placeholder="t('globals.terms.unassigned')"
               @select="selectTeam"
               type="team"
+              trigger-variant="inline"
+              button-class="px-0 py-0.5"
             />
+          </SidebarField>
+          <SidebarField :label="t('conversation.sidebar.priority')">
             <SelectComboBox
               v-model="conversationStore.current.priority_id"
               :items="priorityOptions"
-              :placeholder="t('placeholders.selectPriority')"
+              :placeholder="t('globals.terms.none')"
               @select="selectPriority"
               type="priority"
+              trigger-variant="inline"
+              button-class="px-0 py-0.5"
             />
-            
-            <div class="relative">
-              <SelectTag
-                v-if="conversationStore.current"
-                v-model="conversationStore.current.tags"
-                :items="tagOptions"
-                :placeholder="t('placeholders.selectTags')"
-              />
+          </SidebarField>
+        </div>
 
-              <Button
-                v-if="conversationStore.current?.uuid"
-                variant="ghost"
-                size="icon"
-                class="absolute right-1 top-1 z-10 size-7 bg-background/80"
-                :disabled="reloading"
-                :title="t('tag.reload.tooltip')"
-                @click.stop="triggerReload"
-              >
-                <RefreshCw color="gray" :class="{ 'animate-spin': reloading }" />
-              </Button>
-            </div>
+        <div class="relative pb-1">
+          <SelectTag
+            v-if="conversationStore.current"
+            v-model="conversationStore.current.tags"
+            :items="tagOptions"
+            :placeholder="t('placeholders.selectTags')"
+          />
+
+          <Button
+            v-if="conversationStore.current?.uuid"
+            variant="ghost"
+            size="icon"
+            class="absolute right-1 top-1 z-10 size-7 bg-background/80 [&_svg]:size-3"
+            :disabled="reloading"
+            :title="t('tag.reload.tooltip')"
+            @click.stop="triggerReload"
+          >
+            <ArrowsRotate color="gray" :class="{ 'animate-spin': reloading }" />
+          </Button>
+        </div>
+
+        
+
+        <!-- Contact Details -->
+        <Collapsible defaultOpen class="group/section border-t border-border pt-3">
+          <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
+            <span class="flex items-center gap-2">
+              <component :is="contactStateIcon" :class="['size-4']" />
+              {{ t('conversation.contactData.title') }}
+            </span>
+            <ChevronDown class="size-3 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent class="pt-3">
+            <CustomerDetails />
           </CollapsibleContent>
         </Collapsible>
 
         <!-- Information -->
         <Collapsible defaultOpen class="group/section border-t border-border pt-3">
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
-            <span>{{ t('conversation.sidebar.information') }}</span>
-            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+            <span class="flex items-center gap-2">
+              <Ticket class="size-4" /> 
+              {{ t('conversation.sidebar.information') }}
+            </span>
+            <ChevronDown class="size-3 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
           </CollapsibleTrigger>
           <CollapsibleContent class="pt-3">
             <ConversationInfo />
@@ -94,8 +140,11 @@
           class="group/section border-t border-border pt-3"
         >
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
-            <span>{{ t('conversation.sidebar.contactAttributes') }}</span>
-            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+            <span class="flex items-center gap-2">
+              <User class="size-4" /> 
+              <span>{{ t('conversation.sidebar.contactAttributes') }}</span>
+            </span>
+            <ChevronDown class="size-3 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
           </CollapsibleTrigger>
           <CollapsibleContent class="pt-3">
             <CustomAttributes
@@ -114,7 +163,7 @@
         >
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
             <span>{{ t('conversation.sidebar.lastVisitedPages') }}</span>
-            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+            <ChevronDown class="size-3 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
           </CollapsibleTrigger>
           <CollapsibleContent class="pt-3">
             <ConversationSideBarPageVisits />
@@ -127,8 +176,11 @@
           class="group/section border-t border-border pt-3"
         >
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
-            <span>{{ t('globals.terms.note', 2) }}</span>
-            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+            <span class="flex items-center gap-2">
+              <Memo class="size-4" /> 
+              {{ t('globals.terms.note', 2) }}
+            </span>
+            <ChevronDown class="size-3 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
           </CollapsibleTrigger>
           <CollapsibleContent class="pt-3">
             <ContactNotes :contact-id="conversationStore.current.contact.id" compact />
@@ -138,8 +190,11 @@
         <!-- Previous conversations -->
         <Collapsible class="group/section border-t border-border pt-3">
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
-            <span>{{ t('conversation.sidebar.previousConvo') }}</span>
-            <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
+            <span class="flex items-center gap-2">
+              <MessageLines class="size-4" /> 
+              {{ t('conversation.sidebar.previousConvo') }}
+            </span>
+            <ChevronDown class="size-3 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
           </CollapsibleTrigger>
           <CollapsibleContent class="pt-3">
             <PreviousConversations />
@@ -167,14 +222,14 @@ import { useTagStore } from '@/stores/tag'
 import { useUserStore } from '@/stores/user'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@shared-ui/components/ui/collapsible'
-import { ChevronDown, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import ConversationInfo from './ConversationInfo.vue'
-import ConversationSideBarContact from '@/features/conversation/sidebar/ConversationSideBarContact.vue'
+import CustomerDetails from './CustomerDetails.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
+import { useWorkflowCompletion } from '@/composables/useWorkflowCompletion'
 import { useI18n } from 'vue-i18n'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
@@ -183,7 +238,19 @@ import PreviousConversations from '@/features/conversation/sidebar/PreviousConve
 import ConversationSideBarPageVisits from '@/features/conversation/sidebar/ConversationSideBarPageVisits.vue'
 import ComposerTab from '@/features/conversation/sidebar/ComposerTab.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
+import SidebarField from '@/features/conversation/sidebar/SidebarField.vue'
 import api from '../../../api'
+import { Memo, MessageLines, Ticket } from '@qall/icons'
+import { useConversationDrawer } from '@main/composables/useConversationDrawer'
+import {
+  LayoutRight,
+  UpRightFromSquare,
+  ChevronDown,
+  ArrowsRotate,
+  User,
+  UserCheckColored,
+  UserQuestionColored,
+} from '@qall/icons'
 
 const customAttributeStore = useCustomAttributeStore()
 const emitter = useEmitter()
@@ -192,6 +259,11 @@ const usersStore = useUsersStore()
 const teamsStore = useTeamStore()
 const tagStore = useTagStore()
 const userStore = useUserStore()
+const {
+  isConversationDrawerOpen,
+  closeConversationDrawer,
+  expandConversationDrawer
+} = useConversationDrawer()
 const tags = ref([])
 const reloadingUUID = ref('')
 const { t } = useI18n()
@@ -214,11 +286,9 @@ watch(
 
 onMounted(async () => {
   await fetchTags()
-  emitter.on(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, handleTagClassificationUpdate)
 })
 
 onUnmounted(() => {
-  emitter.off(EMITTER_EVENTS.TAG_CLASSIFICATION_UPDATE, handleTagClassificationUpdate)
   clearReloadTimeout()
 })
 
@@ -262,6 +332,12 @@ const tagOptions = computed(() => {
 // as a computed so the tab re-fetches when the page swaps tickets.
 const conversationUUID = computed(() => conversationStore.current?.uuid || '')
 const reloading = computed(() => reloadingUUID.value === conversationUUID.value)
+const contactStateIcon = computed(() => {
+  const verificationLevel = Number(conversationStore.current?.verification_level || 0)
+  if (verificationLevel >= 2) return UserCheckColored
+  if (verificationLevel > 0) return UserQuestionColored
+  return User
+})
 
 const fetchTags = async () => {
   await tagStore.fetchTags()
@@ -316,16 +392,20 @@ const clearReloadTimeout = () => {
   reloadTimeout = null
 }
 
-const handleTagClassificationUpdate = (update) => {
-  if (!update?.uuid || update.uuid !== reloadingUUID.value) return
-  stopReloading(update.uuid)
-  if (update.tag_classification?.status === 'failed') {
+const handleTagClassificationCompleted = async (event) => {
+  if (event.conversation_uuid === reloadingUUID.value) {
+    stopReloading(event.conversation_uuid)
+  }
+  await conversationStore.fetchConversation(event.conversation_uuid)
+  if (event.status === 'failed') {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
       description: t('tag.reload.failed')
     })
   }
 }
+
+useWorkflowCompletion('TAG_CLASSIFICATION_COMPLETED', conversationUUID, handleTagClassificationCompleted)
 
 const handleAssignedUserChange = (id) => {
   conversationStore.updateAssignee('user', {

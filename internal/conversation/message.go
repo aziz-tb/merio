@@ -33,7 +33,13 @@ const (
 	maxMessagesPerPage = 500
 	// Only allow visitor-to-contact upgrade within this window after the last continuity email.
 	upgradeWindowTTL = 7 * 24 * time.Hour
+
+	uniqueMessageSourceIDIndex = "index_unique_conversation_messages_on_source_id"
 )
+
+// ErrDuplicateMessageSourceID is returned when the DB-level inbound Message-ID
+// dedup guard catches a concurrent insert of the same source_id.
+var ErrDuplicateMessageSourceID = errors.New("duplicate message source_id")
 
 // Run starts a pool of worker goroutines to handle message dispatching via inbox's channel and processes incoming messages. It scans for
 // pending outgoing messages at the specified read interval and pushes them to the outgoing queue to be sent.
@@ -457,7 +463,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 
 // QueueReply queues a reply message in a conversation.
 // Named returns so the deferred B1 worklog hook can observe the final error.
-func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}) (message models.Message, err error) {
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}, sendInboxID *int) (message models.Message, err error) {
 	// B1 worklog. UUID-based start because the int conversation_id is not in
 	// scope here; the SQL resolves it inline. Errors are swallowed inside
 	// the helper — instrumentation must never alter action flow.
@@ -470,9 +476,14 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	})
 	defer func() { m.endWorklog(wlID, err) }()
 
-	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
+	effectiveInboxID := inboxID
+	if sendInboxID != nil {
+		effectiveInboxID = *sendInboxID
+	}
+
+	inboxRecord, err := m.inboxStore.GetDBRecord(effectiveInboxID)
 	if err != nil {
-		m.lo.Error("error fetching inbox record", "inbox_id", inboxID, "error", err)
+		m.lo.Error("error fetching inbox record", "inbox_id", effectiveInboxID, "error", err)
 		return models.Message{}, err
 	}
 
@@ -480,9 +491,17 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
 	}
 
+	if metaMap == nil {
+		metaMap = map[string]interface{}{}
+	}
+
 	var sourceID string
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
+		if _, exists := metaMap["from"]; !exists {
+			metaMap["from"] = []string{inboxRecord.From}
+		}
+
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
 		to = stringutil.RemoveEmpty(to)
 		cc = stringutil.RemoveEmpty(cc)
@@ -530,6 +549,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		Private:           false,
 		Media:             media,
 		SourceID:          null.StringFrom(sourceID),
+		SendInboxID:       null.IntFromPtr(sendInboxID),
 		MessageReceiverID: contactID,
 		Meta:              metaJSON,
 	}
@@ -562,8 +582,13 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 
 	// Insert Message.
 	if err := m.q.InsertMessage.Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
-		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
-		m.lo.Error("error inserting message in db", "error", err)
+		message.Private, message.ContentType, message.SourceID, message.Meta, message.SendInboxID); err != nil {
+		if isDuplicateMessageSourceIDError(err) {
+			return fmt.Errorf("%w: %s", ErrDuplicateMessageSourceID, message.SourceID.String)
+		}
+		if m.lo != nil {
+			m.lo.Error("error inserting message in db", "error", err)
+		}
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -610,6 +635,38 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	}
 
 	return nil
+}
+
+func isDuplicateMessageSourceIDError(err error) bool {
+	var pgErr *pq.Error
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return string(pgErr.Code) == "23505" && pgErr.Constraint == uniqueMessageSourceIDIndex
+}
+
+func (m *Manager) handleDuplicateIncomingMessage(in models.IncomingMessage, conversationID int, conversationUUID string, isNewConversation bool) {
+	sourceID := in.SourceID.String
+	if m.lo != nil {
+		m.lo.Info("duplicate message source_id detected; skipping inbound message", "source_id", sourceID, "conversation_id", conversationID)
+	}
+	if !isNewConversation || conversationUUID == "" {
+		return
+	}
+	if m.lo != nil {
+		m.lo.Info("deleting newly-created conversation after duplicate message source_id", "conversation_uuid", conversationUUID, "message_source_id", sourceID)
+	}
+	if err := m.cleanupOrphanedConversation(conversationUUID); err != nil && m.lo != nil {
+		m.lo.Warn("failed to clean up orphaned conversation after duplicate message source_id", "conversation_uuid", conversationUUID, "message_source_id", sourceID, "error", err)
+	}
+}
+
+// cleanupOrphanedConversation removes a conversation created for an inbound
+// message that could not be inserted. The conversations FKs cascade dependent
+// rows, matching the existing attachment-upload failure cleanup path.
+func (m *Manager) cleanupOrphanedConversation(conversationUUID string) error {
+	_, err := m.q.DeleteConversation.Exec(conversationUUID)
+	return err
 }
 
 // RecordAssigneeUserChange records an activity for a user assignee change.
@@ -797,6 +854,10 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Insert message.
 	if err = m.InsertMessage(&msg); err != nil {
+		if errors.Is(err, ErrDuplicateMessageSourceID) {
+			m.handleDuplicateIncomingMessage(in, conversationID, conversationUUID, isNewConversation)
+			return models.Message{}, nil
+		}
 		return models.Message{}, err
 	}
 

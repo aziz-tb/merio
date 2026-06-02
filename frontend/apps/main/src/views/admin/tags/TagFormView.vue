@@ -1,47 +1,35 @@
 <template>
-  <AdminSplitLayout>
-    <template #content>
-      <div class="mb-5">
-        <CustomBreadcrumb :links="breadcrumbLinks" />
+  <PageHeader />
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <div class="space-y-5">
+      <TagsForm
+        v-model="formData"
+        :tags="tags"
+        :slas="slas"
+        :priorities="priorities"
+        :is-editing="isEditing"
+        @submit="save"
+      />
+
+      <div class="flex justify-end gap-2 border-t border-border pt-4">
+        <Button type="button" variant="ghost" @click="goBack">
+          {{ t('globals.messages.cancel') }}
+        </Button>
+        <Button type="button" :isLoading="saving" @click="save">
+          {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
+        </Button>
       </div>
-
-      <LoadingOverlay :loading="isLoading" reserve-height>
-        <div class="space-y-5">
-          <TagsForm
-            v-model="formData"
-            :tags="tags"
-            :slas="slas"
-            :priorities="priorities"
-            :is-editing="isEditing"
-            @submit="save"
-          />
-
-          <div class="flex justify-end gap-2 border-t border-border pt-4">
-            <Button type="button" variant="ghost" @click="goBack">
-              {{ t('globals.messages.cancel') }}
-            </Button>
-            <Button type="button" :isLoading="saving" @click="save">
-              {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
-            </Button>
-          </div>
-        </div>
-      </LoadingOverlay>
-    </template>
-
-    <template #help>
-      <p>{{ $t('admin.tag.help') }}</p>
-    </template>
-  </AdminSplitLayout>
+    </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Button } from '@shared-ui/components/ui/button'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
+import PageHeader from '@main/components/layout/PageHeader.vue'
 import TagsForm from '@/features/admin/tags/TagsForm.vue'
 import { useTagStore } from '@/stores/tag'
 import { useEmitter } from '@/composables/useEmitter'
@@ -69,11 +57,6 @@ const slas = ref([])
 const priorities = ref([])
 
 const isEditing = computed(() => Boolean(props.id))
-const breadcrumbLinks = computed(() => [
-  { path: 'tags-list', label: t('globals.terms.tag', 2) },
-  { path: '', label: isEditing.value ? t('tag.edit') : t('tag.new') }
-])
-
 function defaultTag () {
   return {
     name: '',

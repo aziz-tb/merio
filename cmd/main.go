@@ -51,13 +51,15 @@ import (
 	// builtin.Default().
 	aicapabilities "github.com/abhinavxd/libredesk/internal/ai/tools/builtin/capabilities"
 	"github.com/abhinavxd/libredesk/internal/automation"
-	contextlink "github.com/abhinavxd/libredesk/internal/context_link"
+	"github.com/abhinavxd/libredesk/internal/contract"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/priority"
 	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	execrunner "github.com/abhinavxd/libredesk/internal/exec/runner"
 	exectoken "github.com/abhinavxd/libredesk/internal/exec/token"
+	"github.com/abhinavxd/libredesk/internal/function"
 	"github.com/abhinavxd/libredesk/internal/importer"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/knowledge"
@@ -65,6 +67,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
 	"github.com/abhinavxd/libredesk/internal/role"
+	"github.com/abhinavxd/libredesk/internal/secret"
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
@@ -73,6 +76,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/webhook"
 	"github.com/abhinavxd/libredesk/internal/worklog"
+	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -100,6 +104,7 @@ const (
 // App is the global app context which is passed and injected in the http handlers.
 type App struct {
 	ctx        context.Context
+	db         *sqlx.DB
 	fs         stuffbin.FileSystem
 	consts     atomic.Value
 	auth       *auth_.Auth
@@ -136,6 +141,10 @@ type App struct {
 	aiAgents         *aiagents.Manager
 	aiTools          *aitools.Manager
 	aiToolDispatcher *aitools.Dispatcher
+	function         *function.Manager
+	secret           *secret.Manager
+	customer         *customer.Manager
+	contract         *contract.Manager
 	aiExecutions     *aiexecutions.Manager
 	aiOperations     *aioperations.Manager
 	aiUsage          *aiusage.Manager
@@ -164,7 +173,6 @@ type App struct {
 	customAttribute  *customAttribute.Manager
 	report           *report.Manager
 	webhook          *webhook.Manager
-	contextLink      *contextlink.Manager
 	rateLimit        *ratelimit.Limiter
 	redis            *redis.Client
 	importer         *importer.Importer
@@ -197,6 +205,15 @@ func main() {
 	// Set up signal handler.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	if len(os.Args) > 1 && os.Args[1] == "secrets" {
+		runSecretsCLI(ctx, os.Args[2:])
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "dev-seed-inbound" {
+		runDevSeedInboundCLI(ctx, os.Args[2:])
+		return
+	}
 
 	// Load command line flags into Koanf.
 	initFlags()
@@ -289,9 +306,11 @@ func main() {
 		rdb                         = initRedis()
 		execTokenMgr                = initExecToken(rdb)
 		systemUserID                = initSystemUserID(db)
-		execRunnerMgr               = initExecRunner(db, execTokenMgr, systemUserID)
 		constants                   = initConstants()
 		i18n                        = initI18n(fs)
+		secretsKEK                  = initSecretsKEK()
+		secretMgr                   = initSecret(db, i18n, secretsKEK)
+		execRunnerMgr               = initExecRunner(db, execTokenMgr, systemUserID, secretMgr)
 		csat                        = initCSAT(db, i18n)
 		oidc                        = initOIDC(db, settings, i18n)
 		status                      = initStatus(db, i18n)
@@ -322,7 +341,10 @@ func main() {
 		systemInboxIDInst = initSystemInboxID(db)
 		detectionMgrInst  = initDetectionManager(aiProviderInst, aiUsageInst, systemInboxIDInst)
 		temporalClient    = initTemporal()
-		automation        = initAutomationEngine(db, i18n, detectionMgrInst)
+		functionMgr       = initFunction(db, execRunnerMgr, i18n)
+		customerMgr       = initCustomer(db, i18n, settings, functionMgr)
+		contractMgr       = initContract(db, i18n, settings, functionMgr, customerMgr)
+		automation        = initAutomationEngine(db, i18n, detectionMgrInst, customerMgr, contractMgr)
 		conversation      = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher, temporalClient)
 		autoassigner      = initAutoAssigner(team, user, conversation)
 		// F12: hybrid-search subsystem. Each piece is independently
@@ -367,6 +389,7 @@ func main() {
 
 	var app = &App{
 		ctx:             ctx,
+		db:              db,
 		lo:              lo,
 		fs:              fs,
 		sla:             sla,
@@ -404,6 +427,10 @@ func main() {
 		ai:              initAI(db, i18n),
 		aiAgents:        initAIAgents(db, i18n),
 		aiTools:         initAITools(db, i18n),
+		function:        functionMgr,
+		secret:          secretMgr,
+		customer:        customerMgr,
+		contract:        contractMgr,
 		aiExecutions:    initAIExecutions(db, i18n),
 		aiOperations:    aiOperationsInst,
 		aiUsage:         aiUsageInst,
@@ -417,7 +444,6 @@ func main() {
 		aiToolDispatcher: nil, // assigned below — see line just after this struct literal
 		importer:         initImporter(i18n),
 		webhook:          webhook,
-		contextLink:      initContextLink(db, i18n),
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		userNotification: userNotification,
@@ -450,7 +476,7 @@ func main() {
 	startRealtimeBridge(ctx, rdb, wsHub, initLogger("realtime"))
 	// Wire the AI tool dispatcher now that App is built — it needs both
 	// the tools manager and the execRunner.
-	app.aiToolDispatcher = aitools.NewDispatcher(app.aiTools, app.execRunner)
+	app.aiToolDispatcher = aitools.NewDispatcher(app.aiTools, app.execRunner, app.function)
 	// Wire the agent runner — depends on the dispatcher above. Returns
 	// nil when the Anthropic provider isn't configured; the run endpoint
 	// returns 503 in that case.
@@ -463,6 +489,8 @@ func main() {
 		app.knowledge,
 		app.conversation,
 		app.user,
+		app.customer,
+		app.contract,
 		app.aiUsage,
 		app.aiRunEvents,
 	)

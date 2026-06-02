@@ -8,6 +8,8 @@ import (
 
 	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
 	"github.com/abhinavxd/libredesk/internal/ai/operations/payloads"
+	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
+	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
 	"github.com/abhinavxd/libredesk/internal/detection"
 	"github.com/volatiletech/null/v9"
 )
@@ -58,6 +60,22 @@ func (a *Activities) ValidateAgentsActivity(ctx context.Context, input Input) (O
 		Conversation: conv,
 		Tags:         conv.TagSlugs(),
 		TraceID:      traceID,
+	}
+	if conv.CustomerID.Valid && a.CustomerMgr != nil {
+		customer, err := a.CustomerMgr.GetFreshByCustomerID(ctx, conv.CustomerID.String, customerpkg.FreshOptions{})
+		if err != nil {
+			a.Lo.Warn("agentvalidation: failed to hydrate customer for detection", "conversation_uuid", conv.UUID, "customer_id", conv.CustomerID.String, "error", err)
+		} else {
+			ec.Customer = customer
+		}
+	}
+	if conv.ContractID.Valid && a.ContractMgr != nil {
+		contract, err := a.ContractMgr.GetFreshByContractID(ctx, conv.ContractID.String, contractpkg.FreshOptions{})
+		if err != nil {
+			a.Lo.Warn("agentvalidation: failed to hydrate contract for detection", "conversation_uuid", conv.UUID, "contract_id", conv.ContractID.String, "error", err)
+		} else {
+			ec.Contract = contract
+		}
 	}
 
 	matchingIDs := make([]int, 0)
@@ -120,7 +138,7 @@ func (a *Activities) ValidateAgentsActivity(ctx context.Context, input Input) (O
 		return Output{}, fmt.Errorf("insert ai_operation: %w", err)
 	}
 
-	if err := a.publishValidationCompleted(ctx, conv.UUID, opID, matchingIDs); err != nil {
+	if err := a.publishValidationCompleted(ctx, conv.UUID, statusSuccess, traceID, ""); err != nil {
 		a.Lo.Warn("publish agent validation update failed", "conversation_uuid", conv.UUID, "error", err)
 	}
 
@@ -169,7 +187,7 @@ func (a *Activities) persistSkipped(ctx context.Context, convID int, convUUID st
 	if err != nil {
 		return 0, fmt.Errorf("insert skipped ai_operation: %w", err)
 	}
-	if err := a.publishValidationCompleted(ctx, convUUID, opID, []int{}); err != nil {
+	if err := a.publishValidationCompleted(ctx, convUUID, statusSkipped, traceID, ""); err != nil {
 		a.Lo.Warn("publish skipped agent validation update failed", "conversation_uuid", convUUID, "error", err)
 	}
 	return opID, nil
