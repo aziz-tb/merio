@@ -40,6 +40,20 @@ FROM tags t
 LEFT JOIN users u ON u.id = t.updated_by
 WHERE t.id = $1;
 
+-- name: get-by-id
+SELECT
+    t.id, t.created_at, t.updated_at, t.name, t.parent_id, t.type, t.color,
+    t.visibility, t.description, t.detection, t.sla_policy_id, t.priority_id,
+    t.updated_by,
+    '' AS updated_by_name
+FROM tags t
+WHERE t.id = $1;
+
+-- name: get-by-parent-id
+SELECT t.id, t.name
+FROM tags t
+WHERE t.parent_id = $1;
+
 -- name: insert
 INSERT INTO tags (
     name, parent_id, type, color, visibility, description, detection,

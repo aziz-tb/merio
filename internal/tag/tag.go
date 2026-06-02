@@ -2,7 +2,9 @@
 package tag
 
 import (
+	"database/sql"
 	"embed"
+	"errors"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -37,6 +39,8 @@ type queries struct {
 	GetPublicTags               *sqlx.Stmt `query:"get-public"`
 	GetEnabledForClassification *sqlx.Stmt `query:"get-enabled-for-classification"`
 	GetTag                      *sqlx.Stmt `query:"get"`
+	GetTagByID                  *sqlx.Stmt `query:"get-by-id"`
+	GetTagsByParentID           *sqlx.Stmt `query:"get-by-parent-id"`
 	InsertTag                   *sqlx.Stmt `query:"insert"`
 	DeleteTag                   *sqlx.Stmt `query:"delete"`
 	UpdateTag                   *sqlx.Stmt `query:"update"`
@@ -89,6 +93,10 @@ func (t *Manager) Get(id int) (models.Tag, error) {
 // Create creates a new tag.
 func (t *Manager) Create(tag models.Tag, userID int) (models.Tag, error) {
 	tag.SetDefaults()
+	if err := t.validateParent(0, tag.ParentID); err != nil {
+		return models.Tag{}, err
+	}
+
 	var created models.Tag
 	if err := t.q.InsertTag.Get(&created,
 		tag.Name,
@@ -123,6 +131,20 @@ func (t *Manager) Delete(id int) error {
 // Update updates a tag by ID.
 func (t *Manager) Update(id int, tag models.Tag, userID int) (models.Tag, error) {
 	tag.SetDefaults()
+	if err := t.validateParent(id, tag.ParentID); err != nil {
+		return models.Tag{}, err
+	}
+	if tag.ParentID.Valid {
+		children, err := t.getChildren(id)
+		if err != nil {
+			t.lo.Error("error fetching child tags for validation", "tag_id", id, "error", err)
+			return models.Tag{}, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
+		}
+		if len(children) > 0 {
+			return models.Tag{}, envelope.NewError(envelope.InputError, t.i18n.T("admin.tags.errors.hasChildren"), nil)
+		}
+	}
+
 	var updated models.Tag
 	if err := t.q.UpdateTag.Get(&updated,
 		id,
@@ -169,4 +191,36 @@ func nullOrPositiveInt(v int) any {
 		return nil
 	}
 	return v
+}
+
+// validateParent rejects parent assignments that would create cycles or
+// violate the one-level nesting rule.
+func (t *Manager) validateParent(tagID int, parentID null.Int) error {
+	if !parentID.Valid {
+		return nil
+	}
+	if tagID != 0 && parentID.Int == tagID {
+		return envelope.NewError(envelope.InputError, t.i18n.T("admin.tags.errors.selfParent"), nil)
+	}
+
+	var parent models.Tag
+	if err := t.q.GetTagByID.Get(&parent, parentID.Int); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return envelope.NewError(envelope.InputError, t.i18n.T("admin.tags.errors.parentNotFound"), nil)
+		}
+		t.lo.Error("error fetching parent tag for validation", "tag_id", parentID.Int, "error", err)
+		return envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if parent.ParentID.Valid {
+		return envelope.NewError(envelope.InputError, t.i18n.T("admin.tags.errors.parentHasParent"), nil)
+	}
+	return nil
+}
+
+func (t *Manager) getChildren(parentID int) ([]models.Tag, error) {
+	var children []models.Tag
+	if err := t.q.GetTagsByParentID.Select(&children, parentID); err != nil {
+		return nil, err
+	}
+	return children, nil
 }
