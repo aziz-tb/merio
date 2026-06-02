@@ -51,7 +51,7 @@
 
           <div class="space-y-2">
             <Label>{{ t('admin.customerIdentification.field.excludedEmailDomains') }}</Label>
-            <Input v-model="form.excluded_email_domains_text" placeholder="rabot.energy, rabot-charge.de" @keydown.enter.prevent />
+            <Input v-model="form.excluded_email_domains_text" placeholder="example.com, acme-gmbh.de" @keydown.enter.prevent />
             <p class="text-xs text-muted-foreground">
               {{ t('admin.customerIdentification.field.excludedEmailDomainsHelp') }}
             </p>

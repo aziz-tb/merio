@@ -6,7 +6,7 @@
         class="inline-flex items-center justify-center size-9 rounded-md hover:bg-accent"
       >
         <div class="relative">
-          <Avatar class="h-8 w-8 rounded bg-white">
+          <Avatar class="h-8 w-8 rounded-3xl bg-primary/10">
             <AvatarImage :src="userStore.avatar" alt="U" class="rounded" />
             <AvatarFallback class="rounded">
               {{ userStore.getInitials }}
@@ -24,8 +24,8 @@
       class="min-w-56"
       side="right"
       align="end"
-      :side-offset="8"
-      :align-offset="40"
+      :side-offset="5"
+      :align-offset="15"
     >
       <DropdownMenuLabel class="font-normal space-y-2 px-2">
         <!-- User header -->

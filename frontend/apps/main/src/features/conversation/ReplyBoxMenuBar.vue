@@ -30,6 +30,7 @@
       >
         <Paperclip class="h-4 w-4" />
       </Toggle>
+      <!-- 
       <Toggle
         class="px-2 py-2 border-0"
         variant="outline"
@@ -38,6 +39,7 @@
       >
         <Smile class="h-4 w-4" />
       </Toggle>
+        -->
     </div>
     <Button class="h-8 w-auto" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
       {{ sendLabel }}

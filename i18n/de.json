@@ -1349,7 +1349,7 @@
   "admin.customerIdentification.field.regexHelp": "Beispiel: (?:contract|vertrag)\\s*#?\\s*(\\d+)",
   "admin.customerIdentification.field.llmExtractionEnabled": "LLM-Extraktion aktivieren",
   "admin.customerIdentification.field.excludedEmailDomains": "Ausgeschlossene E-Mail-Domains",
-  "admin.customerIdentification.field.excludedEmailDomainsHelp": "Kommagetrennt, z.B. rabot.energy, rabot-charge.de",
+  "admin.customerIdentification.field.excludedEmailDomainsHelp": "Kommagetrennt, z.B. example.com, acme-gmbh.de",
   "admin.customerIdentification.searchParameters.key": "Schlüssel",
   "admin.customerIdentification.searchParameters.datatype": "Typ",
   "admin.customerIdentification.searchParameters.description": "Beschreibung",
