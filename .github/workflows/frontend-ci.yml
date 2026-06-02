@@ -15,11 +15,11 @@ jobs:
         ports:
           - 5433:5432
         env:
-          POSTGRES_USER: libredesk
-          POSTGRES_PASSWORD: libredesk
-          POSTGRES_DB: libredesk
+          POSTGRES_USER: merio
+          POSTGRES_PASSWORD: merio
+          POSTGRES_DB: merio
         options: >-
-          --health-cmd="pg_isready -U libredesk"
+          --health-cmd="pg_isready -U merio"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -61,11 +61,11 @@ jobs:
 
       - name: Install db schema and run tests
         env:
-          LIBREDESK_SYSTEM_USER_PASSWORD: "StrongPass!123"
+          MERIO_SYSTEM_USER_PASSWORD: "StrongPass!123"
         run: |
-          ./libredesk --install --idempotent-install --yes --config ./config.toml
-          ./libredesk --upgrade --yes --config ./config.toml
-          ./libredesk --config ./config.toml &
+          ./merio --install --idempotent-install --yes --config ./config.toml
+          ./merio --upgrade --yes --config ./config.toml
+          ./merio --config ./config.toml &
           sleep 10
           cd frontend
           pnpm run test:e2e:ci
