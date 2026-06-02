@@ -1,3 +1,4 @@
+<!-- frontend/apps/main/src/features/conversation/ReplyBoxMenuBar.vue -->
 <template>
   <div
     class="flex justify-between h-14 relative"
@@ -7,7 +8,7 @@
       ref="emojiPickerRef"
       :native="true"
       @select="onSelectEmoji"
-      class="absolute bottom-14 left-14"
+      class="absolute bottom-14 left-14 z-50"
       v-if="isEmojiPickerVisible"
     />
     <div class="flex justify-items-start gap-2">
@@ -38,14 +39,14 @@
         <Smile class="h-4 w-4" />
       </Toggle>
     </div>
-    <Button class="h-8 w-6 px-8" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
+    <Button class="h-8 w-auto" @click="handleSend" :disabled="!enableSend" :isLoading="isSending" v-if="showSendButton">
       {{ sendLabel }}
     </Button>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, onUnmounted } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
@@ -66,7 +67,7 @@ const attachmentInput = ref(null)
 // const inlineImageInput = ref(null)
 const isEmojiPickerVisible = ref(false)
 const emojiPickerRef = ref(null)
-const emit = defineEmits(['emojiSelect'])
+const emit = defineEmits(['emojiSelect', 'composerOverlayChange', 'suppressOutsideCollapse'])
 
 // Using defineProps for props that don't need two-way binding
 const props = defineProps({
@@ -94,8 +95,19 @@ const sendLabel = computed(() => {
   return t('globals.messages.send')
 })
 
+watch(isEmojiPickerVisible, (open) => {
+  emit('composerOverlayChange', 'emoji-picker', open)
+})
+
 onClickOutside(emojiPickerRef, () => {
+  if (isEmojiPickerVisible.value) {
+    emit('suppressOutsideCollapse')
+  }
   isEmojiPickerVisible.value = false
+})
+
+onUnmounted(() => {
+  emit('composerOverlayChange', 'emoji-picker', false)
 })
 
 const triggerFileUpload = () => {

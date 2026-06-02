@@ -7,7 +7,10 @@
       class="bg-background p-1 box will-change-transform"
     >
       <div class="flex space-x-1 items-center">
-        <DropdownMenu v-if="aiPrompts.length > 0">
+        <DropdownMenu
+          v-if="aiPrompts.length > 0"
+          @update:open="(open) => emitComposerOverlayChange('editor-ai-menu', open)"
+        >
           <DropdownMenuTrigger>
             <Button size="sm" variant="ghost" class="flex items-center justify-center">
               <span class="flex items-center">
@@ -17,7 +20,7 @@
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent>
+          <DropdownMenuContent @pointerDownOutside="emitSuppressOutsideCollapse">
             <DropdownMenuItem
               v-for="prompt in aiPrompts"
               :key="prompt.key"
@@ -73,7 +76,10 @@
     <EditorContent :editor="editor" class="native-html" />
 
     <Dialog v-model:open="showLinkDialog">
-      <DialogContent class="sm:max-w-[425px]">
+      <DialogContent
+        class="sm:max-w-[425px]"
+        @pointerDownOutside="emitSuppressOutsideCollapse"
+      >
         <DialogHeader>
           <DialogTitle>
             {{
@@ -153,6 +159,7 @@ import { useTypingIndicator } from '@shared-ui/composables'
 import { useConversationStore } from '@main/stores/conversation'
 import { useFileDropAttachments } from '@main/composables/useFileDropAttachments'
 import mentionSuggestion from './mentionSuggestion'
+import macroSuggestion from './macroSuggestion'
 
 const textContent = defineModel('textContent', { default: '' })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -182,19 +189,44 @@ const props = defineProps({
   getSuggestions: {
     type: Function,
     default: null
+  },
+  getMacros: {
+    type: Function,
+    default: () => []
+  },
+  onMacroPicked: {
+    type: Function,
+    default: () => {}
   }
 })
 
-const emit = defineEmits(['send', 'aiPromptSelected', 'mentionsChanged', 'files-dropped'])
+const emit = defineEmits([
+  'send',
+  'aiPromptSelected',
+  'mentionsChanged',
+  'files-dropped',
+  'composerOverlayChange',
+  'suppressOutsideCollapse'
+])
 
 const emitPrompt = (key) => emit('aiPromptSelected', key)
+const emitComposerOverlayChange = (name, open) => {
+  emit('composerOverlayChange', name, open)
+}
+const emitSuppressOutsideCollapse = () => {
+  emit('suppressOutsideCollapse')
+}
 const { handleDrop } = useFileDropAttachments((files) => emit('files-dropped', files))
+
+watch(showLinkDialog, (open) => {
+  emitComposerOverlayChange('editor-link-dialog', open)
+})
 
 // Set up typing indicator
 const conversationStore = useConversationStore()
 const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping, {
   get isPrivateMessage() { return props.messageType === 'private_note' }
-}) 
+})
 
 // To preseve the table styling in emails, need to set the table style inline.
 // Created these custom extensions to set the table style inline.
@@ -271,7 +303,10 @@ const buildExtensions = () => {
       HTMLAttributes: {
         class: 'ld-mention'
       },
-      suggestion: mentionSuggestion
+      suggestions: [
+        mentionSuggestion,
+        macroSuggestion
+      ]
     })
   ]
 
@@ -310,7 +345,16 @@ const editor = useEditor({
   content: htmlContent.value,
   editorProps: {
     attributes: { class: 'outline-none' },
-    getSuggestions: props.getSuggestions,
+    getSuggestions: (...args) => props.getSuggestions?.(...args) ?? [],
+    getMacros: (...args) => props.getMacros?.(...args),
+    onMacroPicked: (...args) => props.onMacroPicked?.(...args),
+    get messageType() {
+      return props.messageType
+    },
+    onComposerOverlayChange: (name, open) => {
+      emitComposerOverlayChange(`editor-${name}`, open)
+    },
+    onSuppressOutsideCollapse: emitSuppressOutsideCollapse,
     handleDrop,
     handleKeyDown: (view, event) => {
       if (event.ctrlKey && event.key.toLowerCase() === 'b') {
@@ -367,6 +411,10 @@ watch(
 )
 
 onUnmounted(() => {
+  emitComposerOverlayChange('editor-ai-menu', false)
+  emitComposerOverlayChange('editor-link-dialog', false)
+  emitComposerOverlayChange('editor-mention-suggestion', false)
+  emitComposerOverlayChange('editor-macro-suggestion', false)
   editor.value?.destroy()
 })
 

@@ -1,41 +1,92 @@
+<!-- frontend/apps/main/src/features/conversation/ReplyBoxContent.vue -->
 <template>
   <!-- Set fixed width only when not in fullscreen. -->
   <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen }">
-    <!-- Top row: compact mode dropdown (reply / forward / private note) on the left,
-         fullscreen toggle on the right. The dropdown label tracks the active messageType. -->
+    <!-- Top row: mode dropdown (reply / forward / private note) on the left,
+         collapsed recipients summary inline next to it (email channels only),
+         fullscreen toggle on the right. -->
     <div
       class="flex justify-between items-center"
       :class="{ 'mb-1': !isFullscreen, 'border-b border-border pb-2': isFullscreen }"
     >
-      <div class="flex items-center gap-2">
-        <DropdownMenu>
+      <div class="flex items-center gap-3 min-w-0">
+        <DropdownMenu @update:open="(open) => emitComposerOverlayChange('mode-menu', open)">
           <DropdownMenuTrigger as-child>
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 p-1 rounded text-sm font-semibold hover:bg-accent transition-colors"
+              class="inline-flex  items-center gap-1.5 p-1 rounded text-sm font-semibold hover:bg-accent transition-colors"
               :class="messageType === 'private_note' ? 'text-amber-700' : 'text-foreground'"
             >
               <component :is="modeIcon" class="size-4" />
               <span>{{ modeLabel }}</span>
-              <ChevronDown class="size-3.5 opacity-60" />
+              <ChevronDown class="size-4 opacity-60" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" class="w-44">
+          <DropdownMenuContent
+            align="start"
+            class="w-44"
+            @pointerDownOutside="emitSuppressOutsideCollapse"
+          >
             <DropdownMenuItem @click="setMode('reply')">
-              <MessageSquare class="size-4 mr-2" />
+              <Message class="size-4 mr-2" />
               <span>{{ $t('globals.terms.reply') }}</span>
             </DropdownMenuItem>
             <DropdownMenuItem v-if="canForward" @click="setMode('forward')">
-              <MessageSquareShare class="size-4 mr-2" />
+              <MessageArrowUpRight class="size-4 mr-2" />
               <span>{{ $t('globals.terms.forward') }}</span>
             </DropdownMenuItem>
             <DropdownMenuItem @click="setMode('private_note')">
-              <MessageSquareText class="size-4 mr-2" />
+              <MessageLines class="size-4 mr-2" />
               <span>{{ $t('globals.terms.privateNote') }}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <!-- Forward status chip: live count of <div data-source-uuid> blocks still in the editor. -->
+
+        <!-- Collapsed recipients summary. Only renders when recipients are
+             not expanded AND this is an email-channel reply or forward. -->
+        <button
+          v-if="showRecipientsSummary"
+          type="button"
+          class="inline-flex min-w-0 items-center truncate text-sm text-muted-foreground hover:text-blue-500 transition-colors"
+          :title="recipientsSummaryTitle"
+          @click.stop="expandRecipients"
+        >
+          <span class="truncate">{{ recipientsSummary }}</span>
+        </button>
+
+        <DropdownMenu
+          v-if="showInboxSelector && !isRecipientsExpanded"
+          @update:open="(open) => emitComposerOverlayChange('compact-inbox-menu', open)"
+        >
+          <DropdownMenuTrigger as-child>
+            <button
+              type="button"
+              class="inline-flex min-w-0 items-center truncate text-sm text-muted-foreground hover:text-blue-500 transition-colors"
+              :title="selectedInbox?.from || ''"
+            >
+              <span class="truncate">{{ selectedInbox?.name || $t('replyBox.selectInbox') }}</span>
+              <ChevronDown class="size-3.5 ml-1 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            class="w-72"
+            @pointerDownOutside="emitSuppressOutsideCollapse"
+          >
+            <DropdownMenuItem
+              v-for="inbox in availableSendInboxes"
+              :key="inbox.id"
+              @click="selectedInboxId = inbox.id"
+            >
+              <div class="flex flex-col">
+                <span class="text-sm font-medium">{{ inbox.name }}</span>
+                <span class="text-xs text-muted-foreground">{{ inbox.from }}</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <!-- Forward status chip: live count of forwarded sources still in the editor. -->
         <span
           v-if="messageType === 'forward' && forwardSourceCount > 0"
           class="inline-flex items-center text-xs text-muted-foreground bg-muted/50 rounded px-2 py-0.5"
@@ -48,12 +99,34 @@
       </Button>
     </div>
 
-    <!-- To, CC, and BCC fields. Visible in reply + forward modes (email channel only). -->
-    <div v-if="conversationStore.current.inbox_channel === 'email'">
+    <!-- TO, CC, and BCC inputs. Visible in reply + forward modes (email channel only)
+         when recipients are expanded. Otherwise the collapsed summary above shows them. -->
+    <div v-if="conversationStore.current.inbox_channel === INBOX_CHANNEL.EMAIL && isRecipientsExpanded">
       <div
         :class="['space-y-3', isFullscreen ? 'p-4 border-b border-border' : 'mb-4']"
         v-if="messageType === 'reply' || messageType === 'forward'"
       >
+        <div v-if="showInboxSelector" class="flex items-center space-x-2">
+          <label class="w-12 text-sm font-medium text-muted-foreground">{{ $t('replyBox.fromLabel') }}:</label>
+          <Select
+            :model-value="selectedInboxId ? String(selectedInboxId) : ''"
+            @update:model-value="(v) => selectedInboxId = v ? Number(v) : null"
+            @update:open="(open) => emitComposerOverlayChange('from-select', open)"
+          >
+            <SelectTrigger class="flex-grow">
+              <SelectValue :placeholder="$t('replyBox.selectInbox')" />
+            </SelectTrigger>
+            <SelectContent @pointerDownOutside="emitSuppressOutsideCollapse">
+              <SelectItem
+                v-for="inbox in availableSendInboxes"
+                :key="inbox.id"
+                :value="String(inbox.id)"
+              >
+                {{ inbox.name }} ({{ inbox.from }})
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div class="flex items-center space-x-2">
           <label class="w-12 text-sm font-medium text-muted-foreground">TO:</label>
           <Input
@@ -123,10 +196,14 @@
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
         :getSuggestions="getSuggestions"
+        :getMacros="getMacros"
+        :onMacroPicked="onMacroPicked"
         @aiPromptSelected="handleAiPromptSelected"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @files-dropped="handleFilesDropped"
+        @composerOverlayChange="emitComposerOverlayChange"
+        @suppressOutsideCollapse="emitSuppressOutsideCollapse"
       />
     </div>
 
@@ -164,7 +241,7 @@
           :title="$t('globals.messages.remove')"
           class="absolute top-2 right-2 inline-flex items-center justify-center size-6 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors z-10"
         >
-          <X class="size-3.5" />
+          <X class="size-4" />
         </button>
         <div class="native-html text-sm" v-html="sourcePreviewHTML(source)" />
       </div>
@@ -180,6 +257,8 @@
       :enableSend="enableSend"
       :handleSend="handleSend"
       @emojiSelect="handleEmojiSelect"
+      @composerOverlayChange="emitComposerOverlayChange"
+      @suppressOutsideCollapse="emitSuppressOutsideCollapse"
     />
   </div>
 </template>
@@ -188,17 +267,17 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { INBOX_CHANNEL } from '@main/constants/inbox'
 import {
   Maximize2,
   Minimize2,
-  MessageSquareText,
-  MessageSquare,
-  MessageSquareShare,
   ChevronDown,
   X
 } from 'lucide-vue-next'
+import { Message, MessageArrowUpRight, MessageLines } from "@qall/icons"
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useConversationStore } from '@main/stores/conversation'
+import { useInboxStore } from '@main/stores/inbox'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -207,6 +286,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@shared-ui/components/ui/select'
 import { useEmitter } from '@main/composables/useEmitter'
 import AttachmentsPreview from '@/features/conversation/message/attachment/AttachmentsPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
@@ -219,6 +305,7 @@ import { useUsersStore } from '@main/stores/users'
 import { useTeamStore } from '@main/stores/team'
 
 const messageType = defineModel('messageType', { default: 'reply' })
+const selectedInboxId = defineModel('selectedInboxId', { default: null })
 const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
 const bcc = defineModel('bcc', { default: '' })
@@ -231,6 +318,12 @@ const mentions = defineModel('mentions', { default: () => [] })
 // Sources to forward — populated when entering Forward mode, cleared on send/exit.
 // Kept out of the Tiptap editor so email HTML doesn't get stripped by ProseMirror's parser.
 const forwardedSources = defineModel('forwardedSources', { default: () => [] })
+
+// Recipients expanded state — when false, the TO/CC/BCC inputs are hidden
+// and a compact summary is shown next to the mode dropdown. Owned by the
+// parent ReplyBox so it can collapse on click-outside / Escape.
+const isRecipientsExpanded = defineModel('isRecipientsExpanded', { default: false })
+
 const macroStore = useMacroStore()
 const usersStore = useUsersStore()
 const teamStore = useTeamStore()
@@ -266,6 +359,25 @@ const getSuggestions = async (query) => {
     }))
 
   return [...users, ...teams].slice(0, 25)
+}
+
+const getMacros = async (query) => {
+  if (messageType.value === 'forward') return []
+
+  await macroStore.loadMacros()
+
+  const q = query.toLowerCase()
+  const filtered = macroStore.macroOptions.filter((m) =>
+    (m.name || '').toLowerCase().includes(q)
+  )
+
+  return [...filtered].sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0))
+}
+
+const onMacroPicked = (macro) => {
+  const plainMacro = JSON.parse(JSON.stringify(macro))
+  plainMacro._inserted_from_editor = true
+  conversationStore.setMacro(plainMacro, MACRO_CONTEXT.REPLY)
 }
 
 // Handle mentions changed from editor
@@ -309,24 +421,35 @@ const emit = defineEmits([
   'inlineImageUpload',
   'fileDelete',
   'aiPromptSelected',
-  'filesDropped'
+  'filesDropped',
+  'composerOverlayChange',
+  'suppressOutsideCollapse'
 ])
 
 const conversationStore = useConversationStore()
+const inboxStore = useInboxStore()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
 const editorRef = ref(null)
 
+const emitComposerOverlayChange = (name, open) => {
+  emit('composerOverlayChange', name, open)
+}
+
+const emitSuppressOutsideCollapse = () => {
+  emit('suppressOutsideCollapse')
+}
+
 // Mode dropdown state. Reply, Forward, and Private Note are all persistent modes.
 const canForward = computed(
-  () => conversationStore.current?.inbox_channel === 'email'
+  () => conversationStore.current?.inbox_channel === INBOX_CHANNEL.EMAIL
 )
 
 const modeIcon = computed(() => {
-  if (messageType.value === 'private_note') return MessageSquareText
-  if (messageType.value === 'forward') return MessageSquareShare
-  return MessageSquare
+  if (messageType.value === 'private_note') return MessageLines
+  if (messageType.value === 'forward') return MessageArrowUpRight
+  return Message
 })
 
 const modeLabel = computed(() => {
@@ -345,6 +468,18 @@ const forwardSourceCount = computed(() =>
   messageType.value === 'forward' ? forwardedSources.value.length : 0
 )
 
+const availableSendInboxes = computed(() => inboxStore.emailInboxesEnabled)
+
+const showInboxSelector = computed(() => {
+  if (conversationStore.current?.inbox_channel !== INBOX_CHANNEL.EMAIL) return false
+  if (messageType.value !== 'reply' && messageType.value !== 'forward') return false
+  return availableSendInboxes.value.length >= 2
+})
+
+const selectedInbox = computed(() =>
+  availableSendInboxes.value.find((inbox) => Number(inbox.id) === Number(selectedInboxId.value))
+)
+
 // Renders one source's HTML for the non-editable preview and at send time.
 // Pure helper imported from forwardBody.js — kept out of Tiptap so email HTML survives.
 const sourcePreviewHTML = (source) => buildForwardSourceHTML(source)
@@ -352,6 +487,61 @@ const sourcePreviewHTML = (source) => buildForwardSourceHTML(source)
 // Drop a single source from the forward preview when the user clicks its X button.
 const removeSource = (uuid) => {
   forwardedSources.value = forwardedSources.value.filter((s) => s.uuid !== uuid)
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Collapsed recipients summary. Renders next to the mode dropdown
+// when recipients aren't expanded. Shows "To: x@y.com +N" where N is
+// the total of all other recipients across TO, CC, BCC.
+// ──────────────────────────────────────────────────────────────────
+const parseList = (s) =>
+  s
+    ? s
+        .split(',')
+        .map((e) => e.trim())
+        .filter(Boolean)
+    : []
+
+const toList = computed(() => parseList(to.value))
+const ccList = computed(() => parseList(cc.value))
+const bccList = computed(() => parseList(bcc.value))
+
+const allRecipientsCount = computed(
+  () => toList.value.length + ccList.value.length + bccList.value.length
+)
+
+const showRecipientsSummary = computed(() => {
+  if (conversationStore.current?.inbox_channel !== INBOX_CHANNEL.EMAIL) return false
+  if (messageType.value !== 'reply' && messageType.value !== 'forward') return false
+  if (isRecipientsExpanded.value) return false
+  return true
+})
+
+const recipientsSummary = computed(() => {
+  const first = toList.value[0]
+  if (!first) {
+    return t('replyBox.addRecipient')
+  }
+  const remaining = allRecipientsCount.value - 1
+  if (remaining <= 0) return `${first}`
+  return `${first} +${remaining}`
+})
+
+const recipientsSummaryTitle = computed(() => {
+  const parts = []
+  if (toList.value.length) parts.push(`To: ${toList.value.join(', ')}`)
+  if (ccList.value.length) parts.push(`Cc: ${ccList.value.join(', ')}`)
+  if (bccList.value.length) parts.push(`Bcc: ${bccList.value.join(', ')}`)
+  return parts.join(' · ') || t('replyBox.addRecipient')
+})
+
+const expandRecipients = async () => {
+  isRecipientsExpanded.value = true
+  await nextTick()
+  // Focus the editor again rather than yanking focus into the TO input.
+  // The user clicked the summary to see the inputs, not necessarily to
+  // start editing the recipient list — they can click into the input
+  // themselves if needed.
 }
 
 // Tracks the previous mode so we only run forward-entry / forward-exit side-effects once
@@ -382,6 +572,10 @@ const setMode = (mode) => {
     bcc.value = ''
     showCc.value = false
     showBcc.value = false
+    // Forward starts with recipients expanded — the user always needs to
+    // fill in the new TO, so showing the input immediately is friendlier
+    // than making them click the summary first.
+    isRecipientsExpanded.value = true
     // Empty editor for the agent's note. Forwarded sources live in their own state and get
     // concatenated at send time — keeping them out of Tiptap avoids ProseMirror stripping
     // the email HTML during parse.

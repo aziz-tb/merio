@@ -17,9 +17,11 @@ export default {
   render: () => {
     let component
     let popup
+    let editor
 
     return {
       onStart: (props) => {
+        editor = props.editor
         component = new VueRenderer(MentionList, {
           props: {
             ...props,
@@ -36,10 +38,18 @@ export default {
         popup = document.createElement('div')
         popup.style.position = 'fixed'
         popup.style.zIndex = '9999'
+        popup.addEventListener(
+          'pointerdown',
+          () => {
+            editor?.options.editorProps?.onSuppressOutsideCollapse?.()
+          },
+          { capture: true }
+        )
         if (component.element) {
           popup.appendChild(component.element)
         }
         document.body.appendChild(popup)
+        editor?.options.editorProps?.onComposerOverlayChange?.('mention-suggestion', true)
 
         // Position the popup
         updatePosition(popup, props.clientRect)
@@ -70,6 +80,7 @@ export default {
       },
 
       onExit: () => {
+        editor?.options.editorProps?.onComposerOverlayChange?.('mention-suggestion', false)
         if (popup && popup.parentNode) {
           popup.parentNode.removeChild(popup)
         }

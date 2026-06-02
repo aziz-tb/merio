@@ -45,7 +45,8 @@ const isDraftEmpty = (draft) => {
   const hasInlineImage = /<img\b/i.test(content)
   const hasAttachments = draft.meta?.attachments?.length > 0
   const hasMacroActions = draft.meta?.macro_actions?.length > 0
-  return textContent.length === 0 && !hasInlineImage && !hasAttachments && !hasMacroActions
+  const hasSendInboxId = draft.meta?.send_inbox_id != null
+  return textContent.length === 0 && !hasInlineImage && !hasAttachments && !hasMacroActions && !hasSendInboxId
 }
 
 /**
@@ -64,6 +65,7 @@ export function useDraftManager (key, uploadedFiles = null) {
   const skipNextSave = ref(false)
   const loadedAttachments = ref([])
   const loadedMacroActions = ref([])
+  const sendInboxId = ref(null)
   const isTransitioning = ref(false)
 
   // Reactive localStorage for all drafts
@@ -80,6 +82,12 @@ export function useDraftManager (key, uploadedFiles = null) {
       draftMeta.macro_actions = macroActions
     } else {
       delete draftMeta.macro_actions
+    }
+
+    if (sendInboxId.value != null) {
+      draftMeta.send_inbox_id = Number(sendInboxId.value)
+    } else {
+      delete draftMeta.send_inbox_id
     }
 
     // Set only required attachment fields
@@ -150,6 +158,7 @@ export function useDraftManager (key, uploadedFiles = null) {
     isDirty.value = false
     loadedAttachments.value = []
     loadedMacroActions.value = []
+    sendInboxId.value = null
   }
 
   /**
@@ -191,6 +200,7 @@ export function useDraftManager (key, uploadedFiles = null) {
       textContent.value = ''
       loadedAttachments.value = validateAttachments(meta.attachments)
       loadedMacroActions.value = validateMacroActions(meta.macro_actions)
+      sendInboxId.value = meta.send_inbox_id ?? null
     } catch (error) {
       resetState()
     } finally {
@@ -246,6 +256,7 @@ export function useDraftManager (key, uploadedFiles = null) {
   const watchSources = [
     htmlContent,
     textContent,
+    sendInboxId,
     () => conversationStore.macros[MACRO_CONTEXT.REPLY]
   ]
   if (uploadedFiles) {
@@ -281,6 +292,7 @@ export function useDraftManager (key, uploadedFiles = null) {
     isLoading,
     clearDraft,
     loadedAttachments,
-    loadedMacroActions
+    loadedMacroActions,
+    sendInboxId
   }
 }
