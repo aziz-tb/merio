@@ -143,6 +143,10 @@ type ConversationListItem struct {
 	LastInteractionSender null.String             `db:"last_interaction_sender" json:"last_interaction_sender"`
 	NextSLADeadlineAt     null.Time               `db:"next_sla_deadline_at" json:"next_sla_deadline_at"`
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
+	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
+	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
+	Tags                  null.JSON               `db:"tags" json:"tags"`
+	TagIDs                null.JSON               `db:"tag_ids" json:"tag_ids"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`
@@ -373,6 +377,7 @@ type Message struct {
 	SenderID          int                    `db:"sender_id" json:"sender_id"`
 	SenderType        string                 `db:"sender_type" json:"sender_type"`
 	InboxID           int                    `db:"inbox_id" json:"-"`
+	SendInboxID       null.Int               `db:"send_inbox_id" json:"send_inbox_id"`
 	Meta              json.RawMessage        `db:"meta" json:"meta"`
 	Attachments       attachment.Attachments `db:"attachments" json:"attachments"`
 	From              string                 `db:"from"  json:"-"`

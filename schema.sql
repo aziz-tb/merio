@@ -294,6 +294,7 @@ CREATE TABLE conversation_messages (
     "content" TEXT NULL,
 	text_content TEXT NULL,
     source_id TEXT NULL,
+    send_inbox_id INT REFERENCES inboxes(id) ON DELETE RESTRICT ON UPDATE CASCADE NULL,
  	sender_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
     sender_type message_sender_type NOT NULL,
     meta JSONB DEFAULT '{}'::JSONB NULL
@@ -302,6 +303,7 @@ CREATE INDEX index_trgm_conversation_messages_on_text_content ON conversation_me
 CREATE INDEX index_conversation_messages_on_conversation_id ON conversation_messages (conversation_id);
 CREATE INDEX index_conversation_messages_on_created_at ON conversation_messages (created_at);
 CREATE UNIQUE INDEX index_unique_conversation_messages_on_source_id ON conversation_messages (source_id) WHERE source_id IS NOT NULL;
+CREATE INDEX index_conversation_messages_on_send_inbox_id ON conversation_messages (send_inbox_id) WHERE send_inbox_id IS NOT NULL;
 CREATE INDEX index_conversation_messages_on_status ON conversation_messages (status);
 CREATE INDEX index_conversation_messages_on_conversation_id_and_created_at ON conversation_messages (conversation_id, created_at);
 

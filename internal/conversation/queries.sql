@@ -77,6 +77,22 @@ SELECT
     conversations.last_interaction_sender,
     conversations.next_sla_deadline_at,
     conversations.priority_id,
+    conversations.assigned_user_id,
+    conversations.assigned_team_id,
+    (SELECT COALESCE(
+        (SELECT json_agg(t.name)
+        FROM tags t
+        INNER JOIN conversation_tags ct ON ct.tag_id = t.id
+        WHERE ct.conversation_id = conversations.id),
+        '[]'::json
+    )) AS tags,
+    (SELECT COALESCE(
+        (SELECT json_agg(t.id)
+        FROM tags t
+        INNER JOIN conversation_tags ct ON ct.tag_id = t.id
+        WHERE ct.conversation_id = conversations.id),
+        '[]'::json
+    )) AS tag_ids,
     (
     SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
     FROM (
@@ -620,6 +636,7 @@ SELECT
     m.private,
     m.sender_type,
     m.sender_id,
+    m.send_inbox_id,
     m.meta,
     c.uuid as conversation_uuid,
     m.content_type,
@@ -628,7 +645,7 @@ SELECT
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'cc')) AS cc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'bcc')) AS bcc,
     ARRAY(SELECT jsonb_array_elements_text(m.meta->'to')) AS to,
-    c.inbox_id,
+    COALESCE(m.send_inbox_id, c.inbox_id) AS inbox_id,
     c.uuid as conversation_uuid,
     c.subject,
     c.contact_id as message_receiver_id,
@@ -653,6 +670,7 @@ SELECT
     m.private,
     m.sender_type,
     m.sender_id,
+    m.send_inbox_id,
     m.meta,
     c.uuid as conversation_uuid,
     u.id AS "author.id",
@@ -702,6 +720,7 @@ SELECT
    m.private,
    m.sender_id,
    m.sender_type,
+   m.send_inbox_id,
    m.meta,
    $1::uuid AS conversation_uuid,
    u.id AS "author.id",
@@ -748,11 +767,11 @@ inserted_msg AS (
    INSERT INTO conversation_messages (
        "type", status, conversation_id, "content",
        text_content, sender_id, sender_type, private,
-       content_type, source_id, meta
+       content_type, source_id, meta, send_inbox_id
    )
    VALUES (
        $1, $2, (SELECT id FROM conversation_id),
-       $5, $6, $7, $8, $9, $10, $11, $12
+       $5, $6, $7, $8, $9, $10, $11, $12, $13
    )
    RETURNING *
 )

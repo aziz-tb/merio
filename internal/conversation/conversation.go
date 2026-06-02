@@ -1438,6 +1438,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			nil,
 			nil,
 			map[string]any{"is_automated": true}, /**meta**/
+			nil,                                  /**sendInboxID**/
 		)
 		if err != nil {
 			return fmt.Errorf("sending reply: %w", err)
@@ -1538,7 +1539,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	}
 
 	// Send CSAT reply.
-	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, meta)
+	_, err = m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, []string{conversation.Contact.Email.String}, nil, nil, meta, nil /**sendInboxID**/)
 	if err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

@@ -463,7 +463,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 
 // QueueReply queues a reply message in a conversation.
 // Named returns so the deferred B1 worklog hook can observe the final error.
-func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}) (message models.Message, err error) {
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}, sendInboxID *int) (message models.Message, err error) {
 	// B1 worklog. UUID-based start because the int conversation_id is not in
 	// scope here; the SQL resolves it inline. Errors are swallowed inside
 	// the helper — instrumentation must never alter action flow.
@@ -476,9 +476,14 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	})
 	defer func() { m.endWorklog(wlID, err) }()
 
-	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
+	effectiveInboxID := inboxID
+	if sendInboxID != nil {
+		effectiveInboxID = *sendInboxID
+	}
+
+	inboxRecord, err := m.inboxStore.GetDBRecord(effectiveInboxID)
 	if err != nil {
-		m.lo.Error("error fetching inbox record", "inbox_id", inboxID, "error", err)
+		m.lo.Error("error fetching inbox record", "inbox_id", effectiveInboxID, "error", err)
 		return models.Message{}, err
 	}
 
@@ -486,9 +491,17 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
 	}
 
+	if metaMap == nil {
+		metaMap = map[string]interface{}{}
+	}
+
 	var sourceID string
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
+		if _, exists := metaMap["from"]; !exists {
+			metaMap["from"] = []string{inboxRecord.From}
+		}
+
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
 		to = stringutil.RemoveEmpty(to)
 		cc = stringutil.RemoveEmpty(cc)
@@ -536,6 +549,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		Private:           false,
 		Media:             media,
 		SourceID:          null.StringFrom(sourceID),
+		SendInboxID:       null.IntFromPtr(sendInboxID),
 		MessageReceiverID: contactID,
 		Meta:              metaJSON,
 	}
@@ -568,7 +582,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 
 	// Insert Message.
 	if err := m.q.InsertMessage.Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
-		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
+		message.Private, message.ContentType, message.SourceID, message.Meta, message.SendInboxID); err != nil {
 		if isDuplicateMessageSourceIDError(err) {
 			return fmt.Errorf("%w: %s", ErrDuplicateMessageSourceID, message.SourceID.String)
 		}

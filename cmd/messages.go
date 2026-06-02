@@ -13,6 +13,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wlmodels "github.com/abhinavxd/libredesk/internal/worklog/models"
@@ -32,6 +33,7 @@ type forwardReq struct {
 	Body         string   `json:"body"`
 	SkipQuote    bool     `json:"skip_quote"`
 	Comment      string   `json:"comment"`
+	SendInboxID  *int     `json:"send_inbox_id,omitempty"`
 }
 
 type messageReq struct {
@@ -43,7 +45,42 @@ type messageReq struct {
 	BCC         []string               `json:"bcc"`
 	SenderType  string                 `json:"sender_type"`
 	Mentions    []cmodels.MentionInput `json:"mentions"`
+	SendInboxID *int                   `json:"send_inbox_id,omitempty"`
 	EchoID      string                 `json:"echo_id"`
+}
+
+const (
+	errSendInboxOverridePrivate      = "send_inbox_id cannot be used for private notes"
+	errSendInboxOverrideContact      = "send_inbox_id cannot be used when sending as contact"
+	errSendInboxOverrideConversation = "send_inbox_id can only be used on email conversations"
+	errSendInboxOverrideInbox        = "send_inbox_id must reference an email inbox"
+)
+
+func resolveSendInboxOverride(sendInboxID *int, private bool, senderType, conversationChannel, disabledInboxMessage string, getInbox func(any) (imodels.Inbox, error)) (*int, error) {
+	if sendInboxID == nil {
+		return nil, nil
+	}
+	if private {
+		return nil, envelope.NewError(envelope.InputError, errSendInboxOverridePrivate, nil)
+	}
+	if senderType == umodels.UserTypeContact {
+		return nil, envelope.NewError(envelope.InputError, errSendInboxOverrideContact, nil)
+	}
+	if conversationChannel != inbox.ChannelEmail {
+		return nil, envelope.NewError(envelope.InputError, errSendInboxOverrideConversation, nil)
+	}
+
+	sendInbox, err := getInbox(*sendInboxID)
+	if err != nil {
+		return nil, err
+	}
+	if !sendInbox.Enabled {
+		return nil, envelope.NewError(envelope.InputError, disabledInboxMessage, nil)
+	}
+	if sendInbox.Channel != inbox.ChannelEmail {
+		return nil, envelope.NewError(envelope.InputError, errSendInboxOverrideInbox, nil)
+	}
+	return &sendInbox.ID, nil
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -262,6 +299,11 @@ func handleSendMessage(r *fastglue.Request) error {
 		}
 	}
 
+	sendInboxID, err := resolveSendInboxOverride(req.SendInboxID, req.Private, req.SenderType, inbox.Channel, app.i18n.T("status.disabledInbox"), app.inbox.GetDBRecord)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
 	// Get media for all attachments, skip any already associated with a model.
 	media, err := getUnassociatedMedia(app, req.Attachments)
 	if err != nil {
@@ -290,7 +332,7 @@ func handleSendMessage(r *fastglue.Request) error {
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
 	}
-	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta)
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta, sendInboxID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -347,6 +389,11 @@ func handleForwardMessage(r *fastglue.Request) error {
 	// v1 constraint: email-only.
 	if inboxRecord.Channel != inbox.ChannelEmail {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Forwarding is only supported on email conversations.", nil, envelope.InputError)
+	}
+
+	sendInboxID, err := resolveSendInboxOverride(req.SendInboxID, false, umodels.UserTypeAgent, inboxRecord.Channel, app.i18n.T("status.disabledInbox"), app.inbox.GetDBRecord)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 
 	// Resolve source UUIDs: prefer body field, fall back to URL path for legacy single-source callers.
@@ -439,7 +486,7 @@ func handleForwardMessage(r *fastglue.Request) error {
 		"forwarded_from_list": forwardedUUIDs,
 	}
 
-	newMsg, err := app.conversation.QueueReply(clonedMedia, conv.InboxID, user.ID, conv.ContactID, cuuid, body, req.To, req.CC, req.BCC, meta)
+	newMsg, err := app.conversation.QueueReply(clonedMedia, conv.InboxID, user.ID, conv.ContactID, cuuid, body, req.To, req.CC, req.BCC, meta, sendInboxID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
