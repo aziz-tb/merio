@@ -14,39 +14,26 @@ builds:
     env:
       - CGO_ENABLED=0
     goos:
-      - darwin
-      - freebsd
       - linux
-      - netbsd
-      - openbsd
-      - windows
     goarch:
       - amd64
       - arm64
-      - arm
-    goarm:
-      - 6
-      - 7
-    binary: 'merio{{ if eq .Os "windows" }}.exe{{ end }}'
+    binary: 'merio'
     ldflags:
       - -s -w -X "main.buildString={{ .Tag }} ({{ .ShortCommit }} {{ .Date }}, {{ .Os }}/{{ .Arch }})" -X "main.versionString={{ .Tag }}"
     hooks:
       post: make stuff BIN={{ .Path }}
 
-  # Temporal worker binary. Built independently of the main app so it
-  # can be deployed + scaled on its own cadence. See docs/temporal.md.
-  # No stuffbin embedding — the worker has no static assets.
   - id: "temporal-worker"
     main: ./cmd/temporal_worker
     env:
       - CGO_ENABLED=0
     goos:
-      - darwin
       - linux
     goarch:
       - amd64
       - arm64
-    binary: 'temporal-worker{{ if eq .Os "windows" }}.exe{{ end }}'
+    binary: 'temporal-worker'
     ldflags:
       - -s -w
 
