@@ -1,98 +1,64 @@
 <template>
-  <Collapsible defaultOpen class="group/section border-t border-border pt-3">
-    <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
-      <span class="flex items-center gap-2">
-        <component :is="stateIcon" :class="['size-4']" />
-        {{ t('conversation.contactData.title') }}
-      </span>
-      <ChevronDown class="size-4 text-muted-foreground transition-transform group-data-[state=closed]/section:-rotate-90" />
-    </CollapsibleTrigger>
-    <CollapsibleContent class="pt-3">
-      <div v-if="!customer" class="mb-3 rounded-md border border-input bg-background p-3">
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex min-w-0 items-start gap-2">
-            <Avatar class="mt-1 size-8">
-              <AvatarImage v-if="contactAvatar" :src="contactAvatar" :alt="contactName" />
-              <AvatarFallback>
-                <User class="size-4 text-muted-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <div class="min-w-0 flex-1">
-              <template v-if="!customer">
-                <router-link
-                  v-if="canOpenContact"
-                  :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
-                  class="inline-flex max-w-full min-w-0 items-center gap-1"
-                >
-                  <div class="min-w-0">
-                    <p class="flex truncate text-sm font-medium text-foreground decoration-1 underline-offset-2 hover:underline">
-                      {{ contactName }}
-                      <ExternalLink class="size-2.5 ml-2 mt-1 shrink-0 text-muted-foreground" />
-                    </p>
-                    <p class="truncate text-xs text-muted-foreground decoration-1 underline-offset-2 hover:underline">
-                      {{ contactEmail || t('conversation.sidebar.notAvailable') }}
-                    </p>
-                  </div>
-                  
-                </router-link>
-                <div v-else class="min-w-0">
-                  <p class="truncate text-xs text-muted-foreground">
-                    {{ contactEmail || t('conversation.sidebar.notAvailable') }}
-                  </p>
-                </div>
-              </template>
 
-              <template v-else>
-                <router-link
-                  v-if="canOpenContact"
-                  :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
-                  class="group/contact mt-2 inline-flex max-w-full min-w-0 items-center gap-1"
-                >
-                  <p class="truncate text-xs font-medium text-muted-foreground decoration-1 underline-offset-2 group-hover/contact:underline">
-                    {{ contactEmail || t('conversation.sidebar.notAvailable') }}
-                  </p>
-                  <ExternalLink class="size-2.5 ml-2 shrink-0 text-muted-foreground" />
-                </router-link>
-                <div v-else class="min-w-0">
-                  <p class="mt-2 truncate text-xs font-medium text-muted-foreground">
-                    {{ contactEmail || t('conversation.sidebar.notAvailable') }}
-                  </p>
-                </div>
-              </template>
+      <!-- Unlinked contact: avatar + name + email + contact-detail rows -->
+      <div v-if="!customer" class="mb-3 space-y-3 rounded-md border border-input bg-background p-3">
+        <div class="flex min-w-0 items-start gap-2">
+          <Avatar class="mt-1 size-8">
+            <AvatarImage v-if="contactAvatar" :src="contactAvatar" :alt="contactName" />
+            <AvatarFallback>
+              <User class="size-4 text-muted-foreground" />
+            </AvatarFallback>
+          </Avatar>
+          <div class="min-w-0 flex-1">
+            <router-link
+              v-if="canOpenContact"
+              :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
+              class="inline-flex max-w-full min-w-0 items-center gap-1"
+            >
+              <div class="min-w-0">
+                <p class="flex truncate text-sm font-medium text-foreground decoration-1 underline-offset-2 hover:underline">
+                  {{ contactName }}
+                  <ExternalLink class="size-2.5 ml-2 mt-1 shrink-0 text-muted-foreground" />
+                </p>
+                <p class="truncate text-xs text-muted-foreground decoration-1 underline-offset-2 hover:underline">
+                  {{ contactEmail || t('conversation.sidebar.notAvailable') }}
+                </p>
+              </div>
+            </router-link>
+            <div v-else class="min-w-0">
+              <p class="truncate text-sm font-medium text-foreground">{{ contactName }}</p>
+              <p class="truncate text-xs text-muted-foreground">
+                {{ contactEmail || t('conversation.sidebar.notAvailable') }}
+              </p>
             </div>
           </div>
         </div>
 
-        <Collapsible v-if="hasContactDetails" class="group/contactDetails mt-3 border-t border-border pt-2">
-          <CollapsibleTrigger class="flex w-full items-center justify-between text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-            <span>{{ t('conversation.contactData.moreDetails') }}</span>
-            <ChevronDown class="size-3.5 transition-transform group-data-[state=closed]/contactDetails:-rotate-90" />
-          </CollapsibleTrigger>
-          <CollapsibleContent class="mt-2 space-y-2 text-xs">
-            <div v-if="phoneNumber" class="flex items-center gap-2">
-              <Phone class="size-3.5 shrink-0 text-muted-foreground" />
-              <span class="min-w-0 truncate text-foreground">{{ phoneNumber }}</span>
+        <!-- Contact detail rows (always visible when present, no longer collapsible) -->
+        <div v-if="hasContactDetails" class="space-y-2 border-t border-border pt-2 text-xs">
+          <div v-if="phoneNumber" class="flex items-center gap-2">
+            <Phone class="size-4 shrink-0 text-muted-foreground" />
+            <span class="min-w-0 truncate text-foreground">{{ phoneNumber }}</span>
+          </div>
+          <div v-if="stringValue(contact.external_user_id)" class="flex items-center gap-2">
+            <IdCard class="size-4 shrink-0 text-muted-foreground" />
+            <span class="min-w-0 truncate text-foreground">{{ stringValue(contact.external_user_id) }}</span>
+          </div>
+          <template v-if="isLivechat">
+            <div v-if="countryName" class="flex items-center gap-2">
+              <Globe class="size-4 shrink-0 text-muted-foreground" />
+              <span class="min-w-0 truncate text-foreground">{{ countryName }}</span>
             </div>
-            <div v-if="stringValue(contact.external_user_id)" class="flex items-center gap-2">
-              <IdCard class="size-3.5 shrink-0 text-muted-foreground" />
-              <span class="min-w-0 truncate text-foreground">{{ stringValue(contact.external_user_id) }}</span>
+            <div v-if="conversation.meta?.ip" class="flex items-center gap-2">
+              <Monitor class="size-4 shrink-0 text-muted-foreground" />
+              <span class="min-w-0 truncate text-foreground">{{ conversation.meta.ip }}</span>
             </div>
-            <template v-if="isLivechat">
-              <div v-if="countryName" class="flex items-center gap-2">
-                <Globe class="size-3.5 shrink-0 text-muted-foreground" />
-                <span class="min-w-0 truncate text-foreground">{{ countryName }}</span>
-              </div>
-              <div v-if="conversation.meta?.ip" class="flex items-center gap-2">
-                <Monitor class="size-3.5 shrink-0 text-muted-foreground" />
-                <span class="min-w-0 truncate text-foreground">{{ conversation.meta.ip }}</span>
-              </div>
-              <div v-if="parsedUA" class="flex items-center gap-2">
-                <Smartphone class="size-3.5 shrink-0 text-muted-foreground" />
-                <span class="min-w-0 truncate text-foreground">{{ parsedUA }}</span>
-              </div>
-            </template>
-          </CollapsibleContent>
-        </Collapsible>
+            <div v-if="parsedUA" class="flex items-center gap-2">
+              <Smartphone class="size-4 shrink-0 text-muted-foreground" />
+              <span class="min-w-0 truncate text-foreground">{{ parsedUA }}</span>
+            </div>
+          </template>
+        </div>
       </div>
 
       <ConflictInfoPanel
@@ -108,7 +74,7 @@
           v-if="running"
           class="rounded-md border border-input bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground"
         >
-          <Loader2 class="mx-auto mb-2 size-4 animate-spin" />
+          <Loader class="mx-auto mb-2 size-4 animate-spin" />
           {{ t('conversation.customer.searching') }}
         </div>
 
@@ -117,7 +83,7 @@
             <PopoverAnchor as-child>
               <div ref="searchRow" class="flex items-center gap-1.5">
                 <div class="relative min-w-0 flex-1">
-                  <Search class="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Search class="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     v-model="searchQuery"
                     class="h-8 pl-8 text-xs"
@@ -139,12 +105,12 @@
                       type="button"
                       size="icon"
                       variant="ghost"
-                      class="size-8"
+                      class="size-8 [&_svg]:size-3"
                       :disabled="startingIdentification"
                       @click="reIdentify"
                     >
-                      <Loader2 v-if="startingIdentification" class="size-4 animate-spin" />
-                      <RefreshCw v-else class="size-4" />
+                      <Loader v-if="startingIdentification" class="size-4 animate-spin" />
+                      <ArrowsRotate v-else class="size-3 text-gray-500"  />
                       <span class="sr-only">{{ t('conversation.customer.reIdentify') }}</span>
                     </Button>
                   </TooltipTrigger>
@@ -153,12 +119,29 @@
               </div>
             </PopoverAnchor>
 
-            <FailurePanel
+            <!-- Inline failure panel (was previously a render function) -->
+            <div
               v-if="visiblePanel"
-              :title="visiblePanel.title"
-              :message="visiblePanel.message"
-              @dismiss="dismissPanel"
-            />
+              class="rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-100"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex min-w-0 gap-2">
+                  <AlertTriangle class="mt-0.5 size-4 shrink-0" />
+                  <div class="min-w-0">
+                    <p class="font-medium">{{ visiblePanel.title }}</p>
+                    <p v-if="visiblePanel.message" class="mt-1 whitespace-pre-wrap break-words">{{ visiblePanel.message }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="rounded p-0.5 text-yellow-800 hover:bg-yellow-100 dark:text-yellow-100 dark:hover:bg-yellow-900/40"
+                  @click="dismissPanel"
+                >
+                  <X class="size-4" />
+                </button>
+              </div>
+            </div>
+
             <ReconnectInfoPanel
               v-if="showReconnectPanel"
               :customer="linkedCustomer"
@@ -166,7 +149,7 @@
               @dismiss="dismissReconnectPanel"
             />
             <div v-if="loading" class="rounded-md border border-input bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-              <Loader2 class="mx-auto mb-2 size-4 animate-spin" />
+              <Loader class="mx-auto mb-2 size-4 animate-spin" />
               {{ t('globals.messages.loading') }}
             </div>
 
@@ -182,7 +165,7 @@
             >
               <div ref="dropdownList" class="max-h-72 overflow-y-auto py-1">
                 <div v-if="searching" class="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                  <Loader2 class="size-3.5 animate-spin" />
+                  <Loader class="size-4 animate-spin" />
                   {{ t('conversation.customer.searching') }}
                 </div>
 
@@ -223,42 +206,38 @@
         </template>
       </div>
 
-      <div v-else class="space-y-3 rounded-md border border-input bg-background p-3">
-        <div class="flex items-start justify-between gap-2">
-
-          <div class="min-w-0">
-            <div class="flex min-w-0 items-start gap-2">
-              <Avatar class="mt-1 size-7">
-                <AvatarImage v-if="contactAvatar" :src="contactAvatar" :alt="contactName" />
-                <AvatarFallback>
-                  <User class="size-3 text-muted-foreground" />
-                </AvatarFallback>
-              </Avatar>
-              <div class="min-w-0 flex-1">
+      <!-- Linked customer: avatar + customer name + contact email link + customer/contract details -->
+      <div v-else class="space-y-3 bg-background">
+        <div class="flex items-start justify-between rounded-md border border-input p-3 gap-2">
+          <div class="flex min-w-0 items-start gap-2">
+            <Avatar class="mt-1 size-7">
+              <AvatarImage v-if="contactAvatar" :src="contactAvatar" :alt="contactName" />
+              <AvatarFallback>
+                <User class="size-3 text-muted-foreground" />
+              </AvatarFallback>
+            </Avatar>
+            <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-semibold -mb-1">
                 <span v-if="isPartial" class="text-muted-foreground">{{ t('conversation.customer.maybe') }} </span>
                 {{ customerName(customer) }}
               </p>
-              <template v-if="customer">
-                <router-link
-                  v-if="canOpenContact"
-                  :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
-                  class="group/contact inline-flex max-w-full min-w-0 items-center gap-1"
-                >
-                  <p class="truncate text-xs font-medium text-muted-foreground decoration-1 underline-offset-2 group-hover/contact:underline">
-                    {{ contactEmail || t('conversation.sidebar.notAvailable') }}
-                  </p>
-                  <ExternalLink class="size-2.5 ml-2 shrink-0 text-muted-foreground" />
-                </router-link>
-                <div v-else class="min-w-0">
-                  <p class=" truncate text-xs font-medium text-muted-foreground">
-                    {{ contactEmail || t('conversation.sidebar.notAvailable') }}
-                  </p>
-                </div>
-              </template>
+              <router-link
+                v-if="canOpenContact"
+                :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
+                class="group/contact inline-flex max-w-full min-w-0 items-center gap-1"
+              >
+                <p class="truncate text-xs font-medium text-muted-foreground decoration-1 underline-offset-2 group-hover/contact:underline">
+                  {{ contactEmail || t('conversation.sidebar.notAvailable') }}
+                </p>
+                <ExternalLink class="size-2.5 ml-2 shrink-0 text-muted-foreground" />
+              </router-link>
+              <div v-else class="min-w-0">
+                <p class="truncate text-xs font-medium text-muted-foreground">
+                  {{ contactEmail || t('conversation.sidebar.notAvailable') }}
+                </p>
               </div>
+            </div>
           </div>
-        </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
@@ -278,6 +257,32 @@
           </DropdownMenu>
         </div>
 
+        <!-- Contact detail rows (always visible when present) -->
+        <div v-if="hasContactDetails" class="space-y-2 border-t border-border pt-2 text-xs">
+          <div v-if="phoneNumber" class="flex items-center gap-2">
+            <Phone class="size-4 shrink-0 text-muted-foreground" />
+            <span class="min-w-0 truncate text-foreground">{{ phoneNumber }}</span>
+          </div>
+          <div v-if="stringValue(contact.external_user_id)" class="flex items-center gap-2">
+            <IdCard class="size-4 shrink-0 text-muted-foreground" />
+            <span class="min-w-0 truncate text-foreground">{{ stringValue(contact.external_user_id) }}</span>
+          </div>
+          <template v-if="isLivechat">
+            <div v-if="countryName" class="flex items-center gap-2">
+              <Globe class="size-4 shrink-0 text-muted-foreground" />
+              <span class="min-w-0 truncate text-foreground">{{ countryName }}</span>
+            </div>
+            <div v-if="conversation.meta?.ip" class="flex items-center gap-2">
+              <Monitor class="size-4 shrink-0 text-muted-foreground" />
+              <span class="min-w-0 truncate text-foreground">{{ conversation.meta.ip }}</span>
+            </div>
+            <div v-if="parsedUA" class="flex items-center gap-2">
+              <Smartphone class="size-4 shrink-0 text-muted-foreground" />
+              <span class="min-w-0 truncate text-foreground">{{ parsedUA }}</span>
+            </div>
+          </template>
+        </div>
+
         <div v-if="isPartial && stringValue(conversation.verification_message)" class="rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-100">
           <div class="flex items-start gap-2">
             <AlertTriangle class="mt-0.5 size-4 shrink-0" />
@@ -285,13 +290,16 @@
           </div>
         </div>
 
-        <div v-if="contracts.length > 0" class="space-y-1">
-          
-        <p class="truncate text-xs text-muted-foreground">
-          {{ t('conversation.customer.customerNumber') }}: {{ customer?.customer_id || '-' }}
-        </p>
-        
-          <p class="sidebar-label">{{ t('conversation.customer.contract') }}</p>
+        <div v-if="contracts.length > 0" class="space-y-2 ">
+          <div class="truncate text-xs text-muted-foreground grid grid-cols-2 my-2 ">
+            <div>
+              {{ t('conversation.customer.customerNumber') }}
+            </div>
+            <div class="text-right text-foreground">
+              {{ customer?.customer_id || '-' }}
+            </div>
+          </div>
+
           <PillSwitcher :model-value="selectedContractID" @update:modelValue="swapContract">
             <PillSwitcherItem
               v-for="item in contracts"
@@ -322,7 +330,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            <ExternalLink class="size-3.5" />
+            <ExternalLink class="size-4" />
             {{ link.label || t('conversation.customer.openInERP') }}
           </Button>
         </div>
@@ -343,40 +351,34 @@
             type="button"
             variant="ghost"
             size="sm"
-            class="mx-auto flex h-7 text-xs"
+            class="mx-auto flex h-7 text-xs border border-border"
             @click="previewExpanded = !previewExpanded"
           >
             {{ previewExpanded ? t('conversation.customer.showLess') : t('conversation.customer.showMore') }}
-            <ChevronUp v-if="previewExpanded" class="size-3.5" />
-            <ChevronDown v-else class="size-3.5" />
+            <ChevronUp v-if="previewExpanded" class="size-4" />
+            <ChevronDown v-else class="size-4" />
           </Button>
         </div>
       </div>
-    </CollapsibleContent>
-  </Collapsible>
 </template>
 
 <script setup>
-import { computed, h, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
 import {
   AlertTriangle,
-  ChevronDown,
   ChevronUp,
   ExternalLink,
-  Loader2,
   Globe,
   IdCard,
   Monitor,
   MoreVertical,
-  RefreshCw,
   Search,
   Smartphone,
   X,
 } from 'lucide-vue-next'
-import { UserQuestionColored, UserCheckColored, User, Phone } from '@qall/icons'
-
+import { User, Phone, ArrowsRotate, Loader, ChevronDown } from '@qall/icons'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
@@ -401,42 +403,19 @@ import countries from '@/constants/countries.js'
 import ConflictInfoPanel from './ConflictInfoPanel.vue'
 import ReconnectInfoPanel from './ReconnectInfoPanel.vue'
 
-const FailurePanel = {
-  props: {
-    title: { type: String, required: true },
-    message: { type: String, required: false, default: '' },
-  },
-  emits: ['dismiss'],
-  setup (props, { emit }) {
-    return () => h('div', { class: 'rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-100' }, [
-      h('div', { class: 'flex items-start justify-between gap-2' }, [
-        h('div', { class: 'flex min-w-0 gap-2' }, [
-          h(AlertTriangle, { class: 'mt-0.5 size-4 shrink-0' }),
-          h('div', { class: 'min-w-0' }, [
-            h('p', { class: 'font-medium' }, props.title),
-            props.message ? h('p', { class: 'mt-1 whitespace-pre-wrap break-words' }, props.message) : null,
-          ]),
-        ]),
-        h('button', {
-          type: 'button',
-          class: 'rounded p-0.5 text-yellow-800 hover:bg-yellow-100 dark:text-yellow-100 dark:hover:bg-yellow-900/40',
-          onClick: () => emit('dismiss'),
-        }, [h(X, { class: 'size-3.5' })]),
-      ]),
-    ])
-  },
-}
-
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
 const { t } = useI18n()
 
+// Loaded data
 const loading = ref(false)
 const customer = ref(null)
 const contract = ref(null)
 const linkedCustomer = ref(null)
 const latestOperation = ref(null)
+
+// Search state
 const searchMode = ref(false)
 const searchQuery = ref('')
 const searchResults = ref([])
@@ -447,6 +426,8 @@ const highlightedIndex = ref(-1)
 const dropdownWidth = ref(0)
 const searchRow = ref(null)
 const dropdownList = ref(null)
+
+// Mutation / workflow state
 const assigning = ref(false)
 const running = ref(false)
 const startingIdentification = ref(false)
@@ -455,15 +436,19 @@ const dismissedTraceID = ref('')
 const reconnectDismissed = ref(false)
 const conflictDismissed = ref(false)
 const conflictNotice = ref(null)
+
+// UI state
 const previewExpanded = ref(false)
 const previewLimit = 7
+
+// Refs / timers / cancellation tokens
 let runningTimeout = null
+let searchAbort = null
+let searchSeq = 0
 
 const SEARCH_MIN_CHARS = 2
 const SEARCH_DEBOUNCE_MS = 300
 const SEARCH_MAX_RESULTS = 10
-let searchAbort = null
-let searchSeq = 0
 
 const conversation = computed(() => conversationStore.current || {})
 const contact = computed(() => conversation.value?.contact || {})
@@ -530,12 +515,6 @@ const showReconnectPanel = computed(() => {
     latestOperationNoMatch.value &&
     linkedCustomer.value &&
     !reconnectDismissed.value
-})
-
-const stateIcon = computed(() => {
-  if (verificationLevel.value >= 2 && !searchMode.value) return UserCheckColored
-  if (verificationLevel.value > 0 && !searchMode.value) return UserQuestionColored
-  return User
 })
 
 const visiblePanel = computed(() => {

@@ -7,7 +7,7 @@
       <div v-else class="flex items-center gap-1.5">
         <component
           :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
-          class="size-3.5 text-muted-foreground flex-shrink-0"
+          class="size-4 text-muted-foreground flex-shrink-0"
         />
         <p class="sidebar-value break-all">{{ conversation.inbox_name }}</p>
       </div>
@@ -32,7 +32,7 @@
       <p class="sidebar-label">{{ $t('globals.terms.initiatedAt') }}</p>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-if="conversation.created_at" class="sidebar-value">
-        {{ format(conversation.created_at, 'PPpp') }}
+        {{ formatDateTime(conversation.created_at) }}
       </p>
       <p v-else class="sidebar-value">-</p>
     </div>
@@ -50,7 +50,7 @@
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <div v-else>
         <p v-if="conversation.first_reply_at" class="sidebar-value">
-          {{ format(conversation.first_reply_at, 'PPpp') }}
+          {{ formatDateTime(conversation.first_reply_at) }}
         </p>
         <p v-else class="sidebar-value">-</p>
       </div>
@@ -69,7 +69,7 @@
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <div v-else>
         <p v-if="conversation.resolved_at" class="sidebar-value">
-          {{ format(conversation.resolved_at, 'PPpp') }}
+          {{ formatDateTime(conversation.resolved_at) }}
         </p>
         <p v-else class="sidebar-value">-</p>
       </div>
@@ -87,7 +87,7 @@
       </div>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-if="conversation.last_reply_at" class="sidebar-value">
-        {{ format(conversation.last_reply_at, 'PPpp') }}
+        {{ formatDateTime(conversation.last_reply_at) }}
       </p>
       <p v-else class="sidebar-value">-</p>
     </div>
@@ -96,7 +96,7 @@
       <p class="sidebar-label">{{ $t('globals.terms.closedAt') }}</p>
       <Skeleton v-if="conversationStore.conversation.loading" class="w-32 h-4 mt-0.5" />
       <p v-else class="sidebar-value">
-        {{ format(conversation.closed_at, 'PPpp') }}
+        {{ formatDateTime(conversation.closed_at) }}
       </p>
     </div>
 
@@ -119,7 +119,6 @@
 
 <script setup>
 import { computed } from 'vue'
-import { format } from 'date-fns'
 import { Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
@@ -131,6 +130,7 @@ import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '../../../api'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@main/utils/date'
 
 const emitter = useEmitter()
 const { t } = useI18n()

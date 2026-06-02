@@ -1,3 +1,4 @@
+<!-- frontend/apps/main/src/features/conversation/list/ConversationListItem.vue -->
 <template>
   <ContextMenu>
     <ContextMenuTrigger asChild>

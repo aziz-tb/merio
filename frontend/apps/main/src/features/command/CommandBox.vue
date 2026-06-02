@@ -256,6 +256,7 @@ const { t } = useI18n()
 const open = ref(false)
 const emitter = useEmitter()
 const nestedCommand = ref(null)
+const nestedCommandConversationUUID = ref('')
 const showDatePicker = ref(false)
 const datePickerOpen = ref(false)
 const selectedDate = ref(null)
@@ -344,8 +345,9 @@ function toggleOpen() {
   open.value = !open.value
 }
 
-function setNestedCommand(command) {
+function setNestedCommand(command, conversationUUID = '') {
   nestedCommand.value = command
+  nestedCommandConversationUUID.value = conversationUUID
 }
 
 function formatDuration(minutes) {
@@ -353,12 +355,14 @@ function formatDuration(minutes) {
 }
 
 async function handleSnooze(minutes) {
-  await conversationStore.snoozeConversation(formatDuration(minutes))
+  await conversationStore.snoozeConversation(formatDuration(minutes), nestedCommandConversationUUID.value || undefined)
+  nestedCommandConversationUUID.value = ''
   toggleOpen()
 }
 
 async function resolveConversation() {
-  await conversationStore.updateStatus(CONVERSATION_DEFAULT_STATUSES.RESOLVED)
+  await conversationStore.updateStatus(CONVERSATION_DEFAULT_STATUSES.RESOLVED, nestedCommandConversationUUID.value || undefined)
+  nestedCommandConversationUUID.value = ''
   toggleOpen()
 }
 
@@ -397,7 +401,7 @@ function onInputKeydown(e) {
 }
 
 const nestedCommandHandler = (data) => {
-  setNestedCommand(data.command)
+  setNestedCommand(data.command, data.conversationUUID || '')
   open.value = data.open
 }
 

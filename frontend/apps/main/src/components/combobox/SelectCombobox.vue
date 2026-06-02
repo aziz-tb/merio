@@ -6,6 +6,7 @@
     :items="items"
     :placeholder="placeholder"
     :trigger-variant="triggerVariant"
+    :button-class="buttonClass"
   >
     <!-- Items -->
     <template #item="{ item }">
@@ -97,6 +98,13 @@
           <span class="truncate text-sm">{{ selected.label }}</span>
         </div>
 
+        <div
+          v-else-if="selected"
+          class="flex items-center gap-2 min-w-0"
+        >
+          <span class="truncate text-sm">{{ selected.label }}</span>
+        </div>
+
         <div v-else-if="type === 'user'" class="flex items-center gap-2 min-w-0 text-muted-foreground">
           <Avatar :class="[selectedAvatarClass, 'shrink-0']">
             <AvatarFallback class="bg-muted">
@@ -153,6 +161,10 @@ const props = defineProps({
   triggerVariant: {
     type: String,
     default: 'pill'
+  },
+  buttonClass: {
+    type: String,
+    default: ''
   }
 })
 

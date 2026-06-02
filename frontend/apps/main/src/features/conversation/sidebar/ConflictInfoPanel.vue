@@ -12,7 +12,7 @@
         class="rounded p-0.5 text-blue-800 hover:bg-blue-100 dark:text-blue-100 dark:hover:bg-blue-900/40"
         @click="$emit('dismiss')"
       >
-        <X class="size-3.5" />
+        <X class="size-4" />
       </button>
     </div>
   </div>
