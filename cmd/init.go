@@ -1674,27 +1674,12 @@ func initQueryEmbeddingCache(rdb *redis.Client) *embeddings.QueryEmbeddingCache 
 // embedding provider isn't configured — kb_search will report the
 // disabled state via SetKBSearcher receiving nil.
 func initSearcher(store *embeddings.Store, embed embeddings.Provider, rank reranker.Provider, cache *embeddings.QueryEmbeddingCache) *embeddings.Searcher {
-	if embed == nil {
-		return nil
-	}
-	lo := initLogger("embeddings-searcher")
-	// Reranker threshold defaults to 0.3 when the key is absent so older
-	// configs keep the documented filtering behaviour; an explicit 0.0
-	// in TOML disables the filter. Semantic threshold defaults to 0.0
-	// (no filter) — only enabled once operators have tuned against real
-	// trace similarity values.
-	minReranker := 0.3
-	if ko.Exists("embeddings.min_reranker_score") {
-		minReranker = ko.Float64("embeddings.min_reranker_score")
-	}
-	s, err := embeddings.NewSearcher(embeddings.SearcherOpts{
-		Store:                 store,
-		Embed:                 embed,
-		Reranker:              rank,
-		Cache:                 cache,
-		Lo:                    lo,
-		MinSemanticSimilarity: ko.Float64("embeddings.min_semantic_similarity"),
-		MinRerankerScore:      minReranker,
+	s, err := embeddings.NewConfiguredSearcher(ko, embeddings.SearcherOpts{
+		Store:    store,
+		Embed:    embed,
+		Reranker: rank,
+		Cache:    cache,
+		Lo:       initLogger("embeddings-searcher"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing embeddings searcher: %v", err)

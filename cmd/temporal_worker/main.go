@@ -856,10 +856,7 @@ func buildSearcher(
 	cache *embeddings.QueryEmbeddingCache,
 	ko *koanf.Koanf,
 ) (*embeddings.Searcher, error) {
-	if embed == nil {
-		return nil, nil
-	}
-	return embeddings.NewSearcher(embeddings.SearcherOpts{
+	return embeddings.NewConfiguredSearcher(ko, embeddings.SearcherOpts{
 		Store:    store,
 		Embed:    embed,
 		Reranker: rank,
