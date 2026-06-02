@@ -61,4 +61,3 @@ jobs:
           MERIO_SYSTEM_USER_PASSWORD: "StrongPass!123"
         run: |
           ./merio --install --idempotent-install --yes --config ./config.toml
-          ./merio --upgrade --yes --config ./config.toml
