@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strconv"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/custom_attribute/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	cmodels "github.com/aziz-tb/merio/internal/custom_attribute/models"
+	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

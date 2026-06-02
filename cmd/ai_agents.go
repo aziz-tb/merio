@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	verificationmodels "github.com/abhinavxd/libredesk/internal/verification/models"
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	verificationmodels "github.com/aziz-tb/merio/internal/verification/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

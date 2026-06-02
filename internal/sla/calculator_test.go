@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/business_hours/models"
+	"github.com/aziz-tb/merio/internal/business_hours/models"
 	"github.com/jmoiron/sqlx/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -408,7 +408,7 @@ func TestCalculateDeadline(t *testing.T) {
 					"Wednesday": {Open: "09:00", Close: "17:00"},
 				}),
 			},
-			timeZone: "UTC",
+			timeZone:       "UTC",
 			expectedResult: time.Date(2023, 10, 11, 10, 0, 0, 0, locUTC),
 		},
 		{
@@ -422,12 +422,12 @@ func TestCalculateDeadline(t *testing.T) {
 					"Wednesday": {Open: "09:00", Close: "17:00"},
 				}),
 			},
-			timeZone: "UTC",
+			timeZone:       "UTC",
 			expectedResult: time.Date(2025, 04, 9, 15, 30, 0, 0, locUTC),
 		},
 		{
-			name:      "Monday to Friday 10:00 to 18:00",
-			startTime: time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
+			name:       "Monday to Friday 10:00 to 18:00",
+			startTime:  time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
 			slaMinutes: 1439,
 			businessHours: models.BusinessHours{
 				Hours: mustMarshalJSON(map[string]models.WorkingHours{

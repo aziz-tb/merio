@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/secret"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/secret"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

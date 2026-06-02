@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/usage"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/usage"
 	"github.com/google/uuid"
 )
 

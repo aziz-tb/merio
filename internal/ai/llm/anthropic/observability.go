@@ -7,7 +7,7 @@ import (
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/zerodha/logf"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
 // callLog captures a single completion call's structured log fields.

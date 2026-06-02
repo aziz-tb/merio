@@ -93,12 +93,12 @@ http.interceptors.request.use((request) => {
         }
 
         if (inboxId) {
-            request.headers['X-Libredesk-Inbox-ID'] = inboxId.toString()
+            request.headers['X-Merio-Inbox-ID'] = inboxId.toString()
         }
 
         const visitorTokenForMerge = getVisitorTokenForMerge()
         if (visitorTokenForMerge) {
-            request.headers['X-Libredesk-Visitor-Token'] = visitorTokenForMerge
+            request.headers['X-Merio-Visitor-Token'] = visitorTokenForMerge
         }
     }
 
@@ -107,7 +107,7 @@ http.interceptors.request.use((request) => {
 
 http.interceptors.response.use(
     (response) => {
-        if (response.headers['x-libredesk-clear-visitor']) {
+        if (response.headers['x-merio-clear-visitor']) {
             clearVisitorToken()
         }
         return response

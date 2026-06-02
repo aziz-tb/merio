@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/abhinavxd/libredesk/internal/realtime"
-	"github.com/abhinavxd/libredesk/internal/ws"
-	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	"github.com/aziz-tb/merio/internal/realtime"
+	"github.com/aziz-tb/merio/internal/ws"
+	wsmodels "github.com/aziz-tb/merio/internal/ws/models"
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )

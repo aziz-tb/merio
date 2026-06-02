@@ -12,8 +12,8 @@ import (
 	"github.com/pgvector/pgvector-go"
 	"github.com/zerodha/logf"
 
-	"github.com/abhinavxd/libredesk/internal/ai/embeddings/chunking"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/ai/embeddings/chunking"
+	"github.com/aziz-tb/merio/internal/dbutil"
 )
 
 //go:embed queries.sql

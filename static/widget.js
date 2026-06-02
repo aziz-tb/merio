@@ -1,16 +1,16 @@
 /**
- * Libredesk Chat Widget
+ * Merio Chat Widget
  * Embeddable chat widget for websites
  */
 (function () {
     'use strict';
 
-    if (window.__libredeskWidgetLoaded) {
+    if (window.__merioWidgetLoaded) {
         return;
     }
-    window.__libredeskWidgetLoaded = true;
+    window.__merioWidgetLoaded = true;
 
-    class Libredesk {
+    class Merio {
         constructor(config = {}) {
             if (!config.baseURL) {
                 throw new Error('baseURL is required');
@@ -59,7 +59,7 @@
         }
 
         getCookieName (type) {
-            return 'libredesk-' + type + '-' + this.config.inboxID;
+            return 'merio-' + type + '-' + this.config.inboxID;
         }
 
         getCookieDomain () {
@@ -129,7 +129,7 @@
                 this.setupEventListeners();
                 this.startPageTracking();
             } catch (error) {
-                console.error('Failed to initialize Libredesk Widget:', error);
+                console.error('Failed to initialize Merio Widget:', error);
             }
         }
 
@@ -604,27 +604,27 @@
         }
     }
 
-    Libredesk.prototype.show = Libredesk.prototype.showChat;
-    Libredesk.prototype.hide = Libredesk.prototype.hideChat;
-    Libredesk.prototype.isVisible = function () { return this.isChatVisible; };
-    Libredesk.prototype.onShow = function (fn) { this._onShowCallback = fn; };
-    Libredesk.prototype.onHide = function (fn) { this._onHideCallback = fn; };
-    Libredesk.prototype.onUnreadCountChange = function (fn) { this._onUnreadCountChangeCallback = fn; fn(this.unreadCount); };
+    Merio.prototype.show = Merio.prototype.showChat;
+    Merio.prototype.hide = Merio.prototype.hideChat;
+    Merio.prototype.isVisible = function () { return this.isChatVisible; };
+    Merio.prototype.onShow = function (fn) { this._onShowCallback = fn; };
+    Merio.prototype.onHide = function (fn) { this._onHideCallback = fn; };
+    Merio.prototype.onUnreadCountChange = function (fn) { this._onUnreadCountChangeCallback = fn; fn(this.unreadCount); };
 
-    window.Libredesk = Libredesk;
+    window.Merio = Merio;
 
-    window.initLibredesk = function (config = {}) {
-        if (window.Libredesk && window.Libredesk instanceof Libredesk) {
-            console.warn('Libredesk Widget is already initialized');
-            return window.Libredesk;
+    window.initMerio = function (config = {}) {
+        if (window.Merio && window.Merio instanceof Merio) {
+            console.warn('Merio Widget is already initialized');
+            return window.Merio;
         }
-        window.Libredesk = new Libredesk(config);
-        return window.Libredesk;
+        window.Merio = new Merio(config);
+        return window.Merio;
     };
 
     function autoInit () {
-        if (window.LibredeskSettings) {
-            window.initLibredesk(window.LibredeskSettings);
+        if (window.MerioSettings) {
+            window.initMerio(window.MerioSettings);
         }
     }
 

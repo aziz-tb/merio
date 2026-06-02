@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	itemporal "github.com/abhinavxd/libredesk/internal/temporal"
+	itemporal "github.com/aziz-tb/merio/internal/temporal"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )

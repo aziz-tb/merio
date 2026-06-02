@@ -2,12 +2,12 @@
 LAST_COMMIT := $(or $(shell git rev-parse --short HEAD 2> /dev/null),$(shell head -n 1 VERSION | grep -Eo "^[a-z0-9]+$$"), "")
 
 # Try to get the semver from 1) git 2) the VERSION file 3) fallback.
-VERSION := $(or $(LIBREDESK_VERSION),$(shell git describe --tags --abbrev=0 2> /dev/null),$(shell grep -Eo 'tag: v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?' VERSION | head -1 | sed 's/^tag: //'),"v0.0.0")
+VERSION := $(or $(MERIO_VERSION),$(shell git describe --tags --abbrev=0 2> /dev/null),$(shell grep -Eo 'tag: v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?' VERSION | head -1 | sed 's/^tag: //'),"v0.0.0")
 
 BUILDSTR := ${VERSION} (\#${LAST_COMMIT} $(shell date -u +"%Y-%m-%dT%H:%M:%S%z"))
 
 # Binary names and paths
-BIN := libredesk
+BIN := merio
 WORKER_BIN := temporal-worker
 FRONTEND_DIR := frontend
 FRONTEND_DIST := ${FRONTEND_DIR}/dist
@@ -52,7 +52,7 @@ frontend-build-widget: install-deps
 .PHONY: run-backend
 run-backend:
 	@echo "→ Running backend..."
-	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd/
+	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/aziz-tb/merio/internal/version.Version=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd/
 
 # Run the JS frontend server in development mode (main app only).
 .PHONY: run-frontend
@@ -83,7 +83,7 @@ run-frontend-widget:
 build-backend: $(STUFFBIN)
 	@echo "→ Building backend..."
 	@CGO_ENABLED=0 go build -a \
-		-ldflags="-X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -s -w" \
+		-ldflags="-X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/aziz-tb/merio/internal/version.Version=${VERSION}' -s -w" \
 		-o ${BIN} cmd/*.go
 
 # Build the Temporal worker binary (separate from the main app).
@@ -134,7 +134,7 @@ test:
 # `make deploy-verify` greps the container logs to show which version is
 # actually running — the answer to "did my rebuild actually take?"
 
-DEPLOY_VERSION := $(or $(LIBREDESK_VERSION),$(shell git describe --tags --always --dirty 2> /dev/null),dev)
+DEPLOY_VERSION := $(or $(MERIO_VERSION),$(shell git describe --tags --always --dirty 2> /dev/null),dev)
 DEPLOY_COMMIT := $(or $(LAST_COMMIT),$(shell git rev-parse --short HEAD 2> /dev/null),unknown)
 COMPOSE_BUILD_ENV := VERSION=$(DEPLOY_VERSION) GIT_COMMIT=$(DEPLOY_COMMIT)
 

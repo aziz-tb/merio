@@ -239,7 +239,7 @@ if not resp.ok:
     raise SystemExit
 
 # Expected output shape - array of partial customer records.
-# libredesk will fetch full details for each via search_customer_by_id,
+# merio will fetch full details for each via search_customer_by_id,
 # so this only needs to return the IDs:
 #
 #   [ { "id": "<external customer id>" }, ... ]

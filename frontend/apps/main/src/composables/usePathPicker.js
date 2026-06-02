@@ -3,9 +3,9 @@ import { StorageSerializers, useSessionStorage } from '@vueuse/core'
 import { useAgentRightRail } from './useAgentRightRail'
 
 const targetConditionContext = ref(null)
-const lastIdentifier = useSessionStorage('libredesk:path-picker-identifier', '')
-const lastSource = useSessionStorage('libredesk:path-picker-source', 'ticket')
-const lastConversation = useSessionStorage('libredesk:path-picker-conversation', null, {
+const lastIdentifier = useSessionStorage('merio:path-picker-identifier', '')
+const lastSource = useSessionStorage('merio:path-picker-source', 'ticket')
+const lastConversation = useSessionStorage('merio:path-picker-conversation', null, {
   serializer: StorageSerializers.object,
 })
 

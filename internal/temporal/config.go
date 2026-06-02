@@ -1,4 +1,4 @@
-// Package temporal wraps the Temporal Go SDK with Libredesk-specific
+// Package temporal wraps the Temporal Go SDK with Merio-specific
 // init, observability, and shutdown semantics. Workflow + activity code
 // lives in internal/workflows/<domain>/ and internal/activities/<domain>/
 // respectively; this package is the infrastructure they run on.
@@ -23,7 +23,7 @@ type Config struct {
 	// "127.0.0.1:7233".
 	Address string `koanf:"address"`
 
-	// Namespace defaults to "libredesk". Multi-namespace setup (per
+	// Namespace defaults to "merio". Multi-namespace setup (per
 	// tenant, per workflow class) is deferred until needed.
 	Namespace string `koanf:"namespace"`
 

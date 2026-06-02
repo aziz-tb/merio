@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/user/models"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/knadh/go-i18n"
 	"github.com/redis/go-redis/v9"
@@ -102,7 +102,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger) (*A
 		EnableAutoCreate: true,
 		SessionIDLength:  64,
 		Cookie: simplesessions.CookieOptions{
-			Name:       "libredesk_session",
+			Name:       "merio_session",
 			IsHTTPOnly: true,
 			IsSecure:   cfg.SecureCookies,
 			SameSite:   http.SameSiteLaxMode,

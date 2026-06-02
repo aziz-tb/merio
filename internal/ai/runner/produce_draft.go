@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
 // produceDraftToolName is the platform-mandatory terminal tool every

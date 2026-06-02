@@ -36,10 +36,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/exec/runner/models"
-	tokenpkg "github.com/abhinavxd/libredesk/internal/exec/token"
-	tokenmodels "github.com/abhinavxd/libredesk/internal/exec/token/models"
-	"github.com/abhinavxd/libredesk/internal/secret"
+	"github.com/aziz-tb/merio/internal/exec/runner/models"
+	tokenpkg "github.com/aziz-tb/merio/internal/exec/token"
+	tokenmodels "github.com/aziz-tb/merio/internal/exec/token/models"
+	"github.com/aziz-tb/merio/internal/secret"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 )
@@ -86,7 +86,7 @@ type Opts struct {
 	SandboxToken string
 
 	// PlatformBaseURL is what the Python service hands to scripts as
-	// their callback target — i.e., where exec-runner reaches Libredesk.
+	// their callback target — i.e., where exec-runner reaches Merio.
 	// Typically the same host:port the Go binary listens on.
 	PlatformBaseURL string
 

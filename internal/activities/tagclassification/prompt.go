@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	tagmodels "github.com/abhinavxd/libredesk/internal/tag/models"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	tagmodels "github.com/aziz-tb/merio/internal/tag/models"
 )
 
 // maxContextChars caps the conversation messages portion of the prompt.

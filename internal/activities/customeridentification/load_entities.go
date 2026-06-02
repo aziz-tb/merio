@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/abhinavxd/libredesk/internal/contract"
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	"github.com/abhinavxd/libredesk/internal/customer"
-	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	"github.com/aziz-tb/merio/internal/contract"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	"github.com/aziz-tb/merio/internal/customer"
+	customermodels "github.com/aziz-tb/merio/internal/customer/models"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 	"golang.org/x/sync/errgroup"
 )
 

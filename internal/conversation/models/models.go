@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/aziz-tb/merio/internal/attachment"
+	mmodels "github.com/aziz-tb/merio/internal/media/models"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	umodels "github.com/aziz-tb/merio/internal/user/models"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	execmodels "github.com/abhinavxd/libredesk/internal/exec/runner/models"
-	"github.com/abhinavxd/libredesk/internal/function"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	execmodels "github.com/aziz-tb/merio/internal/exec/runner/models"
+	"github.com/aziz-tb/merio/internal/function"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 func (a *Activities) SearchCustomerByFieldsActivity(ctx context.Context, in cimodels.SearchCustomerByFieldsInput) (cimodels.SearchCustomerByFieldsOutput, error) {

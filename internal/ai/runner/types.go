@@ -26,7 +26,7 @@ package runner
 import (
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
 // RunStatus enumerates every terminal outcome of a Run() call. Each

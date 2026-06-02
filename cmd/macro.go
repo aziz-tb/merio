@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strconv"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	autoModels "github.com/abhinavxd/libredesk/internal/automation/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/macro/models"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	autoModels "github.com/aziz-tb/merio/internal/automation/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/macro/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

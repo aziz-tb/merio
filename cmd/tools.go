@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	execRunner "github.com/abhinavxd/libredesk/internal/exec/runner"
-	execRunnerModels "github.com/abhinavxd/libredesk/internal/exec/runner/models"
-	execTokenModels "github.com/abhinavxd/libredesk/internal/exec/token/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	execRunner "github.com/aziz-tb/merio/internal/exec/runner"
+	execRunnerModels "github.com/aziz-tb/merio/internal/exec/runner/models"
+	execTokenModels "github.com/aziz-tb/merio/internal/exec/token/models"
 	"github.com/zerodha/fastglue"
 )
 

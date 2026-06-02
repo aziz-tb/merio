@@ -13,9 +13,9 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 
-	"github.com/abhinavxd/libredesk/internal/ai/runner"
-	runnerevents "github.com/abhinavxd/libredesk/internal/ai/runner/events"
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/aziz-tb/merio/internal/ai/runner"
+	runnerevents "github.com/aziz-tb/merio/internal/ai/runner/events"
+	"github.com/aziz-tb/merio/internal/envelope"
 )
 
 func handleAgentRunStream(r *fastglue.Request) error {

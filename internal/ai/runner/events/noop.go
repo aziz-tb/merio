@@ -3,7 +3,7 @@ package events
 import (
 	"context"
 
-	"github.com/abhinavxd/libredesk/internal/ai/runner"
+	"github.com/aziz-tb/merio/internal/ai/runner"
 )
 
 type NoopPublisher struct{}

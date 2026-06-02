@@ -1,6 +1,6 @@
 // Package models holds the shared types for short-lived script execution
 // tokens. The token is what a script presents in its `Authorization` header
-// when it calls back into Libredesk; resolving it returns the actor context
+// when it calls back into Merio; resolving it returns the actor context
 // (which user the script is acting as).
 package models
 

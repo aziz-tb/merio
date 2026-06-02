@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/dbutil"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -33,7 +33,7 @@ type executionRow struct {
 	Language       string
 	StartedAt      time.Time
 	FinishedAt     time.Time
-	DurationMs    int
+	DurationMs     int
 	Kind           string
 	ResultCode     *string
 	Message        *string

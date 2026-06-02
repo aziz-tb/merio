@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
-	"github.com/abhinavxd/libredesk/internal/ai/operations/payloads"
-	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
-	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
-	"github.com/abhinavxd/libredesk/internal/detection"
+	aiopmodels "github.com/aziz-tb/merio/internal/ai/operations/models"
+	"github.com/aziz-tb/merio/internal/ai/operations/payloads"
+	contractpkg "github.com/aziz-tb/merio/internal/contract"
+	customerpkg "github.com/aziz-tb/merio/internal/customer"
+	"github.com/aziz-tb/merio/internal/detection"
 	"github.com/volatiletech/null/v9"
 )
 

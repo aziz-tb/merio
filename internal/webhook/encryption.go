@@ -1,8 +1,8 @@
 package webhook
 
 import (
-	"github.com/abhinavxd/libredesk/internal/crypto"
-	"github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/aziz-tb/merio/internal/crypto"
+	"github.com/aziz-tb/merio/internal/webhook/models"
 )
 
 // encryptSecret encrypts webhook secret if present.

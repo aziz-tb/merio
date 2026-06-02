@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/usage"
-	contractpkg "github.com/abhinavxd/libredesk/internal/contract"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	customerpkg "github.com/abhinavxd/libredesk/internal/customer"
-	"github.com/abhinavxd/libredesk/internal/detection"
-	tagmodels "github.com/abhinavxd/libredesk/internal/tag/models"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/usage"
+	contractpkg "github.com/aziz-tb/merio/internal/contract"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	customerpkg "github.com/aziz-tb/merio/internal/customer"
+	"github.com/aziz-tb/merio/internal/detection"
+	tagmodels "github.com/aziz-tb/merio/internal/tag/models"
 	"github.com/lib/pq"
 )
 

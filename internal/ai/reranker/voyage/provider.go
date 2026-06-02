@@ -21,7 +21,7 @@ import (
 	"github.com/zerodha/logf"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/abhinavxd/libredesk/internal/ai/reranker"
+	"github.com/aziz-tb/merio/internal/ai/reranker"
 )
 
 const (

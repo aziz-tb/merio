@@ -9,12 +9,12 @@ import (
 
 	"slices"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/attachment"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/image"
+	mmodels "github.com/aziz-tb/merio/internal/media/models"
+	"github.com/aziz-tb/merio/internal/stringutil"
 	"github.com/google/uuid"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -152,8 +152,8 @@ func handleMediaUpload(r *fastglue.Request) error {
 // Supports both authenticated access (with permission checks) and signed URL access (no permission checks).
 func handleServeMedia(r *fastglue.Request) error {
 	var (
-		app  = r.Context.(*App)
-		uuid = r.RequestCtx.UserValue("uuid").(string)
+		app        = r.Context.(*App)
+		uuid       = r.RequestCtx.UserValue("uuid").(string)
 		authMethod = r.RequestCtx.UserValue("auth_method")
 	)
 

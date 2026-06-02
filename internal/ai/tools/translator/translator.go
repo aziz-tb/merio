@@ -23,9 +23,9 @@ import (
 	"regexp"
 	"strings"
 
-	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
 )
 
 // anthropicToolNameRegex mirrors the SDK's documented constraint. We

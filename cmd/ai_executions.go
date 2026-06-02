@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 
-	aiexecutions "github.com/abhinavxd/libredesk/internal/ai/executions"
-	executionsmodels "github.com/abhinavxd/libredesk/internal/ai/executions/models"
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	aiexecutions "github.com/aziz-tb/merio/internal/ai/executions"
+	executionsmodels "github.com/aziz-tb/merio/internal/ai/executions/models"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	mmodels "github.com/aziz-tb/merio/internal/media/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

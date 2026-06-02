@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultChannel = "libredesk:realtime"
+	DefaultChannel = "merio:realtime"
 
 	EventConversationUpdate              = "conversation_update"
 	EventAgentValidationCompleted        = "agent_validation_completed"

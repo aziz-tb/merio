@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	customermodels "github.com/aziz-tb/merio/internal/customer/models"
 	"github.com/volatiletech/null/v9"
 )
 

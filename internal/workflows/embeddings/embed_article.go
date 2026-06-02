@@ -20,7 +20,7 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
-	actembeddings "github.com/abhinavxd/libredesk/internal/activities/embeddings"
+	actembeddings "github.com/aziz-tb/merio/internal/activities/embeddings"
 )
 
 // EmbedArticleInput drives the per-article indexing workflow.
@@ -39,14 +39,14 @@ type EmbedArticleOutput struct {
 // EmbedArticleWorkflow indexes one KB article into the embeddings
 // table. Stages:
 //
-//	1. FetchSourceContent — load article body + locale.
-//	2. ChunkContent       — markdown-aware split per locked F12 spec.
-//	3. RedactText         — PII redaction over each chunk (loops).
-//	4. GenerateEmbeddings — Voyage call (provider handles batching).
-//	5. StoreEmbeddings    — INSERT ... ON CONFLICT DO NOTHING.
-//	6. SwapActiveVersion  — atomic flip on articles_index_state.
-//	7. CleanupOldVectors (child workflow, ABANDON parent close policy)
-//	   — schedules durable 7-day deletion of the superseded version.
+//  1. FetchSourceContent — load article body + locale.
+//  2. ChunkContent       — markdown-aware split per locked F12 spec.
+//  3. RedactText         — PII redaction over each chunk (loops).
+//  4. GenerateEmbeddings — Voyage call (provider handles batching).
+//  5. StoreEmbeddings    — INSERT ... ON CONFLICT DO NOTHING.
+//  6. SwapActiveVersion  — atomic flip on articles_index_state.
+//  7. CleanupOldVectors (child workflow, ABANDON parent close policy)
+//     — schedules durable 7-day deletion of the superseded version.
 //
 // Idempotency: workflow id is deterministic ("embed-article:<id>:v<r>");
 // re-running succeeds (already-existing rows hit ON CONFLICT). Step 7
@@ -144,8 +144,8 @@ func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArt
 	// running if EmbedArticleWorkflow itself is terminated.
 	if in.Revision > 1 {
 		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-			WorkflowID:        fmt.Sprintf("cleanup-vectors:%d:v%d", in.ArticleID, in.Revision-1),
-			ParentClosePolicy: enumspb.PARENT_CLOSE_POLICY_ABANDON,
+			WorkflowID:            fmt.Sprintf("cleanup-vectors:%d:v%d", in.ArticleID, in.Revision-1),
+			ParentClosePolicy:     enumspb.PARENT_CLOSE_POLICY_ABANDON,
 			WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 		})
 		// Fire-and-forget; not awaited.

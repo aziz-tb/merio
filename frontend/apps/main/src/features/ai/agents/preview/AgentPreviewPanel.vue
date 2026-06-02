@@ -16,7 +16,7 @@
     <div class="px-4 py-3 border-b border-input shrink-0 text-sm space-y-2.5">
       <div v-if="preview.channel.value === 'email'" class="flex items-center gap-3">
         <span class="text-xs text-muted-foreground w-14 shrink-0">{{ t('globals.terms.to') }}</span>
-        <span class="text-muted-foreground">agent@libredesk</span>
+        <span class="text-muted-foreground">agent@merio</span>
       </div>
       <div class="flex items-center gap-3">
         <span class="text-xs text-muted-foreground w-14 shrink-0">{{ t('globals.terms.from') }}</span>

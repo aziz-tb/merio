@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/webhook/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

@@ -36,54 +36,54 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/zerodha/logf"
 
-	actagentvalidation "github.com/abhinavxd/libredesk/internal/activities/agentvalidation"
-	actairuns "github.com/abhinavxd/libredesk/internal/activities/airuns"
-	actcustomeridentification "github.com/abhinavxd/libredesk/internal/activities/customeridentification"
-	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
-	actembeddings "github.com/abhinavxd/libredesk/internal/activities/embeddings"
-	acttagclassification "github.com/abhinavxd/libredesk/internal/activities/tagclassification"
-	aiagents "github.com/abhinavxd/libredesk/internal/ai/agents"
-	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
-	voyageembed "github.com/abhinavxd/libredesk/internal/ai/embeddings/voyage"
-	aiexecutions "github.com/abhinavxd/libredesk/internal/ai/executions"
-	aillm "github.com/abhinavxd/libredesk/internal/ai/llm"
-	anthropicllm "github.com/abhinavxd/libredesk/internal/ai/llm/anthropic"
-	aicatalog "github.com/abhinavxd/libredesk/internal/ai/llm/catalog"
-	aipreset "github.com/abhinavxd/libredesk/internal/ai/llm/preset"
-	aioperations "github.com/abhinavxd/libredesk/internal/ai/operations"
-	"github.com/abhinavxd/libredesk/internal/ai/reranker"
-	voyagerank "github.com/abhinavxd/libredesk/internal/ai/reranker/voyage"
-	airunner "github.com/abhinavxd/libredesk/internal/ai/runner"
-	runnerevents "github.com/abhinavxd/libredesk/internal/ai/runner/events"
-	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
-	aicapabilities "github.com/abhinavxd/libredesk/internal/ai/tools/builtin/capabilities"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
-	aiusage "github.com/abhinavxd/libredesk/internal/ai/usage"
-	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
-	"github.com/abhinavxd/libredesk/internal/contract"
-	"github.com/abhinavxd/libredesk/internal/conversation"
-	"github.com/abhinavxd/libredesk/internal/conversation/priority"
-	"github.com/abhinavxd/libredesk/internal/conversation/status"
-	"github.com/abhinavxd/libredesk/internal/customer"
-	"github.com/abhinavxd/libredesk/internal/detection"
-	execrunner "github.com/abhinavxd/libredesk/internal/exec/runner"
-	exectoken "github.com/abhinavxd/libredesk/internal/exec/token"
-	"github.com/abhinavxd/libredesk/internal/function"
-	"github.com/abhinavxd/libredesk/internal/knowledge"
-	"github.com/abhinavxd/libredesk/internal/migrations"
-	"github.com/abhinavxd/libredesk/internal/realtime"
-	"github.com/abhinavxd/libredesk/internal/setting"
-	"github.com/abhinavxd/libredesk/internal/sla"
-	"github.com/abhinavxd/libredesk/internal/tag"
-	"github.com/abhinavxd/libredesk/internal/team"
-	"github.com/abhinavxd/libredesk/internal/temporal"
-	"github.com/abhinavxd/libredesk/internal/user"
-	"github.com/abhinavxd/libredesk/internal/verification"
-	wfagentvalidation "github.com/abhinavxd/libredesk/internal/workflows/agentvalidation"
-	wfairuns "github.com/abhinavxd/libredesk/internal/workflows/airuns"
-	wfcustomeridentification "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
-	wfembeddings "github.com/abhinavxd/libredesk/internal/workflows/embeddings"
-	wftagclassification "github.com/abhinavxd/libredesk/internal/workflows/tagclassification"
+	actagentvalidation "github.com/aziz-tb/merio/internal/activities/agentvalidation"
+	actairuns "github.com/aziz-tb/merio/internal/activities/airuns"
+	actcustomeridentification "github.com/aziz-tb/merio/internal/activities/customeridentification"
+	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
+	actembeddings "github.com/aziz-tb/merio/internal/activities/embeddings"
+	acttagclassification "github.com/aziz-tb/merio/internal/activities/tagclassification"
+	aiagents "github.com/aziz-tb/merio/internal/ai/agents"
+	"github.com/aziz-tb/merio/internal/ai/embeddings"
+	voyageembed "github.com/aziz-tb/merio/internal/ai/embeddings/voyage"
+	aiexecutions "github.com/aziz-tb/merio/internal/ai/executions"
+	aillm "github.com/aziz-tb/merio/internal/ai/llm"
+	anthropicllm "github.com/aziz-tb/merio/internal/ai/llm/anthropic"
+	aicatalog "github.com/aziz-tb/merio/internal/ai/llm/catalog"
+	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
+	aioperations "github.com/aziz-tb/merio/internal/ai/operations"
+	"github.com/aziz-tb/merio/internal/ai/reranker"
+	voyagerank "github.com/aziz-tb/merio/internal/ai/reranker/voyage"
+	airunner "github.com/aziz-tb/merio/internal/ai/runner"
+	runnerevents "github.com/aziz-tb/merio/internal/ai/runner/events"
+	aitools "github.com/aziz-tb/merio/internal/ai/tools"
+	aicapabilities "github.com/aziz-tb/merio/internal/ai/tools/builtin/capabilities"
+	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
+	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
+	businesshours "github.com/aziz-tb/merio/internal/business_hours"
+	"github.com/aziz-tb/merio/internal/contract"
+	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/conversation/priority"
+	"github.com/aziz-tb/merio/internal/conversation/status"
+	"github.com/aziz-tb/merio/internal/customer"
+	"github.com/aziz-tb/merio/internal/detection"
+	execrunner "github.com/aziz-tb/merio/internal/exec/runner"
+	exectoken "github.com/aziz-tb/merio/internal/exec/token"
+	"github.com/aziz-tb/merio/internal/function"
+	"github.com/aziz-tb/merio/internal/knowledge"
+	"github.com/aziz-tb/merio/internal/migrations"
+	"github.com/aziz-tb/merio/internal/realtime"
+	"github.com/aziz-tb/merio/internal/setting"
+	"github.com/aziz-tb/merio/internal/sla"
+	"github.com/aziz-tb/merio/internal/tag"
+	"github.com/aziz-tb/merio/internal/team"
+	"github.com/aziz-tb/merio/internal/temporal"
+	"github.com/aziz-tb/merio/internal/user"
+	"github.com/aziz-tb/merio/internal/verification"
+	wfagentvalidation "github.com/aziz-tb/merio/internal/workflows/agentvalidation"
+	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
+	wfcustomeridentification "github.com/aziz-tb/merio/internal/workflows/customeridentification"
+	wfembeddings "github.com/aziz-tb/merio/internal/workflows/embeddings"
+	wftagclassification "github.com/aziz-tb/merio/internal/workflows/tagclassification"
 
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/stuffbin"
@@ -267,7 +267,7 @@ func initFlags(ko *koanf.Koanf) {
 	}
 }
 
-// loadConfig loads TOML config + LIBREDESK_* env vars. Same shape as
+// loadConfig loads TOML config + MERIO_* env vars. Same shape as
 // the main binary; the worker reads from the same config file so
 // they always agree on Temporal address/namespace.
 func loadConfig(ko *koanf.Koanf) {
@@ -279,9 +279,9 @@ func loadConfig(ko *koanf.Koanf) {
 		}
 	}
 	_ = ko.Load(env.Provider(".", env.Opt{
-		Prefix: "LIBREDESK_",
+		Prefix: "MERIO_",
 		TransformFunc: func(key, val string) (string, any) {
-			key = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(key, "LIBREDESK_")), "__", ".")
+			key = strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(key, "MERIO_")), "__", ".")
 			return key, val
 		},
 	}), nil)
@@ -302,7 +302,7 @@ func loadTemporalConfig(ko *koanf.Koanf) temporal.Config {
 		cfg.Address = "127.0.0.1:7233"
 	}
 	if cfg.Namespace == "" {
-		cfg.Namespace = "libredesk"
+		cfg.Namespace = "merio"
 	}
 	if cfg.DialTimeout == 0 {
 		cfg.DialTimeout = 10 * time.Second
@@ -866,7 +866,7 @@ func buildSearcher(
 }
 
 func resolveSystemUserID(db *sqlx.DB) int {
-	const systemEmail = "system@libredesk.local"
+	const systemEmail = "system@merio.local"
 	var id int
 	if err := db.QueryRow(
 		`SELECT id FROM users WHERE email = $1 AND type = 'agent' AND deleted_at IS NULL`,

@@ -8,9 +8,9 @@ import (
 
 	enumspb "go.temporal.io/api/enums/v1"
 
-	kmodels "github.com/abhinavxd/libredesk/internal/knowledge/models"
-	"github.com/abhinavxd/libredesk/internal/temporal"
-	wfembeddings "github.com/abhinavxd/libredesk/internal/workflows/embeddings"
+	kmodels "github.com/aziz-tb/merio/internal/knowledge/models"
+	"github.com/aziz-tb/merio/internal/temporal"
+	wfembeddings "github.com/aziz-tb/merio/internal/workflows/embeddings"
 )
 
 // kickEmbedIfPublished is the unified hook called by the KB article

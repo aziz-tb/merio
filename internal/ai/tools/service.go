@@ -3,9 +3,9 @@ package aitools
 import (
 	"context"
 
-	toolmodels "github.com/abhinavxd/libredesk/internal/ai/tools/models"
-	"github.com/abhinavxd/libredesk/internal/function"
-	fnmodels "github.com/abhinavxd/libredesk/internal/function/models"
+	toolmodels "github.com/aziz-tb/merio/internal/ai/tools/models"
+	"github.com/aziz-tb/merio/internal/function"
+	fnmodels "github.com/aziz-tb/merio/internal/function/models"
 	"github.com/jmoiron/sqlx"
 )
 

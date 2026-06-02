@@ -13,10 +13,10 @@ import (
 	"fmt"
 	"sort"
 
-	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
-	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
-	toolmodels "github.com/abhinavxd/libredesk/internal/ai/tools/models"
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
+	aitools "github.com/aziz-tb/merio/internal/ai/tools"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
+	toolmodels "github.com/aziz-tb/merio/internal/ai/tools/models"
 )
 
 // ResolvedTool is one fully dereferenced tool. Exactly one of Internal

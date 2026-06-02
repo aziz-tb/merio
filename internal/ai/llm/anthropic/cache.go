@@ -3,8 +3,8 @@ package anthropic
 import (
 	sdk "github.com/anthropics/anthropic-sdk-go"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/llm/preset"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm/preset"
 )
 
 // maxCacheMarkers is the per-request cap Anthropic enforces. We dedupe

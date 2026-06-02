@@ -9,7 +9,7 @@ import (
 // V2_3_0 provisions the worklog instrumentation table (B1) and grants its
 // permissions to the existing seeded roles on upgraded instances. Idempotent.
 //
-// The libredesk migration framework is forward-only. To roll this back,
+// The merio migration framework is forward-only. To roll this back,
 // run the SQL below manually in psql against the same database, then
 // redeploy a build that no longer contains the worklog code:
 //

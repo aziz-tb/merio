@@ -3,9 +3,9 @@ package main
 import (
 	"strconv"
 
-	businessHours "github.com/abhinavxd/libredesk/internal/business_hours"
-	models "github.com/abhinavxd/libredesk/internal/business_hours/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	businessHours "github.com/aziz-tb/merio/internal/business_hours"
+	models "github.com/aziz-tb/merio/internal/business_hours/models"
+	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

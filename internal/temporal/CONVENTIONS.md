@@ -1,6 +1,6 @@
 # Temporal conventions
 
-The load-bearing rules for every Temporal workflow + activity in the Libredesk codebase. Read once, internalize. These conventions exist because Temporal has sharp edges (determinism, versioning, replay) that bite hard if ignored.
+The load-bearing rules for every Temporal workflow + activity in the Merio codebase. Read once, internalize. These conventions exist because Temporal has sharp edges (determinism, versioning, replay) that bite hard if ignored.
 
 ## Package layout
 

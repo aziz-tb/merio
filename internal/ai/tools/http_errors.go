@@ -3,7 +3,7 @@ package aitools
 import (
 	"errors"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

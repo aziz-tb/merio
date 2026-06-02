@@ -7,12 +7,12 @@
     </main>
     <div class="flex justify-center mb-6">
       <a
-        href="https://libredesk.io/"
+        href="https://merio.io/"
         class="text-xs text-center text-muted-foreground"
         target="_blank"
         rel="noopener noreferrer"
       >
-        Powered by libredesk
+        Powered by merio
       </a>
     </div>
   </div>

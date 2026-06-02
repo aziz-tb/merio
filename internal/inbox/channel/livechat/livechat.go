@@ -9,8 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/inbox"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -23,8 +23,8 @@ const (
 	ChannelLiveChat       = "livechat"
 	MaxConnectionsPerUser = 10
 
-	HomeAppAnnouncement  = "announcement"
-	HomeAppExternalLink  = "external_link"
+	HomeAppAnnouncement = "announcement"
+	HomeAppExternalLink = "external_link"
 )
 
 type PreChatFormField struct {

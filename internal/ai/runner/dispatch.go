@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
-	convmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	aitools "github.com/aziz-tb/merio/internal/ai/tools"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
+	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
+	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )

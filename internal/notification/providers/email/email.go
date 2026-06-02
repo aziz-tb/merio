@@ -4,10 +4,10 @@ import (
 	"math/rand"
 	"net/textproto"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
-	"github.com/abhinavxd/libredesk/internal/inbox/models"
-	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	"github.com/aziz-tb/merio/internal/attachment"
+	"github.com/aziz-tb/merio/internal/inbox/channel/email"
+	"github.com/aziz-tb/merio/internal/inbox/models"
+	notifier "github.com/aziz-tb/merio/internal/notification"
 	"github.com/knadh/smtppool"
 	"github.com/zerodha/logf"
 )

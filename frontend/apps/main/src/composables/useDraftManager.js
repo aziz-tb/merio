@@ -69,7 +69,7 @@ export function useDraftManager (key, uploadedFiles = null) {
   const isTransitioning = ref(false)
 
   // Reactive localStorage for all drafts
-  const localDrafts = useStorage('libredesk_drafts', {})
+  const localDrafts = useStorage('merio_drafts', {})
 
   /**
    * Save draft to localStorage only

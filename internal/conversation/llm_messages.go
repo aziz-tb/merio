@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/conversation/models"
 )
 
 // LoadMessagesForLLM returns the public, non-activity messages for a

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/httputil"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/httputil"
+	"github.com/aziz-tb/merio/internal/inbox"
+	"github.com/aziz-tb/merio/internal/inbox/channel/email/oauth"
+	"github.com/aziz-tb/merio/internal/inbox/channel/livechat"
+	imodels "github.com/aziz-tb/merio/internal/inbox/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

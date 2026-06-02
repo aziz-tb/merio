@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"time"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	"github.com/aziz-tb/merio/internal/inbox"
+	"github.com/aziz-tb/merio/internal/inbox/channel/livechat"
+	wsmodels "github.com/aziz-tb/merio/internal/ws/models"
 )
 
 // BroadcastNewMessage broadcasts a new message to all users.

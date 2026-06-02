@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	aiopmodels "github.com/abhinavxd/libredesk/internal/ai/operations/models"
-	"github.com/abhinavxd/libredesk/internal/ai/operations/payloads"
+	aiopmodels "github.com/aziz-tb/merio/internal/ai/operations/models"
+	"github.com/aziz-tb/merio/internal/ai/operations/payloads"
 	"github.com/volatiletech/null/v9"
 )
 

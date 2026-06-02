@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/abhinavxd/libredesk/internal/setting"
-	cimodels "github.com/abhinavxd/libredesk/internal/workflows/customeridentification"
+	"github.com/aziz-tb/merio/internal/setting"
+	cimodels "github.com/aziz-tb/merio/internal/workflows/customeridentification"
 )
 
 func (a *Activities) LoadSettingsActivity(ctx context.Context, _ cimodels.LoadSettingsInput) (cimodels.Settings, error) {

@@ -19,13 +19,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/crypto"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/version"
-	"github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/abhinavxd/ssrfguard"
+	"github.com/aziz-tb/merio/internal/crypto"
+	"github.com/aziz-tb/merio/internal/dbutil"
+	"github.com/aziz-tb/merio/internal/envelope"
+	"github.com/aziz-tb/merio/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/version"
+	"github.com/aziz-tb/merio/internal/webhook/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -341,12 +341,12 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Libredesk-Webhook/"+version.Version)
+	req.Header.Set("User-Agent", "Merio-Webhook/"+version.Version)
 
 	// Add signature if secret is provided
 	if webhook.Secret != "" {
 		signature := m.generateSignature(payloadBytes, webhook.Secret)
-		req.Header.Set("X-Libredesk-Signature", signature)
+		req.Header.Set("X-Merio-Signature", signature)
 	}
 
 	m.lo.Debug("delivering webhook",

@@ -10,7 +10,7 @@ import (
 // for the F9 configuration data model, and grants the corresponding
 // permissions on the seeded Admin role. Idempotent.
 //
-// The libredesk migration framework is forward-only. To roll this back,
+// The merio migration framework is forward-only. To roll this back,
 // run the SQL below manually in psql against the same database, then
 // redeploy a build that no longer references these tables:
 //

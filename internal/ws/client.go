@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ws/models"
+	"github.com/aziz-tb/merio/internal/ws/models"
 	"github.com/fasthttp/websocket"
 )
 

@@ -8,7 +8,7 @@ import (
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
 // retryDelays defines the exponential backoff schedule used for transient

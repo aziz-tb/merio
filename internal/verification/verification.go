@@ -17,7 +17,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/verification/models"
+	"github.com/aziz-tb/merio/internal/verification/models"
 	"github.com/zerodha/logf"
 )
 

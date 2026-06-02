@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/attachment"
+	"github.com/aziz-tb/merio/internal/conversation/models"
+	imodels "github.com/aziz-tb/merio/internal/inbox/models"
+	"github.com/aziz-tb/merio/internal/stringutil"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/jhillyerd/enmime"
@@ -179,7 +179,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 				HeaderFields: []string{
 					headerAutoSubmitted,
 					headerAutoreply,
-					headerLibredeskLoopPrevention,
+					headerMerioLoopPrevention,
 					headerMessageID,
 				},
 			},
@@ -565,9 +565,9 @@ func isAutoReply(envelope *enmime.Envelope) bool {
 	return false
 }
 
-// isLoopMessage returns true if the email is a loop prevention message. i.e., it has the `X-Libredesk-Loop-Prevention` header with the inbox email address.
+// isLoopMessage returns true if the email is a loop prevention message. i.e., it has the `X-Merio-Loop-Prevention` header with the inbox email address.
 func isLoopMessage(envelope *enmime.Envelope, inboxEmailaddress string) bool {
-	loopHeader := envelope.GetHeader(headerLibredeskLoopPrevention)
+	loopHeader := envelope.GetHeader(headerMerioLoopPrevention)
 	if loopHeader == "" {
 		return false
 	}

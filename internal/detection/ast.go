@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	customermodels "github.com/abhinavxd/libredesk/internal/customer/models"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
+	customermodels "github.com/aziz-tb/merio/internal/customer/models"
 )
 
 // Detection mode constants.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/aziz-tb/merio/internal/stringutil"
 )
 
 func TestResolveReplyTo(t *testing.T) {

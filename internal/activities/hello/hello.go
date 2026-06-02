@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	activitydeps "github.com/abhinavxd/libredesk/internal/activities/dependencies"
+	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
 )
 
 // SayHelloInput is the activity input. Pointer-to-struct is the

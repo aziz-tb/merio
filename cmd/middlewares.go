@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	execTokenPkg "github.com/abhinavxd/libredesk/internal/exec/token"
-	execTokenModels "github.com/abhinavxd/libredesk/internal/exec/token/models"
-	"github.com/abhinavxd/libredesk/internal/image"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
+	"github.com/aziz-tb/merio/internal/envelope"
+	execTokenPkg "github.com/aziz-tb/merio/internal/exec/token"
+	execTokenModels "github.com/aziz-tb/merio/internal/exec/token/models"
+	"github.com/aziz-tb/merio/internal/image"
+	"github.com/aziz-tb/merio/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 	"github.com/zerodha/simplesessions/v3"
@@ -28,6 +28,7 @@ const headerScriptSystem = "X-Script-System"
 //  2. Authorization header carrying an API key (Basic or Token).
 //  3. Session cookie — the standard agent UI flow. CSRF is checked for
 //     POST/PUT/DELETE.
+//
 // Returns the authenticated user or an error.
 func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	var user models.User

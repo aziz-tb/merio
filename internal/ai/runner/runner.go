@@ -10,18 +10,18 @@ import (
 
 	"github.com/zerodha/logf"
 
-	agentmodels "github.com/abhinavxd/libredesk/internal/ai/agents/models"
-	"github.com/abhinavxd/libredesk/internal/ai/embeddings"
-	"github.com/abhinavxd/libredesk/internal/ai/llm"
-	"github.com/abhinavxd/libredesk/internal/ai/llm/preset"
-	aitools "github.com/abhinavxd/libredesk/internal/ai/tools"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/builtin"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/resolver"
-	"github.com/abhinavxd/libredesk/internal/ai/tools/translator"
-	"github.com/abhinavxd/libredesk/internal/ai/usage/redact"
-	"github.com/abhinavxd/libredesk/internal/conversation"
-	"github.com/abhinavxd/libredesk/internal/knowledge"
-	"github.com/abhinavxd/libredesk/internal/user"
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
+	"github.com/aziz-tb/merio/internal/ai/embeddings"
+	"github.com/aziz-tb/merio/internal/ai/llm"
+	"github.com/aziz-tb/merio/internal/ai/llm/preset"
+	aitools "github.com/aziz-tb/merio/internal/ai/tools"
+	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
+	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
+	"github.com/aziz-tb/merio/internal/ai/tools/translator"
+	"github.com/aziz-tb/merio/internal/ai/usage/redact"
+	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/knowledge"
+	"github.com/aziz-tb/merio/internal/user"
 )
 
 // AgentLoader is the slice of aiagents.Manager the runner needs.

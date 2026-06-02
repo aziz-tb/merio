@@ -13,7 +13,7 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
-	hellact "github.com/abhinavxd/libredesk/internal/activities/hello"
+	hellact "github.com/aziz-tb/merio/internal/activities/hello"
 )
 
 // SayHelloInput is the workflow input.

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	contractmodels "github.com/abhinavxd/libredesk/internal/contract/models"
-	custmodels "github.com/abhinavxd/libredesk/internal/customer/models"
-	"github.com/abhinavxd/libredesk/internal/verification/models"
+	contractmodels "github.com/aziz-tb/merio/internal/contract/models"
+	custmodels "github.com/aziz-tb/merio/internal/customer/models"
+	"github.com/aziz-tb/merio/internal/verification/models"
 )
 
 const phoneMinDigits = 7
