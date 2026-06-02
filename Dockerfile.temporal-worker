@@ -32,13 +32,10 @@ RUN CGO_ENABLED=0 go build \
 # Runtime stage
 FROM alpine:3.18
 
-# ca-certificates: outbound HTTPS to Anthropic / Voyage.
-# tzdata: time.LoadLocation for user-configured business-hours timezones.
-# netcat-openbsd: used by the docker-compose healthcheck.
 RUN apk --no-cache add ca-certificates tzdata netcat-openbsd
 
 WORKDIR /worker
-COPY --from=builder /out/temporal-worker .
+COPY temporal-worker .
 COPY config.sample.toml config.toml
 
 CMD ["./temporal-worker", "--config", "/worker/config.toml"]

@@ -54,8 +54,7 @@ FROM alpine:3.18
 RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /merio
-
-COPY --from=backend /out/merio .
+COPY merio .
 COPY config.sample.toml config.toml
 
 EXPOSE 9000
