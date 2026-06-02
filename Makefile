@@ -192,3 +192,27 @@ down:
 .PHONY: logs
 logs:
 	@docker compose logs -f app temporal-worker
+
+# Production deploy targets - run on the VPS only.
+.PHONY: prod-up
+prod-up:
+	@docker compose -f docker-compose.prod.yml up -d
+	@docker compose -f docker-compose.prod.yml ps
+
+.PHONY: prod-down
+prod-down:
+	@docker compose -f docker-compose.prod.yml down
+
+.PHONY: prod-logs
+prod-logs:
+	@docker compose -f docker-compose.prod.yml logs -f app temporal-worker
+
+.PHONY: prod-pull
+prod-pull:
+	@docker compose -f docker-compose.prod.yml pull
+
+.PHONY: prod-restart
+prod-restart: prod-pull
+	@docker compose -f docker-compose.prod.yml up -d --remove-orphans
+	@sleep 5
+	@docker compose -f docker-compose.prod.yml ps
