@@ -3,10 +3,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-      # Build args plumbed through from .env so the binary stamps the
-      # current commit. Without this, `make deploy` produces an image
-      # with no way to tell what commit it came from.
+      dockerfile: Dockerfile.dev
       args:
         VERSION: ${VERSION:-dev}
         GIT_COMMIT: ${GIT_COMMIT:-unknown}

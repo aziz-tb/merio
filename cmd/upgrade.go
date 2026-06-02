@@ -127,7 +127,7 @@ func getLastMigrationVersion(db *sqlx.DB) (string, error) {
 // `migrations` array in the settings table.
 func recordMigrationVersion(ver string, db *sqlx.DB) error {
 	_, err := db.Exec(`INSERT INTO settings (key, value)
-	VALUES('migrations', jsonb_build_array($1))
+	VALUES('migrations', jsonb_build_array($1::text))
 	ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value`, ver)
 	return err
 }
@@ -140,7 +140,7 @@ func recordCurrentMigrationVersion(db *sqlx.DB) error {
 		return nil
 	}
 	_, err := db.Exec(`INSERT INTO settings (key, value)
-	VALUES('migrations', jsonb_build_array($1))
+	VALUES('migrations', jsonb_build_array($1::text))
 	ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, latest)
 	return err
 }

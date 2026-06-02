@@ -1,0 +1,35 @@
+FROM node:20-alpine AS frontend
+RUN corepack enable && corepack prepare pnpm@9.15.3 --activate
+WORKDIR /build/frontend
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY frontend/ ./
+RUN pnpm build:main && pnpm build:widget
+
+FROM golang:1.25-alpine AS backend
+RUN apk add --no-cache git
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+RUN go install github.com/knadh/stuffbin/...@v1.3.0
+COPY . .
+COPY --from=frontend /build/frontend/dist ./frontend/dist
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+RUN CGO_ENABLED=0 go build -a \
+    -ldflags="-s -w \
+        -X 'main.buildString=${VERSION} (${GIT_COMMIT})' \
+        -X 'main.versionString=${VERSION}' \
+        -X 'github.com/aziz-tb/merio/internal/version.Version=${VERSION}'" \
+    -o /out/merio \
+    cmd/*.go
+RUN stuffbin -a stuff -in /out/merio -out /out/merio \
+    frontend/dist i18n schema.sql static
+
+FROM alpine:3.18
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /merio
+COPY --from=backend /out/merio .
+COPY config.sample.toml config.toml
+EXPOSE 9000
+CMD ["./merio"]
