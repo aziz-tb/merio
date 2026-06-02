@@ -2,7 +2,7 @@
     <div :class="wrapperClasses">
         <div
             v-if="hasHeader"
-            class="flex items-center justify-between px-3 py-2 border-b border-input bg-muted/30 shrink-0"
+            class="flex items-center justify-between px-3 py-2  bg-background shrink-0"
         >
             <div class="flex items-center gap-2">
                 <span v-if="title" class="text-sm font-medium text-foreground">{{ title }}</span>
@@ -15,7 +15,7 @@
                 :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'"
             >
                 <X v-if="isFullscreen" class="size-4" />
-                <Maximize2 v-else class="size-4" />
+                <ArrowUpRightAndArrowDownLeftFromCenter v-else class="size-4" />
             </button>
         </div>
         <div ref="codeEditor" @click="editorView?.focus()" :class="bodyClasses" />
@@ -31,8 +31,7 @@ import { json } from '@codemirror/lang-json'
 import { python } from '@codemirror/lang-python'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useColorMode } from '@vueuse/core'
-import { Maximize2, X } from 'lucide-vue-next'
-import { githubLight } from '@fsegurai/codemirror-theme-github-light'
+import { ArrowUpRightAndArrowDownLeftFromCenter, X } from '@qall/icons'
 
 const props = defineProps({
     modelValue: { type: String, default: '' },

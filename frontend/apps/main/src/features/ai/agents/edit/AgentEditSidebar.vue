@@ -49,18 +49,9 @@
 <script setup>
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  ChevronLeft,
-  IdCard,
-  MessageCircle,
-  Wrench,
-  BookOpen,
-  Filter,
-  History,
-} from 'lucide-vue-next'
 import SidebarGroup from './AgentEditSidebarGroup.vue'
 import { AGENT_EDIT_KEY } from '@/composables/useAgentEdit.js'
-
+import { Comment, Wrench, AddressCard, BookOpen, ChevronLeft, Filter, ClockRotateLeft } from "@qall/icons"
 const { t } = useI18n()
 
 // Live agent record from useAgentEdit (provided by AgentEditLayout).
@@ -79,18 +70,13 @@ const sidebarTitle = computed(() =>
 // route name to navigate to, the lucide icon component, and an
 // optional badge slot (e.g., tool count) that the group renders.
 const configureItems = computed(() => {
-  const identity = {
-    key: 'identity',
-    labelKey: 'admin.ai.agent.tab.identity',
-    icon: IdCard,
-    routeName: props.isCreateMode ? 'agent-create-identity' : 'edit-ai-agent-identity',
-  }
+  const identity = { key: 'identity', labelKey: 'admin.ai.agent.tab.identity', icon: AddressCard, routeName: props.isCreateMode ? 'agent-create-identity' : 'edit-ai-agent-identity' }
 
   if (props.isCreateMode) return [identity]
 
   return [
     identity,
-    { key: 'instructions', labelKey: 'admin.ai.agent.tab.instructions', icon: MessageCircle, routeName: 'edit-ai-agent-instructions' },
+    { key: 'instructions', labelKey: 'admin.ai.agent.tab.instructions', icon: Comment, routeName: 'edit-ai-agent-instructions' },
     { key: 'tools',        labelKey: 'admin.ai.agent.tab.tools',        icon: Wrench,        routeName: 'edit-ai-agent-tools' },
     { key: 'knowledge',    labelKey: 'admin.ai.agent.tab.knowledge',    icon: BookOpen,      routeName: 'edit-ai-agent-knowledge' },
     { key: 'detection',    labelKey: 'admin.ai.agent.tab.detection',    icon: Filter,        routeName: 'edit-ai-agent-detection' },
@@ -100,6 +86,6 @@ const configureItems = computed(() => {
 const operateItems = computed(() =>
   props.isCreateMode
     ? []
-    : [{ key: 'history', labelKey: 'admin.ai.agent.tab.history', icon: History, routeName: 'edit-ai-agent-history' }]
+    : [{ key: 'history', labelKey: 'admin.ai.agent.tab.history', icon: ClockRotateLeft, routeName: 'edit-ai-agent-history' }]
 )
 </script>

@@ -18,6 +18,5 @@ export const createToolFormSchema = (t) =>
       .min(1)
       .max(120000)
       .default(30000),
-    async: z.boolean().default(false),
-    enabled: z.boolean().default(true)
+    async: z.boolean().default(false)
   })

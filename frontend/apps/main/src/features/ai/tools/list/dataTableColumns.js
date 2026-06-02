@@ -1,55 +1,65 @@
 import { h } from 'vue'
-import { RouterLink } from 'vue-router'
-import dropdown from './dataTableDropdown.vue'
+import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
 import { Badge } from '@shared-ui/components/ui/badge'
+import { actionsCol, linkCol } from '@/components/datatable/helpers.js'
 
-export const createColumns = (t) => [
-  {
-    accessorKey: 'name',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.name')),
-    cell: ({ row }) =>
-      h(
-        'div',
-        { class: 'text-center' },
+export const createColumns = (t, { onDelete } = {}) => {
+  const actionColumn = actionsCol()
+
+  return [
+    linkCol(t, 'name', {
+      to: (row) => ({ name: 'edit-ai-tool', params: { id: row.id } })
+    }),
+    {
+      accessorKey: 'slug',
+      header: () => t('globals.terms.slug'),
+      cell: ({ row }) =>
         h(
-          RouterLink,
-          {
-            to: { name: 'edit-ai-tool', params: { id: row.original.id } },
-            class: 'text-primary hover:underline'
-          },
-          () => row.getValue('name')
+          'div',
+          { class: 'font-mono text-sm text-muted-foreground' },
+          row.getValue('slug')
         )
-      )
-  },
-  {
-    accessorKey: 'slug',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.slug')),
-    cell: ({ row }) =>
-      h(
-        'div',
-        { class: 'text-center font-mono text-sm text-muted-foreground' },
-        row.getValue('slug')
-      )
-  },
-  {
-    accessorKey: 'enabled',
-    enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
-    cell: ({ row }) => {
-      const enabled = row.getValue('enabled')
-      return h('div', { class: 'text-center' }, [
-        h(
+    },
+    {
+      accessorKey: 'enabled',
+      enableGlobalFilter: false,
+      header: () => t('globals.terms.status'),
+      meta: { align: 'center' },
+      cell: ({ row }) => {
+        const enabled = row.getValue('enabled')
+        return h(
           Badge,
           { variant: enabled ? 'default' : 'secondary', class: 'text-xs' },
           () => (enabled ? t('globals.terms.enabled') : t('globals.terms.disabled'))
         )
-      ])
+      }
+    },
+    {
+      ...actionColumn,
+      size: 72,
+      meta: {
+        ...actionColumn.meta,
+        align: 'right',
+        width: 72
+      },
+      cell: ({ row }) =>
+        h('div', { class: 'flex justify-end' },
+          h(DataTableRowActions, {
+            items: [
+              {
+                label: t('globals.messages.edit'),
+                to: { name: 'edit-ai-tool', params: { id: row.original.id } }
+              },
+              { separator: true },
+              {
+                label: t('globals.messages.delete'),
+                destructive: true,
+                confirm: t('aiTool.deletionConfirmation'),
+                onClick: () => onDelete?.(row.original)
+              }
+            ]
+          })
+        )
     }
-  },
-  {
-    id: 'actions',
-    enableHiding: false,
-    enableSorting: false,
-    cell: ({ row }) => h('div', { class: 'relative' }, h(dropdown, { tool: row.original }))
-  }
-]
+  ]
+}

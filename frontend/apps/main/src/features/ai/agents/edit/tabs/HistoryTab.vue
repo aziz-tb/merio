@@ -115,6 +115,7 @@ import { normalizeExecution } from '@/features/ai/shared/normalizeRunResult.js'
 import api from '@/api'
 import { AGENT_EDIT_KEY } from '@/composables/useAgentEdit.js'
 import { inject } from 'vue'
+import { formatDateTime } from '@main/utils/date'
 
 const { t } = useI18n()
 const edit = inject(AGENT_EDIT_KEY)
@@ -190,13 +191,7 @@ function badgeVariantFor(status) {
 }
 
 function formatTime(iso) {
-  if (!iso) return '—'
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString()
-  } catch {
-    return '—'
-  }
+  return formatDateTime(iso) || '—'
 }
 
 onMounted(() => load(true))

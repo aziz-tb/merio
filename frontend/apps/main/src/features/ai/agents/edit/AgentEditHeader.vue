@@ -29,7 +29,7 @@
       class="cursor-pointer inline-flex items-center justify-center size-8 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
       @click="toggleSidebar"
     >
-      <PanelLeft class="size-4" />
+      <LayoutLeft class="size-4" />
       <span class="sr-only">Toggle sidebar</span>
     </button>
 
@@ -43,7 +43,7 @@
         :disabled="!edit?.isDirty.value || edit?.saving.value"
         @click="onSave"
       >
-        <Loader2 v-if="edit?.saving.value" class="w-3.5 h-3.5 mr-1.5 animate-spin" />
+        <Loader v-if="edit?.saving.value" class="w-3.5 h-3.5 mr-1.5 animate-spin" />
         {{ edit?.saving.value ? t('globals.messages.saving') : t('globals.messages.save') }}
       </Button>
 
@@ -65,7 +65,7 @@
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { Loader2, PanelLeft } from 'lucide-vue-next'
+import { LayoutLeft, Loader } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { useLayoutSidebar } from '@main/composables/useLayoutSidebar'
 import { AGENT_EDIT_KEY } from '@/composables/useAgentEdit.js'
