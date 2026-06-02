@@ -57,6 +57,9 @@ func install(ctx context.Context, db *sqlx.DB, fs stuffbin.FileSystem, idempoten
 	if err := installSchema(db, fs); err != nil {
 		log.Fatalf("error installing schema: %v", err)
 	}
+	if err := recordCurrentMigrationVersion(db); err != nil {
+		log.Fatalf("error recording current migration version: %v", err)
+	}
 
 	log.Println("database schema installed successfully")
 

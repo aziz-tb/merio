@@ -26,66 +26,11 @@ type migFunc struct {
 	fn      func(*sqlx.DB, stuffbin.FileSystem, *koanf.Koanf) error
 }
 
-// migList is the list of available migList ordered by the semver.
-// Each migration is a Go file in internal/migrations named after the semver.
-// The functions are named as: v0.7.0 => migrations.V0_7_0() and are idempotent.
+// migList is the ordered list of available database migrations.
+// Merio starts from a clean schema.sql baseline, so only the baseline marker
+// remains here. Future schema changes can append forward-only migrations.
 var migList = []migFunc{
-	{"v0.3.0", migrations.V0_3_0},
-	{"v0.4.0", migrations.V0_4_0},
-	{"v0.5.0", migrations.V0_5_0},
-	{"v0.6.0", migrations.V0_6_0},
-	{"v0.7.0", migrations.V0_7_0},
-	{"v0.7.4", migrations.V0_7_4},
-	{"v0.8.5", migrations.V0_8_5},
-	{"v0.9.1", migrations.V0_9_1},
-	{"v0.10.0", migrations.V0_10_0},
-	{"v1.0.1", migrations.V1_0_1},
-	{"v2.0.0", migrations.V2_0_0},
-	{"v2.2.0", migrations.V2_2_0},
-	{"v2.3.0", migrations.V2_3_0},
-	{"v2.4.0", migrations.V2_4_0},
-	{"v2.5.0", migrations.V2_5_0},
-	{"v2.6.0", migrations.V2_6_0},
-	{"v2.7.0", migrations.V2_7_0},
-	{"v2.7.1", migrations.V2_7_1},
-	{"v2.7.2", migrations.V2_7_2},
-	{"v2.7.3", migrations.V2_7_3},
-	{"v2.7.4", migrations.V2_7_4},
-	{"v2.7.5", migrations.V2_7_5},
-	{"v2.7.6", migrations.V2_7_6},
-	{"v2.7.7", migrations.V2_7_7},
-	{"v2.7.8", migrations.V2_7_8},
-	{"v2.7.9", migrations.V2_7_9},
-	{"v2.8.0", migrations.V2_8_0},
-	{"v2.8.1", migrations.V2_8_1},
-	{"v2.8.2", migrations.V2_8_2},
-	{"v2.8.3", migrations.V2_8_3},
-	{"v2.8.4", migrations.V2_8_4},
-	{"v2.8.5", migrations.V2_8_5},
-	{"v2.8.6", migrations.V2_8_6},
-	{"v2.8.7", migrations.V2_8_7},
-	{"v2.8.8", migrations.V2_8_8},
-	{"v2.8.9", migrations.V2_8_9},
-	{"v2.8.10", migrations.V2_8_10},
-	{"v2.8.11", migrations.V2_8_11},
-	{"v2.8.12", migrations.V2_8_12},
-	{"v2.8.13", migrations.V2_8_13},
-	{"v2.8.14", migrations.V2_8_14},
-	{"v2.8.15", migrations.V2_8_15},
-	{"v2.8.16", migrations.V2_8_16},
-	{"v2.8.17", migrations.V2_8_17},
-	{"v2.8.18", migrations.V2_8_18},
-	{"v2.8.19", migrations.V2_8_19},
-	{"v2.8.20", migrations.V2_8_20},
-	{"v2.8.21", migrations.V2_8_21},
-	{"v2.8.22", migrations.V2_8_22},
-	{"v2.8.23", migrations.V2_8_23},
-	{"v2.8.24", migrations.V2_8_24},
-	{"v2.8.25", migrations.V2_8_25},
-	{"v2.8.26", migrations.V2_8_26},
-	{"v2.8.27", migrations.V2_8_27},
-	{"v2.8.28", migrations.V2_8_28},
-	{"v2.8.29", migrations.V2_8_29},
+	{"v0.1.0", migrations.V0_1_0},
 }
 
 // upgrade upgrades the database to the current version by running SQL migration files
@@ -111,7 +56,7 @@ func upgrade(db *sqlx.DB, fs stuffbin.FileSystem, prompt bool) {
 
 	// No migrations to run.
 	if len(toRun) == 0 {
-		log.Printf("no upgrades to run. Database is up to date.")
+		log.Printf("no pending upgrades. Database is up to date.")
 		return
 	}
 
@@ -122,8 +67,7 @@ func upgrade(db *sqlx.DB, fs stuffbin.FileSystem, prompt bool) {
 			log.Fatalf("error running migration %s: %v", m.version, err)
 		}
 
-		// Record the migration version in the settings table. There was no
-		// settings table until v0.7.0, so ignore the no-table errors.
+		// Record the migration version in the settings table.
 		if err := recordMigrationVersion(m.version, db); err != nil {
 			if dbutil.IsTableNotExistError(err) {
 				continue
@@ -156,6 +100,13 @@ func getPendingMigrations(db *sqlx.DB) (string, []migFunc, error) {
 	return lastVer, toRun, nil
 }
 
+func latestMigrationVersion() string {
+	if len(migList) == 0 {
+		return "v0.0.0"
+	}
+	return migList[len(migList)-1].version
+}
+
 // getLastMigrationVersion returns the last migration semver recorded in the DB.
 // If there isn't any, `v0.0.0` is returned.
 func getLastMigrationVersion(db *sqlx.DB) (string, error) {
@@ -175,9 +126,22 @@ func getLastMigrationVersion(db *sqlx.DB) (string, error) {
 // recordMigrationVersion inserts the given version (of DB migration) into the
 // `migrations` array in the settings table.
 func recordMigrationVersion(ver string, db *sqlx.DB) error {
-	_, err := db.Exec(fmt.Sprintf(`INSERT INTO settings (key, value)
-	VALUES('migrations', '["%s"]'::JSONB)
-	ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value`, ver))
+	_, err := db.Exec(`INSERT INTO settings (key, value)
+	VALUES('migrations', jsonb_build_array($1))
+	ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value`, ver)
+	return err
+}
+
+// recordCurrentMigrationVersion marks a freshly installed schema.sql database
+// as already being at the current baseline.
+func recordCurrentMigrationVersion(db *sqlx.DB) error {
+	latest := latestMigrationVersion()
+	if latest == "v0.0.0" {
+		return nil
+	}
+	_, err := db.Exec(`INSERT INTO settings (key, value)
+	VALUES('migrations', jsonb_build_array($1))
+	ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, latest)
 	return err
 }
 

@@ -1274,7 +1274,7 @@ CREATE INDEX idx_function_executions_invoker_user_id
 -- Customer / contract identification (Wave 3 Batch 10). customers and
 -- contracts are caches of ERP-resolved records; last_synced_at drives the
 -- TTL. The conversations identification columns are added here (after both
--- tables exist) to mirror the migration's post-state exactly.
+-- tables exist) to mirror the current baseline state exactly.
 CREATE TABLE customers (
     id              BIGSERIAL PRIMARY KEY,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1369,8 +1369,7 @@ CREATE INDEX index_conversations_on_contract_id
 
 -- agent_executions — immutable record of every agent run on a
 -- conversation. agent_execution_outcomes — at-most-one commitment per
--- run (sent / drafted / escalated / discarded). See migration v2_7_6
--- for the rationale.
+-- run (sent / drafted / escalated / discarded).
 DROP TABLE IF EXISTS agent_execution_outcomes CASCADE;
 DROP TABLE IF EXISTS agent_executions CASCADE;
 CREATE TABLE agent_executions (
@@ -1425,7 +1424,7 @@ CREATE INDEX index_agent_execution_outcomes_on_outcome_committed_at
 -- synthetic runs, future internal jobs). Channel is 'email' because
 -- the enum has no 'system' value; enabled=false keeps it out of inbox
 -- pickers. The UUID is stable and resolved at app startup; see
--- internal/migrations/v2_7_7.go::SystemInboxUUID.
+-- internal/migrations/v0_1_0.go::SystemInboxUUID.
 INSERT INTO inboxes (uuid, name, channel, enabled, config, "from")
 VALUES ('00000000-0000-0000-0000-000000000001', 'System (Internal)', 'email', FALSE, '{}'::jsonb, '')
 ON CONFLICT (uuid) DO NOTHING;
@@ -1433,8 +1432,7 @@ ON CONFLICT (uuid) DO NOTHING;
 -- ai_usage — one row per LLM provider call. Partitioned by month on
 -- created_at; the application's partition manager keeps the runway
 -- extended. Indexes declared on the parent; PG14+ propagates to every
--- child partition automatically. See migration v2_7_7 for full
--- rationale.
+-- child partition automatically.
 DROP TABLE IF EXISTS ai_usage CASCADE;
 CREATE TABLE ai_usage (
 	id                      BIGSERIAL NOT NULL,
@@ -1564,7 +1562,8 @@ VALUES
 	('notification.email.hello_hostname', '""'::jsonb),
     ('notification.email.email_address', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.max_msg_retries', '3'::jsonb),
-    ('notification.email.enabled', 'false'::jsonb);
+    ('notification.email.enabled', 'false'::jsonb),
+    ('migrations', '["v0.1.0"]'::jsonb);
 
 -- Customer / contract identification settings (Wave 3 Batch 10). 8 rows
 -- under the customer_identification.* namespace. Operators populate
