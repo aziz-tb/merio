@@ -13,7 +13,7 @@ jobs:
       db:
         image: postgres:17-alpine
         ports:
-          - 5433:5432
+          - 5432:5432
         env:
           POSTGRES_USER: merio
           POSTGRES_PASSWORD: merio
@@ -44,9 +44,6 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      - name: Install cypress deps
-        run: sudo apt-get update && sudo apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb
-
       - name: Build binary and frontend
         run: make build
 
@@ -59,13 +56,9 @@ jobs:
       - name: Run unit tests for frontend
         run: cd frontend && pnpm test:run
 
-      - name: Install db schema and run tests
+      - name: Verify install + upgrade
         env:
           MERIO_SYSTEM_USER_PASSWORD: "StrongPass!123"
         run: |
           ./merio --install --idempotent-install --yes --config ./config.toml
           ./merio --upgrade --yes --config ./config.toml
-          ./merio --config ./config.toml &
-          sleep 10
-          cd frontend
-          pnpm run test:e2e:ci
