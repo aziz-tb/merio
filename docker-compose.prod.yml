@@ -1,0 +1,172 @@
+services:
+  app:
+    image: ghcr.io/aziz-tb/merio:${IMAGE_TAG:-latest}
+    container_name: merio_app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9100:9000"
+    environment:
+      MERIO_SYSTEM_USER_PASSWORD: ${MERIO_SYSTEM_USER_PASSWORD:?required}
+      MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?required}
+      MERIO_EXEC__SANDBOX_URL: http://host.docker.internal:8090
+      MERIO_EXEC__SANDBOX_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
+      MERIO_EXEC__PLATFORM_BASE_URL: http://127.0.0.1:9100
+      MERIO_TEMPORAL__ENABLED: "true"
+      MERIO_TEMPORAL__ADDRESS: temporal:7233
+      MERIO_TEMPORAL__NAMESPACE: merio
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - merio
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      temporal:
+        condition: service_started
+    volumes:
+      - ./uploads:/merio/uploads:rw
+      - ./config.toml:/merio/config.toml:ro
+      - ./config:/merio/config:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/health 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    command: [sh, -c, "./merio --install --idempotent-install --yes --config /merio/config.toml && ./merio --upgrade --yes --config /merio/config.toml && ./merio --config /merio/config.toml"]
+
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: merio_db
+    restart: unless-stopped
+    networks:
+      - merio
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: merio_redis
+    restart: unless-stopped
+    networks:
+      - merio
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  temporal-postgresql:
+    image: postgres:17-alpine
+    container_name: merio_temporal_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:?required}
+      POSTGRES_DB: temporal
+    networks:
+      - merio
+    expose:
+      - "5432"
+    volumes:
+      - temporal-postgresql-data:/var/lib/postgresql/data
+      - ./config/temporal/temporal-init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  temporal:
+    image: temporalio/auto-setup:1.29
+    container_name: merio_temporal
+    restart: unless-stopped
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:?required}
+      POSTGRES_SEEDS: temporal-postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      DEFAULT_NAMESPACE: merio
+      DEFAULT_NAMESPACE_RETENTION: 30d
+    networks:
+      - merio
+    expose:
+      - "7233"
+      - "9090"
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+    volumes:
+      - ./config/temporal:/etc/temporal/config/dynamicconfig:ro
+
+  temporal-ui:
+    image: temporalio/ui:2.32.0
+    container_name: merio_temporal_ui
+    restart: unless-stopped
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: https://temporal.merio.io
+    networks:
+      - merio
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      - temporal
+
+  temporal-worker:
+    image: ghcr.io/aziz-tb/merio-temporal-worker:${IMAGE_TAG:-latest}
+    container_name: merio_temporal_worker
+    restart: unless-stopped
+    environment:
+      MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?required}
+      MERIO_EXEC__SANDBOX_URL: http://host.docker.internal:8090
+      MERIO_EXEC__SANDBOX_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
+      MERIO_EXEC__PLATFORM_BASE_URL: http://127.0.0.1:9100
+      MERIO_TEMPORAL__ENABLED: "true"
+      MERIO_TEMPORAL__ADDRESS: temporal:7233
+      MERIO_TEMPORAL__NAMESPACE: merio
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./config.toml:/worker/config.toml:ro
+      - ./config:/worker/config:ro
+    networks:
+      - merio
+    depends_on:
+      db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z temporal 7233 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  merio:
+
+volumes:
+  postgres-data:
+  redis-data:
+  temporal-postgresql-data:

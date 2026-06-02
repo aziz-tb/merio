@@ -1,3 +1,4 @@
+# exec-runner/app/runner/prewarm.py
 """
 Pre-warming L1 memory snapshots so first real call hits warm cache.
 

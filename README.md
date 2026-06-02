@@ -85,6 +85,17 @@ __________________
 See [installation docs](https://docs.merio.io/getting-started/installation)
 __________________
 
+## Deployment
+
+Production runs on a single VPS via Docker Compose and nginx.
+
+- Production compose: [`docker-compose.prod.yml`](./docker-compose.prod.yml)
+- Production config example: [`config.toml.example`](./config.toml.example)
+- nginx configs and setup runbook: [`deploy/nginx/`](./deploy/nginx/)
+- Deploy script: [`deploy/deploy.sh`](./deploy/deploy.sh), intended to be called by the CI/CD workflow over SSH
+
+Images are published to GHCR as `ghcr.io/aziz-tb/merio` and `ghcr.io/aziz-tb/merio-temporal-worker`.
+
 ## Developers
 
 - If you are interested in contributing, **please read [CONTRIBUTING.md](./CONTRIBUTING.md) first**.
