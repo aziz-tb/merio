@@ -1,5 +1,5 @@
 <template>
-  <div class="inline-flex items-center gap-0.5 rounded-full border border-border bg-accent border-secondary p-1 shadow-md">
+  <div class="inline-flex items-center gap-0.5 rounded-full border border-border bg-white dark:bg-accent border-secondary p-1 shadow-md">
     <Tooltip>
       <TooltipTrigger as-child>
         <button

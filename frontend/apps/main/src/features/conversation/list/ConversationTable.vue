@@ -12,40 +12,38 @@
           class="h-8 border-border/60 bg-transparent pl-9 text-xs shadow-none focus-visible:bg-background"
         />
       </div>
-      <span class="inline-flex h-7 shrink-0 items-center rounded-full border border-border bg-background px-3 text-xs text-muted-foreground">
-        {{ countLabel }}
+      <DropdownMenu v-if="!route.params.viewID">
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 shrink-0 gap-1 rounded-full border border-border bg-background px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <span>{{ tableTotal }}</span>
+            <span>{{ listStatusLabel }}</span>
+            <ChevronDown class="size-3 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            v-for="status in conversationStore.statusOptions"
+            :key="status.value"
+            @click="handleStatusChange(status)"
+          >
+            {{ statusDisplayLabel(status) }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <span
+        v-else
+        class="inline-flex h-7 shrink-0 items-center rounded-full border border-border bg-background px-3 text-xs text-muted-foreground"
+      >
+        {{ tableTotal }}
       </span>
     </div>
 
     <!-- Scrollable table -->
-    <div ref="scrollContainer" class="relative min-h-0 flex-1 overflow-auto">
-      <div class="pointer-events-none sticky top-0 z-30 flex h-0 justify-end">
-        <div class="pointer-events-auto flex h-9 w-10 items-center justify-center bg-sidebar">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              class="inline-flex size-6 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted hover:text-foreground"
-              :title="t('conversation.table.columnPicker')"
-            >
-              <Plus class="size-4" />
-              <span class="sr-only">{{ t('conversation.table.columnPicker') }}</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="w-56">
-              <DropdownMenuLabel>{{ t('conversation.table.columnPicker') }}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                v-for="column in columnsByDefinition"
-                :key="column.id"
-                :checked="isColumnVisible(column.id)"
-                :disabled="isColumnVisible(column.id) && visibleColumns.length <= 1"
-                @update:checked="(value) => toggleColumn(column.id, value)"
-              >
-                {{ column.label }}
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
+    <div ref="scrollContainer" class="min-h-0 flex-1 overflow-auto">
       <table class="w-full border-collapse text-sm" :style="{ minWidth: tableMinWidth }">
         <thead class="sticky top-0 z-20 bg-sidebar">
           <tr ref="headerRowEl" class="m-2">
@@ -54,7 +52,8 @@
               :key="column.id"
               :class="[
                 'group/header relative h-9 px-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80',
-                column.align === 'center' ? 'text-center' : 'text-left'
+                column.align === 'center' ? 'text-center' : 'text-left',
+                isLastVisibleColumn(column.id) ? 'pr-10' : ''
               ]"
               :style="columnStyle(column)"
             >
@@ -123,8 +122,30 @@
                 :aria-label="t('conversation.table.resizeColumn')"
                 @pointerdown.stop.prevent="startResize(column.id, $event)"
               />
+              <DropdownMenu v-if="isLastVisibleColumn(column.id)">
+                <DropdownMenuTrigger
+                  class="no-drag absolute right-2 top-1.5 inline-flex size-6 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+                  :title="t('conversation.table.columnPicker')"
+                  @click.stop
+                >
+                  <Plus class="size-4" />
+                  <span class="sr-only">{{ t('conversation.table.columnPicker') }}</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-56">
+                  <DropdownMenuLabel>{{ t('conversation.table.columnPicker') }}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    v-for="column in columnsByDefinition"
+                    :key="column.id"
+                    :checked="isColumnVisible(column.id)"
+                    :disabled="isColumnVisible(column.id) && visibleColumns.length <= 1"
+                    @update:checked="(value) => toggleColumn(column.id, value)"
+                  >
+                    {{ column.label }}
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </th>
-
           </tr>
         </thead>
 
@@ -234,6 +255,7 @@ import { useConversationStore } from '@main/stores/conversation'
 import { useTeamStore } from '@main/stores/team'
 import { useUsersStore } from '@main/stores/users'
 import { useInboxView } from '@main/composables/useInboxView'
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
 import ConversationTableCell from '@/features/conversation/list/ConversationTableCell.vue'
 
 const MIN_COLUMN_WIDTH = 72
@@ -380,12 +402,9 @@ const tableColumnCount = computed(() => visibleColumns.value.length)
 const isLoading = computed(() => conversationStore.conversations.loading)
 const showSkeleton = computed(() => isLoading.value && conversationStore.conversationsList.length === 0)
 
-const countLabel = computed(() => {
-  const total = conversationStore.conversations.total || sortedRows.value.length
-  const status = String(conversationStore.getListStatus || '').trim()
-  if (status) return `${total} ${status.toLowerCase()}`
-  return t('conversation.table.count', { n: total })
-})
+const tableTotal = computed(() => conversationStore.conversations.total || sortedRows.value.length)
+const statusDisplayLabel = (status) => getStatusDisplayLabel(status, t)
+const listStatusLabel = computed(() => statusDisplayLabel(conversationStore.getListStatus))
 
 const filteredRows = computed(() => {
   const rows = conversationStore.conversationsList || []
@@ -485,6 +504,15 @@ function toggleColumn(id, value) {
 
 function hideColumn(id) {
   toggleColumn(id, false)
+}
+
+function isLastVisibleColumn(id) {
+  const columns = visibleColumns.value
+  return columns[columns.length - 1]?.id === id
+}
+
+function handleStatusChange(status) {
+  conversationStore.setListStatus(status.label)
 }
 
 function setSort(id, desc) {

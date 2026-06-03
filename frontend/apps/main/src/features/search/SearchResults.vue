@@ -1,14 +1,14 @@
 <template>
-  <div class="max-w-5xl mx-auto p-6 min-h-screen">
+  <div class="h-full min-h-0 p-4">
     <Tabs :default-value="defaultTab" v-model="activeTab">
-      <TabsList class="grid w-full mb-6" :class="tabsGridClass">
+      <TabsList class="mb-4 grid w-full" :class="tabsGridClass">
         <TabsTrigger v-for="(items, type) in results" :key="type" :value="type">
           {{ $t(tabLabelKeys[type], 2) }} ({{ items.length }})
         </TabsTrigger>
       </TabsList>
 
       <TabsContent v-for="(items, type) in results" :key="type" :value="type" class="mt-0">
-        <div class="bg-background rounded border overflow-hidden">
+        <div class="overflow-hidden rounded-md border border-border bg-background">
           <!-- No results message -->
           <div v-if="items.length === 0" class="p-8 text-center text-muted-foreground">
             <div class="text-lg font-medium mb-2">
@@ -22,7 +22,7 @@
             <div
               v-for="item in items"
               :key="item.id || item.uuid"
-              class="p-6 hover:bg-accent/50 transition duration-200 ease-in-out group"
+              class="group p-4 transition duration-200 ease-in-out hover:bg-muted/40"
             >
               <router-link
                 :to="{
@@ -34,11 +34,11 @@
                 }"
                 class="block"
               >
-                <div class="flex justify-between items-start">
-                  <div class="flex-grow">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0 flex-1">
                     <!-- Reference number and status -->
                     <div
-                      class="text-sm font-semibold mb-2 text-muted-foreground group-hover:text-primary transition duration-200 flex items-center gap-2"
+                      class="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground transition duration-200"
                     >
                       <span>
                         #{{
@@ -58,7 +58,7 @@
 
                     <!-- Content -->
                     <div
-                      class="text-foreground font-medium mb-2 text-lg group-hover:text-primary transition duration-200"
+                      class="mb-2 truncate text-sm font-medium text-foreground transition duration-200"
                     >
                       {{
                         truncateText(
@@ -69,8 +69,8 @@
                     </div>
 
                     <!-- Timestamp -->
-                    <div class="text-sm text-muted-foreground flex items-center">
-                      <ClockIcon class="h-4 w-4 mr-1" />
+                    <div class="flex items-center text-xs text-muted-foreground">
+                      <ClockIcon class="mr-1 size-3.5" />
                       {{
                         formatDate(
                           type === 'conversations' ? item.created_at : item.conversation_created_at
@@ -81,10 +81,10 @@
 
                   <!-- Right arrow icon -->
                   <div
-                    class="bg-secondary rounded-full p-2 group-hover:bg-primary transition duration-200"
+                    class="rounded-full bg-secondary p-2 transition duration-200 group-hover:bg-muted"
                   >
                     <ChevronRightIcon
-                      class="h-5 w-5 text-secondary-foreground group-hover:text-primary-foreground"
+                      class="size-4 text-secondary-foreground"
                       aria-hidden="true"
                     />
                   </div>

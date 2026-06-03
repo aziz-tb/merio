@@ -1,19 +1,11 @@
 <template>
-  <div class="border-b border-border bg-card">
-    <div class="container mx-auto max-w-7xl px-6 py-4">
-      <router-link
-        :to="{ name: 'contacts' }"
-        class="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ChevronLeft class="size-3" />
-        {{ t('contact.page.backToContacts') }}
-      </router-link>
-
+  <div class="border-b border-border bg-card pb-4">
+    <div class="container mx-auto w-full px-6 py-4">
       <div class="flex items-start gap-4">
         <Avatar class="size-12 shrink-0">
           <AvatarImage v-if="avatarURL" :src="avatarURL" :alt="displayName" />
           <AvatarFallback class="bg-muted">
-            <User class="size-5 text-muted-foreground" />
+            <User class="size-6 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
 
@@ -25,7 +17,7 @@
               variant="heading"
               @commit="updateContactName"
             />
-            <PencilIcon class="size-4 text-muted-foreground opacity-0 transition-opacity group-hover/name:opacity-50" />
+            <Pen class="size-4 text-muted-foreground opacity-0 transition-opacity group-hover/name:opacity-50" />
           </div>
 
           <p class="mt-0.5 truncate text-sm text-muted-foreground">{{ stringValue(contact?.email) }}</p>
@@ -34,7 +26,7 @@
             v-if="customer"
             class="mt-2 inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground"
           >
-            <LinkIcon class="size-3 shrink-0" />
+            <LinkSimple class="size-3 shrink-0" />
             <span class="truncate">{{ customerName }}</span>
             <span>·</span>
             <span class="shrink-0 font-mono">{{ customer.customer_id }}</span>
@@ -59,7 +51,7 @@
           <DropdownMenu v-if="contact">
             <DropdownMenuTrigger as-child>
               <Button type="button" variant="ghost" size="icon" class="size-8">
-                <MoreHorizontal class="size-4" />
+                <EllipsisVertical class="size-4" />
                 <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
               </Button>
             </DropdownMenuTrigger>
@@ -81,7 +73,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronLeft, Link as LinkIcon, MoreHorizontal, Pencil as PencilIcon, Plus, User } from 'lucide-vue-next'
+import { Plus, EllipsisVertical, LinkSimple, Pen, User } from '@qall/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Button } from '@shared-ui/components/ui/button'
 import {

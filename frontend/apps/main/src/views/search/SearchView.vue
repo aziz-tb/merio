@@ -1,8 +1,8 @@
 <template>
-  <div class="flex flex-col h-screen bg-background">
+  <div class="flex h-full min-h-0 flex-col bg-sidebar">
      <!-- Header -->
     <SearchHeader v-model="searchQuery" @search="handleSearch" />
-    <div class="flex-1 overflow-y-auto">
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <div v-if="loading" class="flex justify-center items-center h-64">
         <Spinner />
       </div>

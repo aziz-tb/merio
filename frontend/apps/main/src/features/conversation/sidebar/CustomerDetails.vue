@@ -81,36 +81,34 @@
         <template v-else>
           <Popover v-model:open="dropdownOpen">
             <PopoverAnchor as-child>
-              <div ref="searchRow" class="flex items-center gap-1.5">
-                <div class="relative min-w-0 flex-1">
-                  <Search class="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    v-model="searchQuery"
-                    class="h-8 pl-8 text-xs"
-                    :placeholder="t('conversation.customer.searchPlaceholder')"
-                    autocomplete="off"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    :aria-expanded="dropdownOpen"
-                    @focus="onInputFocus"
-                    @keydown.down.prevent="onArrowDown"
-                    @keydown.up.prevent="onArrowUp"
-                    @keydown.enter.prevent="onEnter"
-                    @keydown.esc="closeDropdown"
-                  />
-                </div>
+              <div ref="searchRow" class="relative min-w-0 flex-1">
+                <Search class="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  v-model="searchQuery"
+                  class="h-8 pl-8 pr-9 text-xs"
+                  :placeholder="t('conversation.customer.searchPlaceholder')"
+                  autocomplete="off"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  :aria-expanded="dropdownOpen"
+                  @focus="onInputFocus"
+                  @keydown.down.prevent="onArrowDown"
+                  @keydown.up.prevent="onArrowUp"
+                  @keydown.enter.prevent="onEnter"
+                  @keydown.esc="closeDropdown"
+                />
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
-                      class="size-8 [&_svg]:size-3"
+                      class="absolute right-1 top-1/2 z-10 size-6 -translate-y-1/2 bg-background/80 text-muted-foreground hover:text-foreground [&_svg]:size-3"
                       :disabled="startingIdentification"
                       @click="reIdentify"
                     >
-                      <Loader v-if="startingIdentification" class="size-4 animate-spin" />
-                      <ArrowsRotate v-else class="size-3 text-gray-500"  />
+                      <Loader v-if="startingIdentification" class="size-3 animate-spin" />
+                      <ArrowsRotate v-else class="size-3" />
                       <span class="sr-only">{{ t('conversation.customer.reIdentify') }}</span>
                     </Button>
                   </TooltipTrigger>
@@ -379,7 +377,6 @@ import {
   X,
 } from 'lucide-vue-next'
 import { User, Phone, ArrowsRotate, Loader, ChevronDown } from '@qall/icons'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import {
