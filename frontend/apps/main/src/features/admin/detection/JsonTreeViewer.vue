@@ -33,6 +33,7 @@
                 <template v-else>"{{ node.key }}"</template></span><span class="text-muted-foreground shrink-0">:</span>
               <span class="text-muted-foreground ml-1">{{ node.type === 'array' ? '[]' : '{}' }}</span>
               <button
+                v-if="showActionButton"
                 type="button"
                 class="shrink-0 opacity-0 group-hover/row:opacity-100 focus:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-opacity self-center"
                 :title="actionTitle"
@@ -40,7 +41,7 @@
                 @click.stop="handleAction(node.path)"
               >
                 <Check v-if="copiedPath === node.path" class="size-3 text-green-600 dark:text-green-400" />
-                <Copy />
+                <component :is="actionIcon" v-else class="size-3" />
               </button>
             </div>
           </template>
@@ -70,6 +71,7 @@
                 <!-- Expanded: just the opening brace + action icon -->
                 <span class="text-muted-foreground ml-1">{{ node.type === 'array' ? '[' : '{' }}</span>
                 <button
+                  v-if="showActionButton"
                   type="button"
                   class="shrink-0 opacity-0 group-hover/row:opacity-100 focus:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-opacity self-center"
                   :title="actionTitle"
@@ -77,7 +79,7 @@
                   @click.stop="handleAction(node.path)"
                 >
                   <Check v-if="copiedPath === node.path" class="size-3 text-green-600 dark:text-green-400" />
-                  <Copy v-else />
+                  <component :is="actionIcon" v-else class="size-3" />
                 </button>
               </template>
               <template v-else>
@@ -95,6 +97,7 @@
                   {{ node.type === 'array' ? '[ … ]' : '{ … }' }}
                 </button>
                 <button
+                  v-if="showActionButton"
                   type="button"
                   class="shrink-0 opacity-0 group-hover/row:opacity-100 focus:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-opacity self-center"
                   :title="actionTitle"
@@ -102,7 +105,7 @@
                   @click.stop="handleAction(node.path)"
                 >
                   <Check v-if="copiedPath === node.path" class="size-3 text-green-600 dark:text-green-400" />
-                  <Copy v-else />
+                  <component :is="actionIcon" v-else class="size-3" />
                 </button>
               </template>
             </div>
@@ -142,6 +145,7 @@
                   <template v-if="parentIsArray">{{ node.key }}</template>
                   <template v-else>"{{ node.key }}"</template></span><span class="text-muted-foreground">:</span>
                 <span :class="valueClasses(node.value)" class="ml-2 break-words">{{ formatValueDisplay(node.value) }}</span><button
+                  v-if="showActionButton"
                   type="button"
                   class="inline-flex items-center align-middle ml-2 opacity-0 group-hover/row:opacity-100 focus:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-opacity"
                   :title="actionTitle"
@@ -149,7 +153,7 @@
                   @click.stop="handleAction(node.path)"
                 >
                   <Check v-if="copiedPath === node.path" class="size-3 text-green-600 dark:text-green-400" />
-                  <Copy v-else />
+                  <component :is="actionIcon" v-else class="size-3" />
                 </button>
               </span>
             </div>
@@ -168,7 +172,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { MagnifyingGlass as Search, Check, ListTree, Copy, ChevronDown, ChevronRight } from '@qall/icons'
+import { Check, ListTree, ChevronDown, ChevronRight } from '@qall/icons'
 
 defineOptions({ name: 'JsonTreeViewer' })
 
@@ -204,24 +208,18 @@ const normalizedQuery = computed(() => rootSearchQuery.value.trim().toLowerCase(
 // --- Expansion state ---
 const localExpandedPaths = ref(new Set())
 const expandedPaths = computed(() => props.expandedPaths || localExpandedPaths.value)
-const explicitlyToggled = ref(new Set())
 
-const isExpanded = (path) => {
-  if (explicitlyToggled.value.has(path)) {
-    return expandedPaths.value.has(path)
-  }
-  return true
-}
+const isExpanded = (path) => expandedPaths.value.has(path)
 
 const toggle = (path) => {
   if (props.isRoot) {
-    explicitlyToggled.value.add(path)
-    if (expandedPaths.value.has(path)) {
-      expandedPaths.value.delete(path)
+    const next = new Set(expandedPaths.value)
+    if (next.has(path)) {
+      next.delete(path)
     } else {
-      expandedPaths.value.add(path)
+      next.add(path)
     }
-    localExpandedPaths.value = new Set(expandedPaths.value)
+    localExpandedPaths.value = next
   } else {
     emit('toggle', path)
   }
@@ -312,11 +310,12 @@ const visibleNodeCount = computed(() => {
 
 watch(normalizedQuery, (q) => {
   if (!q || !props.isRoot) return
-  expandMatchingDescendants(props.value, props.basePath)
-  localExpandedPaths.value = new Set(expandedPaths.value)
+  const next = new Set(expandedPaths.value)
+  expandMatchingDescendants(props.value, props.basePath, next)
+  localExpandedPaths.value = next
 })
 
-const expandMatchingDescendants = (value, prefix) => {
+const expandMatchingDescendants = (value, prefix, expanded) => {
   if (value === null || typeof value !== 'object') return
   const entries = Array.isArray(value)
     ? value.map((v, i) => [String(i), v])
@@ -327,9 +326,8 @@ const expandMatchingDescendants = (value, prefix) => {
     if (!isBranch) continue
     const fakeNode = { isBranch: true, value: childValue }
     if (isMatch({ key, value: childValue, isBranch: true }) || branchHasMatchingDescendant(fakeNode)) {
-      expandedPaths.value.add(path)
-      explicitlyToggled.value.add(path)
-      expandMatchingDescendants(childValue, path)
+      expanded.add(path)
+      expandMatchingDescendants(childValue, path, expanded)
     }
   }
 }
@@ -351,7 +349,8 @@ const formatValueDisplay = (value) => {
 }
 
 // --- Action ---
-const actionIcon = computed(() => props.mode === 'picker' ? ListTree : Copy)
+const actionIcon = computed(() => ListTree)
+const showActionButton = computed(() => props.mode === 'picker')
 const actionTitle = computed(() => props.mode === 'picker'
   ? t('jsonTree.selectPath')
   : t('jsonTree.copyPath'))
