@@ -28,7 +28,15 @@
       </AvatarFallback>
     </Avatar>
     <div class="min-w-0 flex flex-col gap-0.5">
-      <span class="truncate text-foreground text-sm">{{ contactName || missing }}</span>
+      <div class="flex min-w-0 items-center gap-1.5">
+        <span class="truncate text-foreground text-sm">{{ displayName || missing }}</span>
+        <Tooltip v-if="isLinked">
+          <TooltipTrigger as-child>
+            <Link class="size-3.5 shrink-0 text-muted-foreground" />
+          </TooltipTrigger>
+          <TooltipContent>{{ t('conversation.customer.linkedTooltip') }}</TooltipContent>
+        </Tooltip>
+      </div>
       <p
         v-if="contactEmail"
         class="truncate text-muted-foreground text-xs"
@@ -226,7 +234,8 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { useEmitter } from '@main/composables/useEmitter'
 import { formatDateTime } from '@main/utils/date'
 import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
-import { Check } from '@qall/icons'
+import { getConversationDisplayName, hasLinkedCustomer } from '@main/utils/conversationDisplay'
+import { Check, Link } from '@qall/icons'
 
 const props = defineProps({
   columnId: { type: String, required: true },
@@ -263,15 +272,6 @@ const findOptionByLabel = (items, label) => {
 
 const sameValue = (a, b) => String(a ?? '') === String(b ?? '')
 
-// Null-safe: default parameter only fires on `undefined`, not `null`.
-const fullName = (person) => {
-  if (!person) return ''
-  return [stringValue(person.first_name), stringValue(person.last_name)]
-    .filter(Boolean)
-    .join(' ')
-    .trim()
-}
-
 const initials = (name) => {
   const parts = stringValue(name).trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'
@@ -282,13 +282,14 @@ const stripHTML = (value) => stringValue(value).replace(/<[^>]*>/g, ' ').replace
 
 // Contact
 const contact = computed(() => props.conversation.contact || {})
-const contactName = computed(() => fullName(contact.value) || stringValue(contact.value.email))
+const displayName = computed(() => getConversationDisplayName(props.conversation))
 const contactAvatar = computed(() => stringValue(contact.value.avatar_url))
-const contactInitials = computed(() => initials(contactName.value || contact.value.first_name))
+const contactInitials = computed(() => initials(displayName.value || contact.value.first_name))
 const contactEmail = computed(() => stringValue(contact.value.email))
 const contactTitle = computed(() =>
-  [contactName.value, stringValue(contact.value.email)].filter(Boolean).join(' · ')
+  [displayName.value, stringValue(contact.value.email)].filter(Boolean).join(' · ')
 )
+const isLinked = computed(() => hasLinkedCustomer(props.conversation))
 
 // Subject + activity preview (both shown in the subject column, stacked)
 const subjectText = computed(() => stringValue(props.conversation.subject))

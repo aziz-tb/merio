@@ -119,7 +119,6 @@
               :key="conversation.uuid"
               :conversation="conversation"
               :currentConversation="conversationStore.current"
-              :contactFullName="conversationStore.getContactFullName(conversation.uuid)"
               class="transition-colors duration-200"
             />
           </div>

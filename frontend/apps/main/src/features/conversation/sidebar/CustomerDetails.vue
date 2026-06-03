@@ -386,6 +386,7 @@ import { useUserStore } from '@/stores/user'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { useEmitter } from '@/composables/useEmitter'
 import { useWorkflowCompletion } from '@/composables/useWorkflowCompletion'
+import { getCustomerDisplayName } from '@main/utils/conversationDisplay'
 import countries from '@/constants/countries.js'
 import ConflictInfoPanel from './ConflictInfoPanel.vue'
 import ReconnectInfoPanel from './ReconnectInfoPanel.vue'
@@ -928,12 +929,7 @@ watch(uuid, async (next) => {
 }, { immediate: true })
 
 const customerName = (row) => {
-  if (!row) return '-'
-  const company = stringValue(row.company)
-  if (company) return company
-  const first = stringValue(row.firstname)
-  const last = stringValue(row.lastname)
-  return [first, last].filter(Boolean).join(' ') || row.customer_id || '-'
+  return getCustomerDisplayName(row) || '-'
 }
 
 function stringValue (v) {

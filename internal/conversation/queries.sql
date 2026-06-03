@@ -56,12 +56,18 @@ SELECT
     conversations.uuid,
     conversations.reference_number,
     conversations.waiting_since,
+    conversations.customer_id,
     users.created_at as "contact.created_at",
     users.updated_at as "contact.updated_at",
     users.first_name as "contact.first_name",
     users.last_name as "contact.last_name",
     users.email as "contact.email",
     users.avatar_url as "contact.avatar_url",
+    COALESCE(cust.customer_id, conversations.customer_id) as "customer.customer_id",
+    cust.business as "customer.business",
+    cust.firstname as "customer.firstname",
+    cust.lastname as "customer.lastname",
+    cust.company as "customer.company",
     inboxes.channel as inbox_channel,
     inboxes.name as inbox_name,
     conversations.sla_policy_id,
@@ -129,6 +135,7 @@ SELECT
     FROM conversations
     JOIN users ON contact_id = users.id
     JOIN inboxes ON inbox_id = inboxes.id  
+    LEFT JOIN customers cust ON cust.customer_id = conversations.customer_id
     LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
     LEFT JOIN conversation_priorities ON priority_id = conversation_priorities.id
     LEFT JOIN LATERAL (
@@ -215,6 +222,11 @@ SELECT
    ct.external_user_id as "contact.external_user_id",
    ct.linked_customer_id as "contact.linked_customer_id",
    ct.linked_customer_id_at as "contact.linked_customer_id_at",
+   COALESCE(cust.customer_id, c.customer_id) as "customer.customer_id",
+   cust.business as "customer.business",
+   cust.firstname as "customer.firstname",
+   cust.lastname as "customer.lastname",
+   cust.company as "customer.company",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
@@ -228,6 +240,7 @@ SELECT
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN customers cust ON cust.customer_id = c.customer_id
 LEFT JOIN sla_policies sla ON c.sla_policy_id = sla.id
 LEFT JOIN teams at ON at.id = c.assigned_team_id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id

@@ -11,9 +11,15 @@
         <Skeleton class="w-[130px] h-5" v-else />
         <span
           v-if="!conversationStore.conversation.loading" 
-          class="text-xs text-muted-foreground truncate"
+          class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
         >
-        {{ conversationStore.currentContactName }}
+          <span class="truncate">{{ currentDisplayName }}</span>
+          <Tooltip v-if="currentHasLinkedCustomer">
+            <TooltipTrigger as-child>
+              <LinkSimple class="size-3 shrink-0 text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>{{ t('conversation.customer.linkedTooltip') }}</TooltipContent>
+          </Tooltip>
         </span>
       </div>
 
@@ -119,7 +125,8 @@ import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
-import { Check, LayoutRight } from '@qall/icons'
+import { getConversationDisplayName, hasLinkedCustomer } from '@main/utils/conversationDisplay'
+import { Check, LayoutRight, Link, LinkSimple } from '@qall/icons'
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
@@ -129,6 +136,8 @@ const { t } = useI18n()
 const detailsPaneOpen = useStorage('conversationSidebarOpen', true)
 
 const statusButtonLabel = computed(() => conversationStore.current?.status || '')
+const currentDisplayName = computed(() => getConversationDisplayName(conversationStore.current))
+const currentHasLinkedCustomer = computed(() => hasLinkedCustomer(conversationStore.current))
 const currentStatusOption = computed(() =>
   conversationStore.statusOptions.find((status) => status.label === statusButtonLabel.value) || {
     label: statusButtonLabel.value

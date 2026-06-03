@@ -30,8 +30,14 @@
           <div class="flex-1 min-w-0 space-y-1">
             <!-- Contact name + time -->
             <div class="flex items-baseline justify-between gap-2">
-              <h3 class="text-sm font-semibold truncate text-foreground">
-                {{ contactFullName }}
+              <h3 class="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold text-foreground">
+                <span class="truncate">{{ displayName }}</span>
+                <Tooltip v-if="isLinked">
+                  <TooltipTrigger as-child>
+                    <LinkSimple class="size-3 shrink-0 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>{{ t('conversation.customer.linkedTooltip') }}</TooltipContent>
+                </Tooltip>
               </h3>
               <span
                 class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 tabular-nums"
@@ -112,8 +118,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Envelope as Mail, Message as MessageSquare, Reply, EnvelopeOpen as MailOpen, FilePen } from '@qall/icons'
+import { Envelope as Mail, Message as MessageSquare, Reply, EnvelopeOpen as MailOpen, FilePen, Link, LinkSimple } from '@qall/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
@@ -121,12 +128,15 @@ import {
   ContextMenuItem,
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
 import { useConversationStore } from '@main/stores/conversation'
+import { getConversationDisplayName, hasLinkedCustomer } from '@main/utils/conversationDisplay'
 
 let timer = null
 const now = ref(new Date())
 const route = useRoute()
+const { t } = useI18n()
 const conversationStore = useConversationStore()
 const frdStatus = ref('')
 const rdStatus = ref('')
@@ -134,8 +144,7 @@ const nrdStatus = ref('')
 
 const props = defineProps({
   conversation: Object,
-  currentConversation: Object,
-  contactFullName: String
+  currentConversation: Object
 })
 
 const handleMarkAsUnread = () => {
@@ -197,4 +206,7 @@ const draftPreview = computed(() => {
   const text = draft.content.replace(/<[^>]*>/g, '').trim()
   return text.length > 120 ? text.slice(0, 120) + '...' : text
 })
+
+const displayName = computed(() => getConversationDisplayName(props.conversation))
+const isLinked = computed(() => hasLinkedCustomer(props.conversation))
 </script>

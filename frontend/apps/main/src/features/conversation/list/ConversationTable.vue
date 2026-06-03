@@ -246,6 +246,7 @@ import { useTeamStore } from '@main/stores/team'
 import { useUsersStore } from '@main/stores/users'
 import { useInboxView } from '@main/composables/useInboxView'
 import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
+import { getConversationDisplayName } from '@main/utils/conversationDisplay'
 import ConversationTableCell from '@/features/conversation/list/ConversationTableCell.vue'
 
 const MIN_COLUMN_WIDTH = 72
@@ -269,8 +270,8 @@ const COLUMN_DEFS = [
     labelKey: 'conversation.table.columns.user',
     width: 240,
     sortType: 'text',
-    sortValue: (row) => contactName(row),
-    searchValue: (row) => [contactName(row), row.contact?.email].filter(Boolean).join(' ')
+    sortValue: (row) => getConversationDisplayName(row),
+    searchValue: (row) => [getConversationDisplayName(row), row.contact?.email].filter(Boolean).join(' ')
   },
   {
     id: 'priority',

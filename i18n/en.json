@@ -683,6 +683,7 @@
   "conversation.customer.dismiss": "Dismiss",
   "conversation.customer.lastAttemptFailed": "Last attempt failed",
   "conversation.customer.lastAttemptTimedOut": "Last attempt timed out",
+  "conversation.customer.linkedTooltip": "Customer linked",
   "conversation.customer.maybe": "Maybe",
   "conversation.customer.menu.removeCustomer": "Remove connected customer",
   "conversation.customer.menu.searchNew": "Search new customer",
