@@ -114,6 +114,14 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 		err            error
 	)
 
+	agent, err := u.Get(id, "", []string{models.UserTypeAgent})
+	if err != nil {
+		return err
+	}
+	if agent.IsSystemUser() {
+		return envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.notAllowed", "name", "system user"), nil)
+	}
+
 	// Set password?
 	if newPassword != "" {
 		if !IsStrongPassword(newPassword) {
@@ -141,12 +149,11 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 
 // SoftDeleteAgent soft deletes an agent by ID.
 func (u *Manager) SoftDeleteAgent(id int) error {
-	// Disallow if user is system user.
-	systemUser, err := u.GetSystemUser()
+	agent, err := u.Get(id, "", []string{models.UserTypeAgent})
 	if err != nil {
 		return err
 	}
-	if id == systemUser.ID {
+	if agent.IsSystemUser() {
 		return envelope.NewError(envelope.InputError, u.i18n.T("user.cannotDeleteSystemUser"), nil)
 	}
 	if _, err := u.q.SoftDeleteAgent.Exec(id); err != nil {

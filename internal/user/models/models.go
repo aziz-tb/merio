@@ -14,7 +14,7 @@ import (
 const (
 	UserModel = "user"
 
-	SystemUserEmail = "System"
+	SystemUserEmail = "system@merio.local"
 
 	// User types
 	UserTypeAgent   = "agent"
@@ -38,6 +38,7 @@ type UserCompact struct {
 	LastName       string      `db:"last_name" json:"last_name"`
 	Email          null.String `db:"email" json:"email"`
 	Enabled        bool        `db:"enabled" json:"enabled"`
+	IsSystem       bool        `db:"is_system" json:"is_system"`
 	AvatarURL      null.String `db:"avatar_url" json:"avatar_url"`
 	ExternalUserID null.String `db:"external_user_id" json:"external_user_id"`
 	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
@@ -66,6 +67,7 @@ type User struct {
 	PhoneNumber            null.String          `db:"phone_number" json:"phone_number"`
 	AvatarURL              null.String          `db:"avatar_url" json:"avatar_url"`
 	Enabled                bool                 `db:"enabled" json:"enabled"`
+	IsSystem               bool                 `db:"is_system" json:"is_system"`
 	Password               null.String          `db:"password" json:"-"`
 	LastActiveAt           null.Time            `db:"last_active_at" json:"last_active_at"`
 	LastLoginAt            null.Time            `db:"last_login_at" json:"last_login_at"`
@@ -128,5 +130,5 @@ func (u *User) HasAdminRole() bool {
 }
 
 func (u *User) IsSystemUser() bool {
-	return u.Email.String == SystemUserEmail
+	return u.IsSystem || u.Email.String == SystemUserEmail
 }

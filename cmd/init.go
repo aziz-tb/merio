@@ -74,6 +74,7 @@ import (
 	tmpl "github.com/aziz-tb/merio/internal/template"
 	"github.com/aziz-tb/merio/internal/temporal"
 	"github.com/aziz-tb/merio/internal/user"
+	usermodels "github.com/aziz-tb/merio/internal/user/models"
 	"github.com/aziz-tb/merio/internal/view"
 	"github.com/aziz-tb/merio/internal/webhook"
 	"github.com/aziz-tb/merio/internal/worklog"
@@ -456,15 +457,14 @@ func initExecToken(rdb *redis.Client) *exectoken.Manager {
 // The system user is identified by a stable email, not by ID, so this
 // works across deployments.
 func initSystemUserID(db *sqlx.DB) int {
-	const systemEmail = "system@merio.local"
 	var id int
 	err := db.QueryRow(
 		`SELECT id FROM users WHERE email = $1 AND type = 'agent' AND deleted_at IS NULL`,
-		systemEmail,
+		usermodels.SystemUserEmail,
 	).Scan(&id)
 	if err != nil {
 		log.Fatalf("System Agent user not found (email=%s) — did the v2.5.0 migration run? %v",
-			systemEmail, err)
+			usermodels.SystemUserEmail, err)
 	}
 	return id
 }

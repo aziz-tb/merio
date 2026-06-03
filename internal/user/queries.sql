@@ -1,7 +1,7 @@
 -- name: get-users-compact
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id
+SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.is_system, users.external_user_id
 FROM users
-WHERE users.email != 'System' AND users.deleted_at IS NULL AND type = ANY($1)
+WHERE users.is_system = false AND users.deleted_at IS NULL AND type = ANY($1)
 
 -- name: soft-delete-agent
 WITH soft_delete AS (
@@ -32,6 +32,7 @@ SELECT
     u.password,
     u.type,
     u.enabled,
+    u.is_system,
     u.avatar_url,
     u.first_name,
     u.last_name,

@@ -134,6 +134,7 @@ CREATE TABLE users (
     type user_type NOT NULL,
     deleted_at TIMESTAMPTZ NULL,
     enabled BOOL DEFAULT TRUE NOT NULL,
+    is_system BOOL DEFAULT FALSE NOT NULL,
     email TEXT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NULL,
@@ -1651,8 +1652,8 @@ VALUES
 
 -- System Agent user — script-execution callbacks act as this user when
 -- a script opts into system identity. Identified by stable reserved email.
-INSERT INTO users (type, enabled, email, first_name, last_name, password)
-SELECT 'agent', TRUE, 'system@merio.local', 'System Agent', '', NULL
+INSERT INTO users (type, enabled, is_system, email, first_name, last_name, password)
+SELECT 'agent', TRUE, TRUE, 'system@merio.local', 'System Agent', '', NULL
 WHERE NOT EXISTS (
 	SELECT 1 FROM users
 	WHERE email = 'system@merio.local'
