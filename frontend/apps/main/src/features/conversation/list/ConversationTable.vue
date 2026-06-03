@@ -18,7 +18,34 @@
     </div>
 
     <!-- Scrollable table -->
-    <div ref="scrollContainer" class="min-h-0 flex-1 overflow-auto">
+    <div ref="scrollContainer" class="relative min-h-0 flex-1 overflow-auto">
+      <div class="pointer-events-none sticky top-0 z-30 flex h-0 justify-end">
+        <div class="pointer-events-auto flex h-9 w-10 items-center justify-center bg-sidebar">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              class="inline-flex size-6 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+              :title="t('conversation.table.columnPicker')"
+            >
+              <Plus class="size-4" />
+              <span class="sr-only">{{ t('conversation.table.columnPicker') }}</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-56">
+              <DropdownMenuLabel>{{ t('conversation.table.columnPicker') }}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                v-for="column in columnsByDefinition"
+                :key="column.id"
+                :checked="isColumnVisible(column.id)"
+                :disabled="isColumnVisible(column.id) && visibleColumns.length <= 1"
+                @update:checked="(value) => toggleColumn(column.id, value)"
+              >
+                {{ column.label }}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
       <table class="w-full border-collapse text-sm" :style="{ minWidth: tableMinWidth }">
         <thead class="sticky top-0 z-20 bg-sidebar">
           <tr ref="headerRowEl" class="m-2">
@@ -98,31 +125,6 @@
               />
             </th>
 
-            <!-- Trailing + column picker -->
-            <th class="no-drag sticky right-0 z-10 h-9 w-10 bg-background px-1 text-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  class="inline-flex size-6 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted hover:text-foreground"
-                  :title="t('conversation.table.columnPicker')"
-                >
-                  <Plus class="size-4" />
-                  <span class="sr-only">{{ t('conversation.table.columnPicker') }}</span>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="w-56">
-                  <DropdownMenuLabel>{{ t('conversation.table.columnPicker') }}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    v-for="column in columnsByDefinition"
-                    :key="column.id"
-                    :checked="isColumnVisible(column.id)"
-                    :disabled="isColumnVisible(column.id) && visibleColumns.length <= 1"
-                    @update:checked="(value) => toggleColumn(column.id, value)"
-                  >
-                    {{ column.label }}
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </th>
           </tr>
         </thead>
 
@@ -137,9 +139,6 @@
                 :style="columnStyle(column)"
               >
                 <Skeleton class="h-3.5 w-full max-w-[12rem]" />
-              </td>
-              <td class="h-14 w-10 px-2">
-                <Skeleton class="mx-auto size-4" />
               </td>
             </tr>
           </template>
@@ -178,8 +177,6 @@
                   :now="now"
                 />
               </td>
-              <!-- Trailing column placeholder matches the + header -->
-              <td class="h-14 w-10 sticky right-0 bg-background transition-colors group-hover:bg-muted/40" />
             </tr>
           </template>
         </tbody>
@@ -239,14 +236,12 @@ import { useUsersStore } from '@main/stores/users'
 import { useInboxView } from '@main/composables/useInboxView'
 import ConversationTableCell from '@/features/conversation/list/ConversationTableCell.vue'
 
-const PLUS_COLUMN_ID = '__column_picker__'
 const MIN_COLUMN_WIDTH = 72
 const MAX_COLUMN_WIDTH = 560
 
 // Column definitions. Each column id matches a branch in ConversationTableCell.
 // `subject` column shows the subject line + last message preview stacked.
 // `user` column shows the contact avatar + name + email.
-// The trailing `+` header is appended programmatically and is not in this list.
 const COLUMN_DEFS = [
   {
     id: 'subject',
@@ -381,7 +376,7 @@ const visibleColumns = computed(() =>
   orderedColumns.value.filter((column) => isColumnVisible(column.id))
 )
 
-const tableColumnCount = computed(() => visibleColumns.value.length + 1)
+const tableColumnCount = computed(() => visibleColumns.value.length)
 const isLoading = computed(() => conversationStore.conversations.loading)
 const showSkeleton = computed(() => isLoading.value && conversationStore.conversationsList.length === 0)
 
@@ -418,14 +413,14 @@ const sortedRows = computed(() => {
 })
 
 const tableMinWidth = computed(() => {
-  const width = visibleColumns.value.reduce((sum, column) => sum + columnWidth(column.id), 40)
+  const width = visibleColumns.value.reduce((sum, column) => sum + columnWidth(column.id), 0)
   return `${Math.max(width, 720)}px`
 })
 
 watch(
   visibleColumns,
   (columns) => {
-    draggableColumnIds.value = [...columns.map((column) => column.id), PLUS_COLUMN_ID]
+    draggableColumnIds.value = columns.map((column) => column.id)
   },
   { immediate: true }
 )
@@ -460,7 +455,7 @@ useDraggable(headerRowEl, draggableColumnIds, {
   preventOnFilter: true,
   onMove: (event) => !event.related?.classList?.contains('no-drag'),
   onUpdate: () => {
-    const nextVisible = draggableColumnIds.value.filter((id) => id !== PLUS_COLUMN_ID)
+    const nextVisible = [...draggableColumnIds.value]
     const hidden = columnOrder.value.filter((id) => !nextVisible.includes(id))
     columnOrder.value = [...nextVisible, ...hidden]
   }

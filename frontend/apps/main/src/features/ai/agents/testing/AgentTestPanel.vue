@@ -113,7 +113,7 @@
             <Input
               type="number"
               min="0"
-              step="1000"
+              step="1"
               :model-value="deadlineMs"
               @input="(e) => (deadlineMs = e.target.value === '' ? 0 : parseInt(e.target.value, 10))"
               placeholder="0 = 60000"

@@ -77,7 +77,7 @@
                 <FormControl>
                   <Input
                     type="number"
-                    step="1000"
+                    step="1"
                     min="1"
                     max="120000"
                     v-bind="field"

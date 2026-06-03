@@ -28,7 +28,7 @@
           type="number"
           min="1"
           max="120000"
-          step="1000"
+          step="1"
           :model-value="timeoutMsModel"
           @input="(e) => setTimeoutMs(e.target.value)"
         />
