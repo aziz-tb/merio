@@ -53,7 +53,7 @@ import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
-import { Paperclip, Smile } from 'lucide-vue-next'
+import { Paperclip, FaceSmile as Smile } from '@qall/icons'
 
 const { t } = useI18n()
 

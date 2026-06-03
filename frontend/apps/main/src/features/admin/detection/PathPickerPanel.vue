@@ -173,7 +173,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
-import { Loader2, Search, X } from 'lucide-vue-next'
+import { Loader as Loader2, MagnifyingGlass as Search, X } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'

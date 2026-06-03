@@ -76,10 +76,10 @@ const configureItems = computed(() => {
 
   return [
     identity,
+    { key: 'detection',    labelKey: 'admin.ai.agent.tab.detection',    icon: Filter,        routeName: 'edit-ai-agent-detection' },
     { key: 'instructions', labelKey: 'admin.ai.agent.tab.instructions', icon: Comment, routeName: 'edit-ai-agent-instructions' },
     { key: 'tools',        labelKey: 'admin.ai.agent.tab.tools',        icon: Wrench,        routeName: 'edit-ai-agent-tools' },
     { key: 'knowledge',    labelKey: 'admin.ai.agent.tab.knowledge',    icon: BookOpen,      routeName: 'edit-ai-agent-knowledge' },
-    { key: 'detection',    labelKey: 'admin.ai.agent.tab.detection',    icon: Filter,        routeName: 'edit-ai-agent-detection' },
   ]
 })
 

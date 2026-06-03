@@ -1,6 +1,6 @@
 <script setup>
 import { reactiveOmit } from "@vueuse/core";
-import { ChevronRightIcon } from '@radix-icons/vue';
+import { ChevronRight } from '@qall/icons'
 import { ContextMenuSubTrigger, useForwardProps } from "reka-ui";
 import { cn } from "@shared-ui/lib/utils";
 
@@ -30,6 +30,6 @@ const forwardedProps = useForwardProps(delegatedProps);
     "
   >
     <slot />
-    <ChevronRightIcon class="ml-auto h-4 w-4" />
+    <ChevronRight class="ml-auto h-4 w-4" />
   </ContextMenuSubTrigger>
 </template>

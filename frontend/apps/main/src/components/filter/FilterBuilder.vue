@@ -139,7 +139,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { Plus } from 'lucide-vue-next'
+import { Plus } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'

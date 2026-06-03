@@ -1,14 +1,15 @@
 <template>
   <!-- Inline message row (no bubble bg). Borders come from `divide-y` on the parent list, so single messages have no border and stacks have hairlines only between adjacent rows. -->
   <div
-    class="group flex flex-row gap-3 px-4 py-4 w-full"
+    class="group flex flex-row gap-3 pl-2 px-4 py-4 w-full"
     :class="{ 'bg-private': isPrivateMessage }"
   >
     <!-- Avatar -->
-    <Avatar class="w-9 h-9 flex-shrink-0">
+    <Avatar class="w-8 h-8 mt-1 flex-shrink-0">
       <AvatarImage :src="getAvatar" />
       <AvatarFallback class="text-xs font-medium">
-        {{ avatarFallback }}
+        <User v-if="!isOutgoing" class="size-4 text-muted-foreground" />
+        <span v-else>{{ avatarFallback }}</span>
       </AvatarFallback>
     </Avatar>
 
@@ -114,7 +115,7 @@ import { computed, ref } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, MoreHorizontal } from 'lucide-vue-next'
+import { Lock, Envelope as Mail, ArrowRotateLeft as RotateCcw, Check, Ellipsis as MoreHorizontal, User } from '@qall/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
@@ -125,6 +126,7 @@ import MessageAttachmentPreview from '@main/features/conversation/message/attach
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
+import { getConversationDisplayName } from '@main/utils/conversationDisplay'
 
 const props = defineProps({
   message: Object,
@@ -141,6 +143,9 @@ const userStore = useUserStore()
 const isOutgoing = computed(() => props.direction === 'outgoing')
 
 const getFullName = computed(() => {
+  if (!isOutgoing.value) {
+    return getConversationDisplayName(convStore.current)
+  }
   const author = props.message.author ?? {}
   const firstName = author.first_name ?? 'User'
   const lastName = author.last_name ?? ''

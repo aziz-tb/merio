@@ -20,7 +20,9 @@ var (
 )
 
 const (
-	maxStatusNameLength = 25
+	maxStatusNameLength  = 25
+	maxStatusColorLength = 32
+	maxStatusIconLength  = 64
 )
 
 // Manager handles changes to statuses.
@@ -70,7 +72,7 @@ func (m *Manager) GetAll() ([]models.Status, error) {
 }
 
 // Create creates a new status.
-func (m *Manager) Create(name, category string) (models.Status, error) {
+func (m *Manager) Create(name, category, color, icon string) (models.Status, error) {
 	var status models.Status
 	if err := m.validateStatusName(name); err != nil {
 		return status, err
@@ -78,7 +80,12 @@ func (m *Manager) Create(name, category string) (models.Status, error) {
 	if err := m.validateCategory(category); err != nil {
 		return status, err
 	}
-	if err := m.q.InsertStatus.Get(&status, name, category); err != nil {
+	color = defaultStatusColor(color, category)
+	icon = defaultStatusIcon(icon, category)
+	if err := m.validateVisuals(color, icon); err != nil {
+		return status, err
+	}
+	if err := m.q.InsertStatus.Get(&status, name, category, color, icon); err != nil {
 		m.lo.Error("error inserting status", "error", err)
 		return status, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -108,12 +115,17 @@ func (m *Manager) Delete(id int) error {
 }
 
 // Update updates a status by id.
-func (m *Manager) Update(id int, name, category string) (models.Status, error) {
+func (m *Manager) Update(id int, name, category, color, icon string) (models.Status, error) {
 	var updatedStatus models.Status
 	if err := m.validateStatusName(name); err != nil {
 		return updatedStatus, err
 	}
 	if err := m.validateCategory(category); err != nil {
+		return updatedStatus, err
+	}
+	color = defaultStatusColor(color, category)
+	icon = defaultStatusIcon(icon, category)
+	if err := m.validateVisuals(color, icon); err != nil {
 		return updatedStatus, err
 	}
 	status, err := m.Get(id)
@@ -125,7 +137,7 @@ func (m *Manager) Update(id int, name, category string) (models.Status, error) {
 		return updatedStatus, envelope.NewError(envelope.InputError, m.i18n.T("conversationStatus.cannotUpdateDefault"), nil)
 	}
 
-	if err := m.q.UpdateStatus.Get(&updatedStatus, id, name, category); err != nil {
+	if err := m.q.UpdateStatus.Get(&updatedStatus, id, name, category, color, icon); err != nil {
 		m.lo.Error("error updating status", "error", err)
 		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -158,4 +170,42 @@ func (m *Manager) validateCategory(category string) error {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.invalidFields", "name", "`category`"), nil)
 	}
 	return nil
+}
+
+func (m *Manager) validateVisuals(color, icon string) error {
+	if len(color) > maxStatusColorLength {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.invalidFields", "name", "`color`"), nil)
+	}
+	if len(icon) > maxStatusIconLength {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.invalidFields", "name", "`icon`"), nil)
+	}
+	return nil
+}
+
+func defaultStatusColor(color, category string) string {
+	if color != "" {
+		return color
+	}
+	switch category {
+	case models.CategoryWaiting:
+		return models.DefaultColorWaiting
+	case models.CategoryResolved:
+		return models.DefaultColorResolved
+	default:
+		return models.DefaultColorOpen
+	}
+}
+
+func defaultStatusIcon(icon, category string) string {
+	if icon != "" {
+		return icon
+	}
+	switch category {
+	case models.CategoryWaiting:
+		return models.DefaultIconWaiting
+	case models.CategoryResolved:
+		return models.DefaultIconResolved
+	default:
+		return models.DefaultIconOpen
+	}
 }

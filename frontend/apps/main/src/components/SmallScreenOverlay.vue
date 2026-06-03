@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { Monitor } from 'lucide-vue-next'
+import { Display as Monitor } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { useI18n } from 'vue-i18n'
 

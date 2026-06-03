@@ -78,7 +78,7 @@
 <script setup>
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Link2, Mail, MessageSquare, Play } from 'lucide-vue-next'
+import { Link as Link2, Envelope as Mail, Message as MessageSquare, Play } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { PillSwitcher, PillSwitcherItem } from '@shared-ui/components/ui/pill-switcher'
 import AgentPreviewHeader from './AgentPreviewHeader.vue'

@@ -1,5 +1,5 @@
 <template>
-  <div class="inline-flex items-center gap-0.5 rounded-full border border-border bg-accent border-secondary p-1 shadow-md">
+  <div class="inline-flex items-center gap-0.5 rounded-full border border-border bg-white dark:bg-accent border-secondary p-1 shadow-md">
     <Tooltip>
       <TooltipTrigger as-child>
         <button
@@ -39,7 +39,7 @@
 <script setup>
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { PanelLeft, Columns3 } from 'lucide-vue-next'
+import { Sidebar as PanelLeft, Columns3 } from '@qall/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { INBOX_VIEW_MODES, useInboxView } from '@main/composables/useInboxView'
 

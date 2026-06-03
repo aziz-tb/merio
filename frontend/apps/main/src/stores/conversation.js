@@ -14,6 +14,7 @@ import { getI18n } from '../i18n'
 import { useThrottleFn } from '@vueuse/core'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '@/constants/conversation'
 import { getPriorityVisual } from '@/utils/priorityVisuals'
+import { getStatusVisual } from '@/utils/statusVisuals'
 import { useInboxStore } from './inbox'
 import api from '../api'
 
@@ -49,13 +50,20 @@ export const useConversationStore = defineStore('conversation', () => {
     })
   })
   const statusOptions = computed(() => {
-    return statuses.value.map(s => ({ label: s.name, value: s.id }))
+    return statuses.value.map(s => ({
+      label: s.name,
+      value: s.id,
+      category: s.category,
+      ...getStatusVisual(s)
+    }))
   })
   // Status options excluding 'Snoozed'
   const statusOptionsNoSnooze = computed(() =>
     statuses.value.filter(s => s.name !== 'Snoozed').map(s => ({
       label: s.name,
-      value: s.id
+      value: s.id,
+      category: s.category,
+      ...getStatusVisual(s)
     }))
   )
 

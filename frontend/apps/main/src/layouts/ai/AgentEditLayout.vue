@@ -40,7 +40,7 @@
           :is-create-mode="isCreateMode"
           @toggle-preview="preview.toggle()"
         />
-        <div class="flex-1 overflow-auto">
+        <div class="min-h-0 flex-1 overflow-auto">
           <router-view v-if="!edit.loading.value && edit.agent.value" />
           <div
             v-else-if="edit.loading.value"

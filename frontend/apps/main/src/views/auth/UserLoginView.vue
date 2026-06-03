@@ -134,7 +134,7 @@ import { useI18n } from 'vue-i18n'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { useAppSettingsStore } from '../../stores/appSettings'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
-import { Eye, EyeOff } from 'lucide-vue-next'
+import { Eye, EyeSlash as EyeOff } from '@qall/icons'
 
 const emitter = useEmitter()
 const { t } = useI18n()

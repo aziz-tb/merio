@@ -45,9 +45,6 @@
           @update:model-value="onSlugInput"
           @keydown.enter.prevent
         />
-        <p v-if="!isCreateMode" class="text-xs text-muted-foreground">
-          {{ t('admin.ai.slugPermanent') }}
-        </p>
       </div>
 
       <!-- Description -->

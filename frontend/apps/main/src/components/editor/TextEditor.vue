@@ -121,15 +121,8 @@
 <script setup>
 import { ref, watch, onUnmounted } from 'vue'
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/vue-3'
-import {
-  ChevronDown,
-  Bold,
-  Italic,
-  Bot,
-  List,
-  ListOrdered,
-  Link as LinkIcon
-} from 'lucide-vue-next'
+import { ListOl as ListOrdered } from '@qall/icons'
+import { ChevronDown, Bold, Italic, Robot as Bot, List, Link as LinkIcon } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RadioGroupIndicator, RadioGroupItem, useForwardProps } from 'radix-vue'
-import { CheckIcon } from '@radix-icons/vue'
+import { CircleSmall } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 
 const props = defineProps({
@@ -35,7 +35,7 @@ const forwardedProps = useForwardProps(delegatedProps)
     "
   >
     <RadioGroupIndicator class="flex items-center justify-center">
-      <CheckIcon class="h-3.5 w-3.5 fill-primary" />
+      <CircleSmall class="h-2 w-2 fill-primary" />
     </RadioGroupIndicator>
   </RadioGroupItem>
 </template>

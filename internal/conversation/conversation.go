@@ -713,6 +713,14 @@ func (c *Manager) UpdateConversationWaitingSince(conversationUUID string, at *ti
 
 // UpdateConversationUserAssignee sets the assignee of a conversation to a specifc user.
 func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, actor umodels.User) error {
+	agent, err := c.userStore.GetAgent(assigneeID, "")
+	if err != nil {
+		return err
+	}
+	if agent.IsSystemUser() {
+		return envelope.NewError(envelope.InputError, c.i18n.Ts("globals.messages.notAllowed", "name", "system user"), nil)
+	}
+
 	if err := c.UpdateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -745,19 +753,16 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	}
 
 	// Broadcast conversation update to widget clients with assignee info.
-	agent, err := c.userStore.GetAgent(assigneeID, "")
-	if err == nil {
-		c.SignAvatarURL(&agent.AvatarURL)
-		c.BroadcastConversationToWidget(uuid, conversation.ContactID, conversation.InboxID, map[string]any{
-			"assignee": map[string]any{
-				"id":                  agent.ID,
-				"first_name":          agent.FirstName,
-				"last_name":           agent.LastName,
-				"avatar_url":          agent.AvatarURL,
-				"availability_status": agent.AvailabilityStatus,
-			},
-		})
-	}
+	c.SignAvatarURL(&agent.AvatarURL)
+	c.BroadcastConversationToWidget(uuid, conversation.ContactID, conversation.InboxID, map[string]any{
+		"assignee": map[string]any{
+			"id":                  agent.ID,
+			"first_name":          agent.FirstName,
+			"last_name":           agent.LastName,
+			"avatar_url":          agent.AvatarURL,
+			"availability_status": agent.AvailabilityStatus,
+		},
+	})
 
 	return nil
 }

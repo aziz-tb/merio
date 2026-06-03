@@ -1004,7 +1004,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group'
 import { Label } from '@shared-ui/components/ui/label'
-import { Plus, X, TriangleAlert, GripVertical, Lightbulb } from 'lucide-vue-next'
+import { Plus, X, TriangleExclamation as TriangleAlert, GripVertical, Lightbulb } from '@qall/icons'
 import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'

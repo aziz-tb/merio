@@ -1,14 +1,9 @@
 import { h } from 'vue'
 import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
+import StatusPill from '@main/components/status/StatusPill.vue'
 import { actionsCol, dateTimeCol } from '@/components/datatable/helpers.js'
 import { CONVERSATION_DEFAULT_STATUSES_LIST } from '@/constants/conversation.js'
-
-const DEFAULT_STATUS_KEY = {
-  Open: 'globals.terms.open',
-  Snoozed: 'globals.terms.snoozed',
-  Resolved: 'globals.terms.resolved',
-  Closed: 'globals.terms.closed'
-}
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
 
 export const createColumns = (t, { onEdit, onDelete } = {}) => {
   const actionColumn = actionsCol()
@@ -16,18 +11,27 @@ export const createColumns = (t, { onEdit, onDelete } = {}) => {
   return [
     {
       accessorKey: 'name',
-      header: () => t('globals.terms.name'),
+      header: () => t('globals.terms.status'),
       cell: ({ row }) => {
         const name = row.getValue('name')
         const isDefault = CONVERSATION_DEFAULT_STATUSES_LIST.includes(name)
-        const label = isDefault ? t(DEFAULT_STATUS_KEY[name]) : name
+        const label = isDefault ? getStatusDisplayLabel(row.original, t) : name
+        const isClickable = onEdit && !isDefault
 
-        return onEdit && !isDefault
-          ? h('span', {
-              class: 'text-primary hover:underline cursor-pointer',
-              onClick: () => onEdit(row.original)
-            }, label)
-          : label
+        return h(StatusPill, {
+          as: isClickable ? 'button' : 'span',
+          ...(isClickable ? { type: 'button' } : {}),
+          status: row.original,
+          label,
+          size: 'md',
+          class: [
+            'max-w-full',
+            isClickable
+              ? 'cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1'
+              : ''
+          ],
+          onClick: isClickable ? () => onEdit(row.original) : undefined
+        })
       }
     },
     {

@@ -119,7 +119,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Mail, MessageSquare } from 'lucide-vue-next'
+import { Envelope as Mail, Message as MessageSquare } from '@qall/icons'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'

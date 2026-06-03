@@ -9,7 +9,7 @@
           </p>
           <Tooltip>
             <TooltipTrigger>
-              <Info class="text-muted-foreground" size="14" />
+              <CircleInfo class="text-muted-foreground" size="12" />
             </TooltipTrigger>
             <TooltipContent>
               {{ attribute.description }}
@@ -36,7 +36,7 @@
         </p>
         <Tooltip>
           <TooltipTrigger>
-            <Info class="text-muted-foreground" size="14" />
+            <CircleInfo class="text-muted-foreground " size="12" />
           </TooltipTrigger>
           <TooltipContent>
             {{ attribute.description }}
@@ -144,7 +144,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { Pencil, Trash2, Check, X, Info } from 'lucide-vue-next'
+import { Pencil, TrashCan as Trash2, Check, X, CircleInfo } from '@qall/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 

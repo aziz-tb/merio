@@ -506,7 +506,7 @@ func ChangeSystemUserPassword(ctx context.Context, db *sqlx.DB) error {
 	if err := updateSystemUserPassword(db, hashedPassword); err != nil {
 		return fmt.Errorf("error updating system user password: %v", err)
 	}
-	fmt.Println("password updated successfully. Login with email 'System' and the new password.")
+	fmt.Printf("password updated successfully for system user '%s'.\n", models.SystemUserEmail)
 	return nil
 }
 
@@ -531,19 +531,28 @@ func CreateSystemUser(ctx context.Context, password string, db *sqlx.DB) error {
 
 	_, err = db.Exec(`
 		WITH sys_user AS (
-			INSERT INTO users (email, type, first_name, last_name, password)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO users (email, type, first_name, last_name, password, enabled, is_system)
+			VALUES ($1, $2, $3, $4, $5, TRUE, TRUE)
+			ON CONFLICT (email) WHERE type = 'agent' AND deleted_at IS NULL
+			DO UPDATE SET
+				first_name = EXCLUDED.first_name,
+				last_name = EXCLUDED.last_name,
+				password = EXCLUDED.password,
+				enabled = TRUE,
+				is_system = TRUE,
+				updated_at = now()
 			RETURNING id
 		)
 		INSERT INTO user_roles (user_id, role_id)
-		SELECT sys_user.id, roles.id 
-		FROM sys_user, roles 
-		WHERE roles.name = $6`,
-		models.SystemUserEmail, models.UserTypeAgent, "System", "", hashedPassword, rmodels.RoleAdmin)
+		SELECT sys_user.id, roles.id
+		FROM sys_user, roles
+		WHERE roles.name = $6
+		ON CONFLICT (user_id, role_id) DO NOTHING`,
+		models.SystemUserEmail, models.UserTypeAgent, "System Agent", "", hashedPassword, rmodels.RoleAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to create system user: %v", err)
 	}
-	log.Print("system user created successfully. Use command 'merio --set-system-user-password' to set the password and login with email 'System'.")
+	log.Printf("system user created successfully. Use command 'merio --set-system-user-password' to set the password for email '%s'.", models.SystemUserEmail)
 	return nil
 }
 

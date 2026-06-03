@@ -67,7 +67,7 @@
 </template>
 
 <script setup>
-import { Trash2 } from 'lucide-vue-next'
+import { TrashCan as Trash2 } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 

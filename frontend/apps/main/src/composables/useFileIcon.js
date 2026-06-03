@@ -1,7 +1,4 @@
-import {
-  FileText, FileSpreadsheet, FileImage,
-  FileVideo, FileAudio, FileArchive, File
-} from 'lucide-vue-next'
+import { FileLines as FileText, FileSpreadsheet, FileImage, FileVideo, FileAudio, FileZipper as FileArchive, File } from '@qall/icons'
 
 const ICON_MAP = {
   // Documents

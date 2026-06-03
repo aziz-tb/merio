@@ -280,17 +280,7 @@ import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema'
 import { Button } from '@shared-ui/components/ui/button'
-import {
-  X,
-  Plus,
-  Timer,
-  CircleAlert,
-  Users,
-  Clock,
-  Hourglass,
-  Bell,
-  SlidersHorizontal
-} from 'lucide-vue-next'
+import { X, Plus, Timer, CircleExclamation as CircleAlert, Users, Clock, Hourglass, Bell, Sliders as SlidersHorizontal } from '@qall/icons'
 import { useUsersStore } from '../../../stores/users'
 import {
   FormControl,

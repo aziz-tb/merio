@@ -12,8 +12,33 @@
           class="h-8 border-border/60 bg-transparent pl-9 text-xs shadow-none focus-visible:bg-background"
         />
       </div>
-      <span class="inline-flex h-7 shrink-0 items-center rounded-full border border-border bg-background px-3 text-xs text-muted-foreground">
-        {{ countLabel }}
+      <DropdownMenu v-if="!route.params.viewID">
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 shrink-0 gap-1 rounded-full border border-border bg-background px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <span>{{ tableTotal }}</span>
+            <span>{{ listStatusLabel }}</span>
+            <ChevronDown class="size-3 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            v-for="status in conversationStore.statusOptions"
+            :key="status.value"
+            @click="handleStatusChange(status)"
+          >
+            {{ statusDisplayLabel(status) }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <span
+        v-else
+        class="inline-flex h-7 shrink-0 items-center rounded-full border border-border bg-background px-3 text-xs text-muted-foreground"
+      >
+        {{ tableTotal }}
       </span>
     </div>
 
@@ -27,7 +52,8 @@
               :key="column.id"
               :class="[
                 'group/header relative h-9 px-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80',
-                column.align === 'center' ? 'text-center' : 'text-left'
+                column.align === 'center' ? 'text-center' : 'text-left',
+                isLastVisibleColumn(column.id) ? 'pr-10' : ''
               ]"
               :style="columnStyle(column)"
             >
@@ -96,14 +122,11 @@
                 :aria-label="t('conversation.table.resizeColumn')"
                 @pointerdown.stop.prevent="startResize(column.id, $event)"
               />
-            </th>
-
-            <!-- Trailing + column picker -->
-            <th class="no-drag sticky right-0 z-10 h-9 w-10 bg-background px-1 text-center">
-              <DropdownMenu>
+              <DropdownMenu v-if="isLastVisibleColumn(column.id)">
                 <DropdownMenuTrigger
-                  class="inline-flex size-6 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+                  class="no-drag absolute right-2 top-1.5 inline-flex size-6 items-center justify-center rounded text-muted-foreground/70 hover:bg-muted hover:text-foreground"
                   :title="t('conversation.table.columnPicker')"
+                  @click.stop
                 >
                   <Plus class="size-4" />
                   <span class="sr-only">{{ t('conversation.table.columnPicker') }}</span>
@@ -137,9 +160,6 @@
                 :style="columnStyle(column)"
               >
                 <Skeleton class="h-3.5 w-full max-w-[12rem]" />
-              </td>
-              <td class="h-14 w-10 px-2">
-                <Skeleton class="mx-auto size-4" />
               </td>
             </tr>
           </template>
@@ -178,8 +198,6 @@
                   :now="now"
                 />
               </td>
-              <!-- Trailing column placeholder matches the + header -->
-              <td class="h-14 w-10 sticky right-0 bg-background transition-colors group-hover:bg-muted/40" />
             </tr>
           </template>
         </tbody>
@@ -210,17 +228,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDraggable } from 'vue-draggable-plus'
 import { useI18n } from 'vue-i18n'
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  EyeOff,
-  GripVertical,
-  Loader,
-  Plus,
-  Search
-} from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Check, ChevronDown, EyeSlash as EyeOff, GripVertical, Loader, Plus, MagnifyingGlass as Search } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
@@ -237,16 +245,16 @@ import { useConversationStore } from '@main/stores/conversation'
 import { useTeamStore } from '@main/stores/team'
 import { useUsersStore } from '@main/stores/users'
 import { useInboxView } from '@main/composables/useInboxView'
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
+import { getConversationDisplayName } from '@main/utils/conversationDisplay'
 import ConversationTableCell from '@/features/conversation/list/ConversationTableCell.vue'
 
-const PLUS_COLUMN_ID = '__column_picker__'
 const MIN_COLUMN_WIDTH = 72
 const MAX_COLUMN_WIDTH = 560
 
 // Column definitions. Each column id matches a branch in ConversationTableCell.
 // `subject` column shows the subject line + last message preview stacked.
 // `user` column shows the contact avatar + name + email.
-// The trailing `+` header is appended programmatically and is not in this list.
 const COLUMN_DEFS = [
   {
     id: 'subject',
@@ -262,8 +270,8 @@ const COLUMN_DEFS = [
     labelKey: 'conversation.table.columns.user',
     width: 240,
     sortType: 'text',
-    sortValue: (row) => contactName(row),
-    searchValue: (row) => [contactName(row), row.contact?.email].filter(Boolean).join(' ')
+    sortValue: (row) => getConversationDisplayName(row),
+    searchValue: (row) => [getConversationDisplayName(row), row.contact?.email].filter(Boolean).join(' ')
   },
   {
     id: 'priority',
@@ -381,16 +389,13 @@ const visibleColumns = computed(() =>
   orderedColumns.value.filter((column) => isColumnVisible(column.id))
 )
 
-const tableColumnCount = computed(() => visibleColumns.value.length + 1)
+const tableColumnCount = computed(() => visibleColumns.value.length)
 const isLoading = computed(() => conversationStore.conversations.loading)
 const showSkeleton = computed(() => isLoading.value && conversationStore.conversationsList.length === 0)
 
-const countLabel = computed(() => {
-  const total = conversationStore.conversations.total || sortedRows.value.length
-  const status = String(conversationStore.getListStatus || '').trim()
-  if (status) return `${total} ${status.toLowerCase()}`
-  return t('conversation.table.count', { n: total })
-})
+const tableTotal = computed(() => conversationStore.conversations.total || sortedRows.value.length)
+const statusDisplayLabel = (status) => getStatusDisplayLabel(status, t)
+const listStatusLabel = computed(() => statusDisplayLabel(conversationStore.getListStatus))
 
 const filteredRows = computed(() => {
   const rows = conversationStore.conversationsList || []
@@ -418,14 +423,14 @@ const sortedRows = computed(() => {
 })
 
 const tableMinWidth = computed(() => {
-  const width = visibleColumns.value.reduce((sum, column) => sum + columnWidth(column.id), 40)
+  const width = visibleColumns.value.reduce((sum, column) => sum + columnWidth(column.id), 0)
   return `${Math.max(width, 720)}px`
 })
 
 watch(
   visibleColumns,
   (columns) => {
-    draggableColumnIds.value = [...columns.map((column) => column.id), PLUS_COLUMN_ID]
+    draggableColumnIds.value = columns.map((column) => column.id)
   },
   { immediate: true }
 )
@@ -460,7 +465,7 @@ useDraggable(headerRowEl, draggableColumnIds, {
   preventOnFilter: true,
   onMove: (event) => !event.related?.classList?.contains('no-drag'),
   onUpdate: () => {
-    const nextVisible = draggableColumnIds.value.filter((id) => id !== PLUS_COLUMN_ID)
+    const nextVisible = [...draggableColumnIds.value]
     const hidden = columnOrder.value.filter((id) => !nextVisible.includes(id))
     columnOrder.value = [...nextVisible, ...hidden]
   }
@@ -490,6 +495,15 @@ function toggleColumn(id, value) {
 
 function hideColumn(id) {
   toggleColumn(id, false)
+}
+
+function isLastVisibleColumn(id) {
+  const columns = visibleColumns.value
+  return columns[columns.length - 1]?.id === id
+}
+
+function handleStatusChange(status) {
+  conversationStore.setListStatus(status.label)
 }
 
 function setSort(id, desc) {

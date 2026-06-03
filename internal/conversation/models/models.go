@@ -127,7 +127,9 @@ type ConversationListItem struct {
 	UUID                  string                  `db:"uuid" json:"uuid"`
 	ReferenceNumber       string                  `db:"reference_number" json:"reference_number"`
 	WaitingSince          null.Time               `db:"waiting_since" json:"waiting_since"`
+	CustomerID            null.String             `db:"customer_id" json:"customer_id"`
 	Contact               ConversationListContact `db:"contact" json:"contact"`
+	Customer              ConversationCustomer    `db:"customer" json:"customer"`
 	InboxChannel          string                  `db:"inbox_channel" json:"inbox_channel"`
 	InboxName             string                  `db:"inbox_name" json:"inbox_name"`
 	SLAPolicyID           null.Int                `db:"sla_policy_id" json:"sla_policy_id"`
@@ -168,6 +170,16 @@ type ConversationListContact struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// ConversationCustomer represents cache-only customer identity fields exposed
+// on conversation list and detail payloads.
+type ConversationCustomer struct {
+	CustomerID null.String `db:"customer_id" json:"customer_id"`
+	Business   null.Bool   `db:"business" json:"business"`
+	Firstname  null.String `db:"firstname" json:"firstname"`
+	Lastname   null.String `db:"lastname" json:"lastname"`
+	Company    null.String `db:"company" json:"company"`
+}
+
 type Conversation struct {
 	ID                        int                    `db:"id" json:"id"`
 	CreatedAt                 time.Time              `db:"created_at" json:"created_at"`
@@ -203,6 +215,7 @@ type Conversation struct {
 	LastInteractionAt         null.Time              `db:"last_interaction_at" json:"last_interaction_at"`
 	LastInteractionSender     null.String            `db:"last_interaction_sender" json:"last_interaction_sender"`
 	Contact                   ConversationContact    `db:"contact" json:"contact"`
+	Customer                  ConversationCustomer   `db:"customer" json:"customer"`
 	SLAPolicyID               null.Int               `db:"sla_policy_id" json:"sla_policy_id"`
 	SlaPolicyName             null.String            `db:"sla_policy_name" json:"sla_policy_name"`
 	AppliedSLAID              null.Int               `db:"applied_sla_id" json:"applied_sla_id"`
@@ -585,6 +598,8 @@ type Status struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	Name      string    `db:"name" json:"name"`
 	Category  string    `db:"category" json:"category"`
+	Color     string    `db:"color" json:"color"`
+	Icon      string    `db:"icon" json:"icon"`
 }
 
 type Priority struct {

@@ -65,6 +65,7 @@ import { useNavDescription } from '@main/composables/useNavDescription'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
+import { FALLBACK_STATUS_VISUAL } from '@main/utils/statusVisuals'
 import api from '../../../api'
 
 const { t } = useI18n()
@@ -101,7 +102,11 @@ onUnmounted(() => {
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(t)),
+  initialValues: {
+    color: FALLBACK_STATUS_VISUAL.color,
+    icon: FALLBACK_STATUS_VISUAL.icon
+  }
 })
 
 const editStatus = (item) => {
@@ -113,7 +118,12 @@ const editStatus = (item) => {
 }
 
 const newStatus = () => {
-  form.resetForm()
+  form.resetForm({
+    values: {
+      color: FALLBACK_STATUS_VISUAL.color,
+      icon: FALLBACK_STATUS_VISUAL.icon
+    }
+  })
   form.setErrors({})
   isEditing.value = false
 }

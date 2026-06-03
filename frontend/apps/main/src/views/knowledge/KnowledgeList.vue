@@ -184,14 +184,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import {
-  Search,
-  Pencil,
-  Send,
-  EyeOff,
-  FolderInput,
-  Trash2,
-} from 'lucide-vue-next'
+import { MagnifyingGlass as Search, Pencil, PaperPlane as Send, EyeSlash as EyeOff, FolderArrowDown as FolderInput, TrashCan as Trash2 } from '@qall/icons'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import PageHeader from '@main/components/layout/PageHeader.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'

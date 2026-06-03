@@ -1,7 +1,8 @@
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="flex min-h-0 flex-col">
     <!-- Main Content Area -->
-    <div class="flex flex-wrap gap-4 pb-4">
+    <div class="min-h-0 flex-1 overflow-y-auto pb-4">
+      <div class="flex flex-wrap gap-4">
       <div class="flex items-center gap-4 mb-4">
         <!-- Search Input -->
         <Input
@@ -96,9 +97,11 @@
           <p class="text-lg text-muted-foreground">{{ $t('contact.noContactsFound') }}</p>
         </div>
       </template>
+      </div>
     </div>
 
     <PaginationBar
+      class="-mx-6 shrink-0 sm:-mx-8"
       v-model:page="page"
       v-model:per-page="perPage"
       :total-pages="totalPages"
@@ -121,7 +124,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowDownWideNarrow, IdCardIcon } from 'lucide-vue-next'
+import { ArrowDownWideShort as ArrowDownWideNarrow, IdCard as IdCardIcon } from '@qall/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'

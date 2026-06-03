@@ -46,7 +46,7 @@ export const adminHomeNavItem = {
 export const adminNavItems = [
   {
     titleKey: 'globals.terms.workspace',
-    iconBgClass: 'bg-purple-200 dark:bg-purple-950/35',
+    iconBgClass: 'bg-purple-200 dark:bg-purple-950/80',
     children: [
       {
         titleKey: 'globals.terms.general',
@@ -76,7 +76,7 @@ export const adminNavItems = [
   {
     titleKey: 'globals.terms.channel',
     isTitleKeyPlural: true,
-    iconBgClass: 'bg-pink-200 dark:bg-pink-950/35',
+    iconBgClass: 'bg-pink-200 dark:bg-pink-950/80',
     children: [
       {
         titleKey: 'globals.terms.inbox',
@@ -91,7 +91,7 @@ export const adminNavItems = [
   {
     titleKey: 'globals.terms.conversation',
     isTitleKeyPlural: true,
-    iconBgClass: 'bg-blue-200 dark:bg-blue-950/35',
+    iconBgClass: 'bg-blue-200 dark:bg-blue-950/80',
     children: [
       {
         titleKey: 'globals.terms.status',
@@ -129,7 +129,7 @@ export const adminNavItems = [
   },
   {
     titleKey: 'globals.terms.productivity',
-    iconBgClass: 'bg-amber-200 dark:bg-amber-950/35',
+    iconBgClass: 'bg-amber-200 dark:bg-amber-950/80',
     children: [
       {
         titleKey: 'globals.terms.macro',
@@ -152,7 +152,7 @@ export const adminNavItems = [
   {
     titleKey: 'globals.terms.teammate',
     isTitleKeyPlural: true,
-    iconBgClass: 'bg-emerald-200 dark:bg-emerald-950/35',
+    iconBgClass: 'bg-emerald-200 dark:bg-emerald-950/80',
     children: [
       {
         titleKey: 'globals.terms.agent',
@@ -191,7 +191,7 @@ export const adminNavItems = [
   {
     titleKey: 'globals.terms.notification',
     isTitleKeyPlural: true,
-    iconBgClass: 'bg-sky-200 dark:bg-sky-950/35',
+    iconBgClass: 'bg-sky-200 dark:bg-sky-950/80',
     children: [
       {
         titleKey: 'globals.terms.email',
@@ -212,7 +212,7 @@ export const adminNavItems = [
   },
   {
     titleKey: 'globals.terms.security',
-    iconBgClass: 'bg-rose-200 dark:bg-rose-950/35',
+    iconBgClass: 'bg-rose-200 dark:bg-rose-950/80',
     children: [
       {
         titleKey: 'globals.terms.sso',
@@ -234,7 +234,7 @@ export const adminNavItems = [
   {
     titleKey: 'globals.terms.integration',
     isTitleKeyPlural: true,
-    iconBgClass: 'bg-violet-200 dark:bg-violet-950/35',
+    iconBgClass: 'bg-violet-200 dark:bg-violet-950/80',
     children: [
       {
         titleKey: 'globals.terms.webhook',
@@ -249,7 +249,7 @@ export const adminNavItems = [
   {
     titleKey: 'admin.nav.erpIntegration',
     icon: UserMagnifyingGlass,
-    iconBgClass: 'bg-orange-200 dark:bg-orange-950/35',
+    iconBgClass: 'bg-orange-200 dark:bg-orange-950/80',
     children: [
       {
         titleKey: 'admin.customerIdentification.title',

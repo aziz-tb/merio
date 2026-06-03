@@ -183,7 +183,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, shallowRef, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader2, Pencil, Play, RefreshCw, RotateCcw, Send } from 'lucide-vue-next'
+import { Loader as Loader2, Pencil, Play, ArrowsRotate as RefreshCw, ArrowRotateLeft as RotateCcw, PaperPlane as Send } from '@qall/icons'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
 import {

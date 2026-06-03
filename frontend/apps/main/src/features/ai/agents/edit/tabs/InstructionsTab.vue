@@ -17,7 +17,7 @@
   good enough for "is the prompt huge?" feedback.
 -->
 <template>
-  <div class="h-full flex flex-col">
+  <div class="min-h-full">
     <div v-if="!agent" class="px-6 py-6 text-sm text-muted-foreground">…</div>
 
     <template v-else>
@@ -51,8 +51,8 @@
         </div>
       </div>
 
-      <!-- CodeMirror prompt — flexes to fill the rest of the tab. -->
-      <div class="flex-1 min-h-0 px-6 pb-2">
+      <!-- CodeMirror prompt — grows with the prompt; the tab scrolls when needed. -->
+      <div class="px-6 pb-4">
         <Label class="text-sm font-medium text-foreground mb-1.5 block">
           {{ t('globals.terms.prompt') }}
         </Label>
@@ -60,7 +60,9 @@
           :model-value="agent.prompt || ''"
           @update:model-value="(v) => (agent.prompt = v)"
           language="text"
-          height-class="h-[60vh]"
+          min-height-class="min-h-[32rem]"
+          line-wrapping
+          auto-height
         />
         <p class="mt-2 text-xs text-muted-foreground">
           {{ t('admin.ai.agent.instructions.platformFinalizeHelp') }}
@@ -68,7 +70,7 @@
       </div>
 
       <!-- Footer strip -->
-      <div class="px-6 py-3 border-t border-input flex items-center justify-between gap-4 text-xs text-muted-foreground shrink-0">
+      <div class="px-6 py-3 border-t border-input flex items-center justify-between gap-4 text-xs text-muted-foreground">
         <span>
           {{ promptChars.toLocaleString() }} {{ t('globals.terms.characters') }}
           <span class="mx-1">·</span>

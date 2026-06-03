@@ -14,7 +14,7 @@
 
 <script setup>
 import { Button } from '@shared-ui/components/ui/button'
-import { X } from 'lucide-vue-next'
+import { X } from '@qall/icons'
 
 defineProps({
   onClose: {

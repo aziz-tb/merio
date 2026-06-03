@@ -170,13 +170,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem
 } from '@shared-ui/components/ui/dropdown-menu'
-import {
-  PlusIcon,
-  MoreVerticalIcon,
-  TrashIcon,
-  ClockIcon,
-  MessageSquareIcon
-} from 'lucide-vue-next'
+import { Plus as PlusIcon, EllipsisVertical as MoreVerticalIcon, TrashCan as TrashIcon, Clock as ClockIcon, Message as MessageSquareIcon } from '@qall/icons'
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useI18n } from 'vue-i18n'
 import { useEmitter } from '@main/composables/useEmitter'

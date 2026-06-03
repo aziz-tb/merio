@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { Download, Info } from 'lucide-vue-next'
+import { Download, Info } from '@qall/icons'
 import { useAppSettingsStore } from '@/stores/appSettings'
 const appSettingsStore = useAppSettingsStore()
 </script>

@@ -177,7 +177,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/u
 import { cn } from '@shared-ui/lib/utils.js'
 import { format } from 'date-fns'
 import { WEEKDAYS } from '../../../constants/date.js'
-import { Calendar as CalendarIcon } from 'lucide-vue-next'
+import { Calendar as CalendarIcon } from '@qall/icons'
 import { useI18n } from 'vue-i18n'
 import SimpleTable from '@main/components/table/SimpleTable.vue'
 import {

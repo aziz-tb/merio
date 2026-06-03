@@ -81,7 +81,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { EllipsisVertical } from 'lucide-vue-next'
+import { EllipsisVertical } from '@qall/icons'
 import { useRouter } from 'vue-router'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'

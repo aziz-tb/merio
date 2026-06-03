@@ -78,6 +78,7 @@ import (
 	"github.com/aziz-tb/merio/internal/team"
 	"github.com/aziz-tb/merio/internal/temporal"
 	"github.com/aziz-tb/merio/internal/user"
+	usermodels "github.com/aziz-tb/merio/internal/user/models"
 	"github.com/aziz-tb/merio/internal/verification"
 	wfagentvalidation "github.com/aziz-tb/merio/internal/workflows/agentvalidation"
 	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
@@ -866,11 +867,10 @@ func buildSearcher(
 }
 
 func resolveSystemUserID(db *sqlx.DB) int {
-	const systemEmail = "system@merio.local"
 	var id int
 	if err := db.QueryRow(
 		`SELECT id FROM users WHERE email = $1 AND type = 'agent' AND deleted_at IS NULL`,
-		systemEmail,
+		usermodels.SystemUserEmail,
 	).Scan(&id); err != nil {
 		log.Fatalf("temporal-worker: resolve system user: %v", err)
 	}

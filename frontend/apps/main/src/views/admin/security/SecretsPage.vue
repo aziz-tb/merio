@@ -104,7 +104,7 @@
 <script setup>
 import { computed, h, onMounted, ref } from 'vue'
 import { formatDistanceToNow } from 'date-fns'
-import { Eye, EyeOff, Plus } from 'lucide-vue-next'
+import { Eye, EyeSlash as EyeOff, Plus } from '@qall/icons'
 import { useI18n } from 'vue-i18n'
 
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'

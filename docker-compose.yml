@@ -148,7 +148,7 @@ services:
   temporal-worker:
     build:
       context: .
-      dockerfile: Dockerfile.temporal-worker
+      dockerfile: Dockerfile.temporal-worker.dev
       args:
         VERSION: ${VERSION:-dev}
         GIT_COMMIT: ${GIT_COMMIT:-unknown}

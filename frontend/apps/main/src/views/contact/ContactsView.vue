@@ -1,7 +1,7 @@
 <template>
   <ContactList>
-    <PageHeader />
-    <ContactsList />
+    <PageHeader class="shrink-0" />
+    <ContactsList class="min-h-0 flex-1" />
   </ContactList>
 </template>
 <script setup>

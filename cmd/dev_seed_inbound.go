@@ -111,10 +111,16 @@ Options:
 	fmt.Printf("Created conversation: id=%d uuid=%s\n", convID, convUUID)
 
 	sourceID := fmt.Sprintf("dev-seed-%s@merio.local", uuid.NewString())
-	meta, _ := json.Marshal(map[string]any{
-		"dev_seed": true,
-		"from":     *from,
+	meta, err := json.Marshal(map[string]any{
+		"from":    []string{*from},
+		"cc":      []string{},
+		"bcc":     []string{},
+		"to":      []string{},
+		"subject": *subject,
 	})
+	if err != nil {
+		return fmt.Errorf("marshal message meta: %w", err)
+	}
 	msg := cmodels.Message{
 		ConversationID:   convID,
 		ConversationUUID: convUUID,

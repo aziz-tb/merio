@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { CheckboxIndicator, CheckboxRoot, useForwardPropsEmits } from 'radix-vue'
-import { CheckIcon } from '@radix-icons/vue'
+import { Check } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 
 const props = defineProps({
@@ -39,7 +39,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
   >
     <CheckboxIndicator class="flex h-full w-full items-center justify-center text-current">
       <slot>
-        <CheckIcon class="h-3.5 w-3.5" />
+        <Check class="h-3.5 w-3.5" />
       </slot>
     </CheckboxIndicator>
   </CheckboxRoot>

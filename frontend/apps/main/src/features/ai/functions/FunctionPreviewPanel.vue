@@ -169,6 +169,7 @@
             v-if="hasPreviewTreeResults"
             :value="previewDataTree"
             :searchable="false"
+            mode="view"
           />
           <p v-else class="text-sm text-muted-foreground">
             {{ t('globals.messages.noResultsFound') }}

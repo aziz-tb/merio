@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { DropdownMenuSubTrigger, useForwardProps } from 'radix-vue'
-import { ChevronRightIcon } from '@radix-icons/vue'
+import { ChevronRight } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 
 const props = defineProps({
@@ -32,6 +32,6 @@ const forwardedProps = useForwardProps(delegatedProps)
     "
   >
     <slot />
-    <ChevronRightIcon class="ml-auto h-4 w-4" />
+    <ChevronRight class="ml-auto h-4 w-4" />
   </DropdownMenuSubTrigger>
 </template>

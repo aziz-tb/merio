@@ -55,7 +55,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle, Circle } from 'lucide-vue-next'
+import { CircleCheck as CheckCircle, Circle } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useInboxStore } from '@/stores/inbox'

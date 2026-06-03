@@ -39,7 +39,6 @@
               tabindex="-1"
               class="cursor-not-allowed bg-muted/40"
             />
-            <p class="text-sm text-muted-foreground">{{ t('admin.ai.slugPermanent') }}</p>
           </FormItem>
 
           <FormField v-slot="{ field }" name="description">
@@ -77,7 +76,7 @@
                 <FormControl>
                   <Input
                     type="number"
-                    step="1000"
+                    step="1"
                     min="1"
                     max="120000"
                     v-bind="field"

@@ -36,7 +36,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronsUpDown } from 'lucide-vue-next'
+import { AnglesUpDown as ChevronsUpDown } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import {
   Popover,

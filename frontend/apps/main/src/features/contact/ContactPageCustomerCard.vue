@@ -146,7 +146,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
-import { ChevronDown, ChevronUp, Info, Loader2, Search, Unlink, X } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Info, Loader as Loader2, MagnifyingGlass as Search, LinkSlash as Unlink, X } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'

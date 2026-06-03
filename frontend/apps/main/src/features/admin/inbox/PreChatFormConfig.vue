@@ -153,7 +153,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { Switch } from '@shared-ui/components/ui/switch'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
-import { Plus, X, GripVertical } from 'lucide-vue-next'
+import { Plus, X, GripVertical } from '@qall/icons'
 import Draggable from 'vuedraggable'
 import api from '@/api'
 

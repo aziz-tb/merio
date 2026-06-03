@@ -50,7 +50,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Calendar as CalendarIcon } from 'lucide-vue-next'
+import { Calendar as CalendarIcon } from '@qall/icons'
 import { parseDate } from '@internationalized/date'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'

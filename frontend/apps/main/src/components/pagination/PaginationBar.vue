@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky bottom-0 bg-background border-t border-border px-4 py-3 mt-auto">
+  <div class="sticky bottom-0 bg-background px-4 py-3 mt-auto">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <span class="text-sm text-muted-foreground tabular-nums">
@@ -93,7 +93,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-vue-next'
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from '@qall/icons'
 import { useI18n } from 'vue-i18n'
 import { getVisiblePages } from '@main/utils/pagination'
 

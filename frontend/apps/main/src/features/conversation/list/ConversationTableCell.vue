@@ -28,7 +28,15 @@
       </AvatarFallback>
     </Avatar>
     <div class="min-w-0 flex flex-col gap-0.5">
-      <span class="truncate text-foreground text-sm">{{ contactName || missing }}</span>
+      <div class="flex min-w-0 items-center gap-1.5">
+        <span class="truncate text-foreground text-sm">{{ displayName || missing }}</span>
+        <Tooltip v-if="isLinked">
+          <TooltipTrigger as-child>
+            <Link class="size-3.5 shrink-0 text-muted-foreground" />
+          </TooltipTrigger>
+          <TooltipContent>{{ t('conversation.customer.linkedTooltip') }}</TooltipContent>
+        </Tooltip>
+      </div>
       <p
         v-if="contactEmail"
         class="truncate text-muted-foreground text-xs"
@@ -84,15 +92,34 @@
     :class="editableCellClass"
     @click.stop
   >
-    <SelectComboBox
-      :model-value="statusModelValue"
-      :items="statusOptions"
-      :placeholder="missing"
-      @select="selectStatus"
-      type="status"
-      trigger-variant="inline"
-      button-class="w-full px-2 py-1 flex justify-center"
-    />
+    <DropdownMenu>
+      <DropdownMenuTrigger as-child>
+        <StatusPill
+          as="button"
+          type="button"
+          :status="currentStatusOption"
+          :label="statusDisplayLabel(currentStatusOption)"
+          size="sm"
+          class="cursor-pointer justify-center transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" class="min-w-44" @click.stop>
+        <DropdownMenuItem
+          v-for="status in statusOptions"
+          :key="status.value"
+          class="gap-2"
+          @click.stop="selectStatus(status)"
+        >
+          <StatusPill :status="status" :label="statusDisplayLabel(status)" size="sm" />
+          <Check
+            :class="[
+              'ml-auto size-4',
+              isSelectedStatus(status) ? 'opacity-100' : 'opacity-0'
+            ]"
+          />
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   </div>
 
   <div
@@ -187,9 +214,16 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@shared-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 import TagPill from '@shared-ui/components/TagPill.vue'
+import StatusPill from '@main/components/status/StatusPill.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useTeamStore } from '@main/stores/team'
@@ -199,6 +233,9 @@ import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { useEmitter } from '@main/composables/useEmitter'
 import { formatDateTime } from '@main/utils/date'
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
+import { getConversationDisplayName, hasLinkedCustomer } from '@main/utils/conversationDisplay'
+import { Check, Link } from '@qall/icons'
 
 const props = defineProps({
   columnId: { type: String, required: true },
@@ -235,15 +272,6 @@ const findOptionByLabel = (items, label) => {
 
 const sameValue = (a, b) => String(a ?? '') === String(b ?? '')
 
-// Null-safe: default parameter only fires on `undefined`, not `null`.
-const fullName = (person) => {
-  if (!person) return ''
-  return [stringValue(person.first_name), stringValue(person.last_name)]
-    .filter(Boolean)
-    .join(' ')
-    .trim()
-}
-
 const initials = (name) => {
   const parts = stringValue(name).trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'
@@ -254,13 +282,14 @@ const stripHTML = (value) => stringValue(value).replace(/<[^>]*>/g, ' ').replace
 
 // Contact
 const contact = computed(() => props.conversation.contact || {})
-const contactName = computed(() => fullName(contact.value) || stringValue(contact.value.email))
+const displayName = computed(() => getConversationDisplayName(props.conversation))
 const contactAvatar = computed(() => stringValue(contact.value.avatar_url))
-const contactInitials = computed(() => initials(contactName.value || contact.value.first_name))
+const contactInitials = computed(() => initials(displayName.value || contact.value.first_name))
 const contactEmail = computed(() => stringValue(contact.value.email))
 const contactTitle = computed(() =>
-  [contactName.value, stringValue(contact.value.email)].filter(Boolean).join(' · ')
+  [displayName.value, stringValue(contact.value.email)].filter(Boolean).join(' · ')
 )
+const isLinked = computed(() => hasLinkedCustomer(props.conversation))
 
 // Subject + activity preview (both shown in the subject column, stacked)
 const subjectText = computed(() => stringValue(props.conversation.subject))
@@ -284,9 +313,13 @@ const priorityModelValue = computed(() =>
 // Status
 const statusName = computed(() => stringValue(props.conversation.status))
 const statusOptions = computed(() => conversationStore.statusOptions)
-const statusModelValue = computed(() =>
-  findOptionByLabel(statusOptions.value, statusName.value)?.value || props.conversation.status_id || ''
+const currentStatusOption = computed(() =>
+  findOptionByLabel(statusOptions.value, statusName.value) || {
+    label: statusName.value
+  }
 )
+const statusDisplayLabel = (status) => getStatusDisplayLabel(status, t)
+const isSelectedStatus = (status) => sameValue(status?.label, statusName.value)
 
 // Team / assignee mirror the canonical conversation payload: IDs on the row,
 // names resolved from app-level stores that are already loaded by App.vue.

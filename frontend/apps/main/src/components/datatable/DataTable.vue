@@ -377,18 +377,7 @@ import {
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { VueDraggable, useDraggable } from 'vue-draggable-plus'
 import { useI18n } from 'vue-i18n'
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  EllipsisVertical,
-  EyeOff,
-  Ghost,
-  GripVertical,
-  Plus,
-  Search
-} from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Check, ChevronDown, EllipsisVertical, EyeSlash as EyeOff, Ghost, GripVertical, Plus, MagnifyingGlass as Search } from '@qall/icons'
 import {
   TableBody,
   TableCell,

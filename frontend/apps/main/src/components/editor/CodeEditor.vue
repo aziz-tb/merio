@@ -41,11 +41,17 @@ const props = defineProps({
     readOnly: Boolean,
     // Tailwind height class. Ignored when readOnly (read-only editors size to content).
     heightClass: { type: String, default: 'h-[28rem]' },
+    // Tailwind min-height class used when autoHeight is enabled.
+    minHeightClass: { type: String, default: '' },
     // Optional header — renders above the editor when any of these is set.
     title: { type: String, default: '' },
     showLanguageLabel: { type: Boolean, default: false },
     // Adds a fullscreen toggle in the header (Escape also exits).
-    expandable: { type: Boolean, default: false }
+    expandable: { type: Boolean, default: false },
+    // Wrap long natural-language content. Keep disabled for code by default.
+    lineWrapping: { type: Boolean, default: false },
+    // Let the editor grow with its content. Useful for long prose prompts.
+    autoHeight: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -64,12 +70,14 @@ const wrapperClasses = computed(() => {
     }
     const parts = ['w-full', 'border', 'rounded-md', 'overflow-hidden']
     if (hasHeader.value) parts.push('flex', 'flex-col')
-    if (!props.readOnly) parts.push(props.heightClass)
+    if (!props.readOnly && props.autoHeight && props.minHeightClass) parts.push(props.minHeightClass)
+    else if (!props.readOnly && !props.autoHeight) parts.push(props.heightClass)
     return parts.join(' ')
 })
 
 const bodyClasses = computed(() => {
     if (isFullscreen.value) return 'flex-1 min-h-0'
+    if (props.autoHeight) return 'w-full'
     if (props.readOnly) return 'w-full'
     return hasHeader.value ? 'flex-1 min-h-0' : 'w-full h-full'
 })
@@ -132,13 +140,21 @@ const initCodeEditor = (body) => {
         doc: body,
         extensions: [
             basicSetup,
+            ...(props.lineWrapping ? [EditorView.lineWrapping] : []),
             ...(langExtension ? [langExtension] : []),
             ...(isDark ? [oneDark] : [lightTheme]),
             EditorView.editable.of(isEditable),
             EditorView.theme({
-                '&': { height: props.readOnly ? 'auto' : '100%' },
-                '.cm-editor': { height: props.readOnly ? 'auto' : '100%' },
-                '.cm-scroller': { overflow: 'auto' }
+                '&': { height: props.readOnly || props.autoHeight ? 'auto' : '100%' },
+                '.cm-editor': { height: props.readOnly || props.autoHeight ? 'auto' : '100%' },
+                '.cm-scroller': {
+                    overflowY: props.readOnly || props.autoHeight ? 'visible' : 'auto',
+                    overflowX: props.lineWrapping ? 'hidden' : 'auto'
+                },
+                '.cm-line': {
+                    overflowWrap: props.lineWrapping ? 'anywhere' : 'normal',
+                    wordBreak: props.lineWrapping ? 'break-word' : 'normal'
+                }
             }),
             EditorView.updateListener.of((update) => {
                 if (!update.docChanged || props.readOnly) return

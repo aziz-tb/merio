@@ -50,7 +50,7 @@
 import { computed } from 'vue'
 import { formatBytes } from '@shared-ui/utils/file'
 import { getFileIcon } from '@/composables/useFileIcon'
-import { X } from 'lucide-vue-next'
+import { X } from '@qall/icons'
 import { DotLoader } from '@shared-ui/components/ui/loader'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 

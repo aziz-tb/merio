@@ -43,7 +43,7 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Check } from 'lucide-vue-next'
+import { Check } from '@qall/icons'
 import { Input } from '@shared-ui/components/ui/input'
 import { cn } from '@shared-ui/lib/utils.js'
 

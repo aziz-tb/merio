@@ -37,7 +37,7 @@
             :title="t('globals.messages.close')"
             @click.stop="closeConversationDrawer"
           >
-            <LayoutRight />
+            <LayoutRightCollapse />
             <span class="sr-only">{{ t('globals.messages.close') }}</span>
           </Button>
         </div>
@@ -240,17 +240,8 @@ import ComposerTab from '@/features/conversation/sidebar/ComposerTab.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SidebarField from '@/features/conversation/sidebar/SidebarField.vue'
 import api from '../../../api'
-import { Memo, MessageLines, Ticket } from '@qall/icons'
+import { Memo, MessageLines, Ticket, UpRightFromSquare, ChevronDown, ArrowsRotate, User, UserCheckColored, UserQuestionColored, LayoutRightCollapse } from '@qall/icons'
 import { useConversationDrawer } from '@main/composables/useConversationDrawer'
-import {
-  LayoutRight,
-  UpRightFromSquare,
-  ChevronDown,
-  ArrowsRotate,
-  User,
-  UserCheckColored,
-  UserQuestionColored,
-} from '@qall/icons'
 
 const customAttributeStore = useCustomAttributeStore()
 const emitter = useEmitter()

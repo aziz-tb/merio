@@ -32,10 +32,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
-import {
-  Download, FileText, FileSpreadsheet, FileImage,
-  FileVideo, FileAudio, FileArchive, File
-} from 'lucide-vue-next'
+import { Download, FileLines as FileText, FileSpreadsheet, FileImage, FileVideo, FileAudio, FileZipper as FileArchive, File } from '@qall/icons'
 
 const props = defineProps({
   attachment: {

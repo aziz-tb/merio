@@ -47,9 +47,10 @@ function dismissSmallScreen() {
   showSmallScreenOverlay.value = false
 }
 
-// True for any /inboxes/* route. Used to drop the outer card on inbox routes
-// where InboxLayout's two ResizablePanels supply their own card frames.
-const isInboxRoute = computed(() => route.path.startsWith('/inboxes'))
+// True for inbox routes that render through InboxLayout. Search lives under
+// /inboxes for navigation, but it should keep App.vue's single-panel card.
+const isSearchRoute = computed(() => route.name === 'search')
+const isInboxRoute = computed(() => route.path.startsWith('/inboxes') && !isSearchRoute.value)
 
 // True for routes that render their own multi-panel card frames and
 // must NOT be wrapped in App.vue's outer rounded card.
@@ -177,6 +178,8 @@ const getUserViews = async () => {
 
 const initToaster = () => {
   emitter.on(EMITTER_EVENTS.SHOW_TOAST, (message) => {
+    if (!message?.description) return
+
     if (message.variant === 'destructive') {
       sooner.error(message.description)
     } else if (message.variant === 'warning') {

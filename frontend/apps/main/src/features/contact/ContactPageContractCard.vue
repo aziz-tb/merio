@@ -79,7 +79,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, UpRightFromSquare as ExternalLink } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card } from '@shared-ui/components/ui/card'
 import { PillSwitcher, PillSwitcherItem } from '@shared-ui/components/ui/pill-switcher'

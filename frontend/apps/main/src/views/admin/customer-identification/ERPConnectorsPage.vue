@@ -104,11 +104,6 @@ import { FloppyDisk, ChevronRight } from '@qall/icons'
 
 const FUNCTIONS = [
   {
-    name: 'search_customer_by_fields',
-    labelKey: 'admin.customerIdentification.function.searchCustomerByFields.label',
-    descriptionKey: 'admin.customerIdentification.function.searchCustomerByFields.description'
-  },
-  {
     name: 'search_contract_by_id',
     labelKey: 'admin.customerIdentification.function.searchContractById.label',
     descriptionKey: 'admin.customerIdentification.function.searchContractById.description'
@@ -117,6 +112,11 @@ const FUNCTIONS = [
     name: 'search_customer_by_id',
     labelKey: 'admin.customerIdentification.function.searchCustomerById.label',
     descriptionKey: 'admin.customerIdentification.function.searchCustomerById.description'
+  },
+  {
+    name: 'search_customer_by_fields',
+    labelKey: 'admin.customerIdentification.function.searchCustomerByFields.label',
+    descriptionKey: 'admin.customerIdentification.function.searchCustomerByFields.description'
   },
   {
     name: 'search_customer_by_free_text',

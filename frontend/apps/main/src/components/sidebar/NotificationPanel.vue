@@ -125,18 +125,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import {
-  Bell,
-  BellOff,
-  Check,
-  CheckCheck,
-  X,
-  Trash2,
-  AtSign,
-  UserPlus,
-  AlertTriangle,
-  AlertCircle
-} from 'lucide-vue-next'
+import { Bell, BellSlash as BellOff, Check, CheckDouble as CheckCheck, X, TrashCan as Trash2, At as AtSign, UserPlus, TriangleExclamation as AlertTriangle, CircleExclamation as AlertCircle } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useNotificationStore } from '@main/stores/notification'
