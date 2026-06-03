@@ -6,7 +6,7 @@
         class="inline-flex items-center justify-center size-9 rounded-md hover:bg-accent"
       >
         <div class="relative">
-          <Avatar class="h-8 w-8 rounded-3xl bg-primary/10">
+          <Avatar class="h-8 w-8 rounded-3xl bg-white dark:bg-accent">
             <AvatarImage :src="userStore.avatar" alt="U" class="rounded" />
             <AvatarFallback class="rounded">
               {{ userStore.getInitials }}

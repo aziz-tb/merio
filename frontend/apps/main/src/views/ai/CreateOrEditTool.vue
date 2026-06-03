@@ -39,7 +39,6 @@
               tabindex="-1"
               class="cursor-not-allowed bg-muted/40"
             />
-            <p class="text-sm text-muted-foreground">{{ t('admin.ai.slugPermanent') }}</p>
           </FormItem>
 
           <FormField v-slot="{ field }" name="description">

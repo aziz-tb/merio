@@ -9,7 +9,7 @@
       <div class="flex min-w-0 items-start gap-3">
         <button
           type="button"
-          class="mt-0.5 inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           @click="toggle"
         >
           <LayoutLeft class="size-[1.1rem]" />
