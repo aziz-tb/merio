@@ -1,4 +1,5 @@
 import { h } from 'vue'
+import { ChevronDown, ChevronRight } from '@qall/icons'
 import TagPill from '@shared-ui/components/TagPill.vue'
 import DataTableRowActions from '@/components/datatable/DataTableRowActions.vue'
 import { actionsCol, dateTimeCol } from '@/components/datatable/helpers.js'
@@ -16,7 +17,7 @@ const VISIBILITY_KEY = {
   disabled: 'admin.tags.visibilityDisabled'
 }
 
-export const createColumns = (t, { onEdit, onDelete } = {}) => {
+export const createColumns = (t, { onEdit, onDelete, onToggleParent, isExpanded } = {}) => {
   const actionColumn = actionsCol()
 
   return [
@@ -27,21 +28,47 @@ export const createColumns = (t, { onEdit, onDelete } = {}) => {
       meta: { label: t('admin.tags.tag'), width: 260 },
       cell: ({ row }) => {
         const tag = row.original
-        return h('button', {
-          type: 'button',
+        const hasChildren = tag._childCount > 0
+        const expanded = hasChildren && (isExpanded?.(tag) || tag._isExpanded)
+        const toggleTitle = t(expanded ? 'globals.terms.collapse' : 'globals.terms.expand')
+        const toggleControl = hasChildren
+          ? h('button', {
+              type: 'button',
+              class: 'inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground',
+              title: toggleTitle,
+              'aria-label': toggleTitle,
+              'aria-expanded': expanded,
+              onClick: (event) => {
+                event.stopPropagation()
+                onToggleParent?.(tag)
+              }
+            }, [
+              h(expanded ? ChevronDown : ChevronRight, { class: 'size-3.5' })
+            ])
+          : tag._depth
+            ? null
+            : h('span', { class: 'size-5 shrink-0' })
+
+        return h('div', {
           class: [
-            'flex max-w-full items-center gap-2 text-left',
+            'flex max-w-full items-center gap-2',
             tag._depth ? 'pl-7' : ''
-          ],
-          onClick: (event) => {
-            event.stopPropagation()
-            onEdit?.(tag)
-          }
+          ]
         }, [
-          h(TagPill, { tag, class: 'max-w-full' }),
-          tag._childCount
-            ? h('span', { class: 'shrink-0 text-xs text-muted-foreground' }, `(${tag._childCount})`)
-            : null
+          toggleControl,
+          h('button', {
+            type: 'button',
+            class: 'inline-flex min-w-0 items-center gap-2 text-left',
+            onClick: (event) => {
+              event.stopPropagation()
+              onEdit?.(tag)
+            }
+          }, [
+            h(TagPill, { tag, class: 'max-w-full' }),
+            tag._childCount
+              ? h('span', { class: 'shrink-0 text-xs text-muted-foreground' }, `(${tag._childCount})`)
+              : null
+          ])
         ])
       }
     },
