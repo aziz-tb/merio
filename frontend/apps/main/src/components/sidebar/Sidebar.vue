@@ -98,14 +98,14 @@
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <div class="flex flex-col items-start justify-between w-full px-1">
+              <div class="flex flex-inline items-start my-2 w-full px-1">
                 <span class="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-2">
                   {{ t('globals.terms.admin') }}
                 </span>
-                <!-- App version -->
-                <div class="text-xs text-muted-foreground">
-                  ({{ settingsStore.settings['app.version'] }})
-                </div>
+                 <!-- App version -->
+                  <div class="text-[8px] mt-2 text-muted-foreground">
+                    ({{ settingsStore.settings['app.version'] }})
+                  </div>
               </div>
             </SidebarMenuItem>
           </SidebarMenu>

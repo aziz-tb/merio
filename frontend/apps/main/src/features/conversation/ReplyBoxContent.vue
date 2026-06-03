@@ -95,7 +95,7 @@
         </span>
       </div>
       <Button class="text-muted-foreground" variant="ghost" size="icon" @click="toggleFullscreen">
-        <component :is="isFullscreen ? Minimize2 : Maximize2" class="size-4" />
+        <component :is="isFullscreen ? Minimize2 : Maximize2" class="size-4.5" />
       </Button>
     </div>
 
@@ -268,8 +268,7 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { INBOX_CHANNEL } from '@main/constants/inbox'
-import { Expand as Maximize2, Compress as Minimize2, ChevronDown, X, Message, MessageArrowUpRight, MessageLines } from '@qall/icons'
-
+import { ArrowUpRightAndArrowDownLeftFromCenter as Maximize2, ArrowDownLeftAndArrowUpRightToCenter as Minimize2, ChevronDown, X, Message, MessageArrowUpRight, MessageLines } from '@qall/icons'
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'

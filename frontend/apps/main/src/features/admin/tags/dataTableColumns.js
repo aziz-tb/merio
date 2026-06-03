@@ -52,7 +52,7 @@ export const createColumns = (t, { onEdit, onDelete, onToggleParent, isExpanded 
         return h('div', {
           class: [
             'flex max-w-full items-center gap-2',
-            tag._depth ? 'pl-7' : ''
+            tag._depth ? ' ml-12' : ''
           ]
         }, [
           toggleControl,

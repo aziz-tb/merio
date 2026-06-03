@@ -25,7 +25,7 @@ const forwardedProps = useForwardProps(delegatedProps)
     :class="cn('flex rounded bg-transparent mr-1', props.class)"
   >
     <slot>
-      <X class="w-4 h-4" />
+      <X class="size-3" />
     </slot>
   </TagsInputItemDelete>
 </template>
