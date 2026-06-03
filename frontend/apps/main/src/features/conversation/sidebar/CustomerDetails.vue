@@ -364,19 +364,9 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
-import {
-  AlertTriangle,
-  ChevronUp,
-  ExternalLink,
-  Globe,
-  IdCard,
-  Monitor,
-  MoreVertical,
-  Search,
-  Smartphone,
-  X,
-} from 'lucide-vue-next'
-import { User, Phone, ArrowsRotate, Loader, ChevronDown } from '@qall/icons'
+import { MobileScreen as Smartphone } from '@qall/icons'
+import { TriangleExclamation as AlertTriangle, ChevronUp, UpRightFromSquare as ExternalLink, Globe, IdCard, Display as Monitor, EllipsisVertical as MoreVertical, MagnifyingGlass as Search, X, User, Phone, ArrowsRotate, Loader, ChevronDown } from '@qall/icons'
+
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import {

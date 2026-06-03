@@ -277,7 +277,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Plus } from 'lucide-vue-next'
+import { Plus, ChevronRight, EllipsisVertical, Folder, Folders } from '@qall/icons'
 import {
   SidebarContent,
   SidebarGroup,
@@ -316,7 +316,7 @@ import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@/api/index.js'
-import { ChevronRight, EllipsisVertical, Folder, Folders } from '@qall/icons'
+
 import {
   DropdownMenu,
   DropdownMenuContent,

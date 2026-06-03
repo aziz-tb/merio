@@ -11,7 +11,7 @@
         <span class="min-w-0 flex-1 truncate text-left">
           <slot name="selected" :selected="selectedItem">{{ selectedLabel }}</slot>
         </span>
-        <CaretSortIcon class="h-4 w-4 shrink-0 opacity-50" />
+        <ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
       </Button>
       <button
         v-else
@@ -40,7 +40,7 @@
               @select="handleSelect"
             >
               <slot name="item" :item="item">{{ item.label }}</slot>
-              <CheckIcon
+              <Check
                 :class="
                   cn('ml-auto h-4 w-4', String(value) === String(item.value) ? 'opacity-100' : 'opacity-0')
                 "
@@ -55,7 +55,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { CaretSortIcon, CheckIcon } from '@radix-icons/vue'
+import { Check, ChevronDown } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 import { Button } from '../button'
 import { Popover, PopoverContent, PopoverTrigger } from '../popover'

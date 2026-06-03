@@ -168,8 +168,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Search, Check, ListTree } from 'lucide-vue-next'
-import { Copy, ChevronDown, ChevronRight } from '@qall/icons'
+import { MagnifyingGlass as Search, Check, ListTree, Copy, ChevronDown, ChevronRight } from '@qall/icons'
 
 defineOptions({ name: 'JsonTreeViewer' })
 

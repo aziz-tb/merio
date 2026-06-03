@@ -791,7 +791,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@shared-ui/components/ui/dialog'
-import { CheckCircle2, RefreshCw, Mail, Lightbulb } from 'lucide-vue-next'
+import { CircleCheck as CheckCircle2, ArrowsRotate as RefreshCw, Envelope as Mail, Lightbulb } from '@qall/icons'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'

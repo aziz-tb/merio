@@ -268,13 +268,8 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { INBOX_CHANNEL } from '@main/constants/inbox'
-import {
-  Maximize2,
-  Minimize2,
-  ChevronDown,
-  X
-} from 'lucide-vue-next'
-import { Message, MessageArrowUpRight, MessageLines } from "@qall/icons"
+import { Expand as Maximize2, Compress as Minimize2, ChevronDown, X, Message, MessageArrowUpRight, MessageLines } from '@qall/icons'
+
 import Editor from '@main/components/editor/TextEditor.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'

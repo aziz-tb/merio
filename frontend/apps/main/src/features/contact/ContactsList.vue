@@ -124,7 +124,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowDownWideNarrow, IdCardIcon } from 'lucide-vue-next'
+import { ArrowDownWideShort as ArrowDownWideNarrow, IdCard as IdCardIcon } from '@qall/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'

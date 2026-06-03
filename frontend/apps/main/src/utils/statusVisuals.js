@@ -27,12 +27,13 @@ import {
   Timer
 } from 'lucide-vue-next'
 import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
+import { CircleCheckBig } from 'lucide-vue-next'
 
 export const STATUS_COLORS = ['grey', 'blue', 'green', 'yellow', 'orange', 'red', 'purple', 'teal']
 
 export const STATUS_COLOR_CLASSES = {
   grey: 'border-border bg-secondary text-secondary-foreground border-secondary-foreground/20 dark:border-secondary-700',
-  blue: 'border-blue-300 bg-blue-100 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100',
+  blue: 'border-blue-100 bg-blue-100/70 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100',
   green: 'border-green-300 bg-green-300/50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-200',
   yellow: 'border-yellow-300 bg-yellow-100 text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200',
   orange: 'border-orange-200 bg-orange-100 text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-100',
@@ -57,7 +58,7 @@ export const STATUS_ICONS = {
   CircleDashed,
   CircleEllipsis,
   CircleAlert,
-  CircleCheck,
+  CircleCheckBig,
   CircleSlash,
   CircleX,
   CirclePause,
@@ -102,7 +103,7 @@ export const DEFAULT_STATUS_VISUALS = {
   },
   [CONVERSATION_DEFAULT_STATUSES.RESOLVED]: {
     color: 'green',
-    icon: 'CircleCheck'
+    icon: 'CircleCheckBig'
   },
   [CONVERSATION_DEFAULT_STATUSES.CLOSED]: {
     color: 'grey',
@@ -128,7 +129,7 @@ export const CATEGORY_STATUS_VISUALS = {
   },
   resolved: {
     color: 'green',
-    icon: 'CircleCheck'
+    icon: 'CircleCheckBig'
   }
 }
 
@@ -137,7 +138,7 @@ export const STATUS_PILL_BASE_CLASS = 'inline-flex max-w-full items-center gap-1
 export const STATUS_PILL_SIZE_CLASSES = {
   xs: 'min-h-5 px-2 py-0.5 text-[11px]',
   sm: 'min-h-5 px-2 py-1.5 text-xs',
-  md: 'h-8 px-2 text-sm'
+  md: 'h-8 px-2 text-xs'
 }
 
 export const STATUS_ICON_SIZE_CLASSES = {

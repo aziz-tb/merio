@@ -56,7 +56,7 @@
 <script setup>
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader2, Send } from 'lucide-vue-next'
+import { Loader as Loader2, PaperPlane as Send } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { AGENT_PREVIEW_KEY } from '@/composables/useAgentPreview.js'

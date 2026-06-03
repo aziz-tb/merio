@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { AccordionHeader, AccordionTrigger } from 'radix-vue'
-import { ChevronDownIcon } from '@radix-icons/vue'
+import { ChevronDown } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 
 const props = defineProps({
@@ -30,7 +30,7 @@ const delegatedProps = computed(() => {
     >
       <slot />
       <slot name="icon">
-        <ChevronDownIcon
+        <ChevronDown
           class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
         />
       </slot>

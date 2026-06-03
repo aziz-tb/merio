@@ -217,11 +217,11 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useMagicKeys } from '@vueuse/core'
-import { CalendarIcon } from 'lucide-vue-next'
+import { Calendar as CalendarIcon, Users, User, Thumbtack as Pin, Rocket, Tags, Bolt as Zap } from '@qall/icons'
 import { useConversationStore } from '@main/stores/conversation'
 import { useMacroStore } from '@main/stores/macro'
 import { CONVERSATION_DEFAULT_STATUSES, MACRO_CONTEXT } from '@main/constants/conversation'
-import { Users, User, Pin, Rocket, Tags, Zap } from 'lucide-vue-next'
+
 import {
   CommandDialog,
   CommandInput,

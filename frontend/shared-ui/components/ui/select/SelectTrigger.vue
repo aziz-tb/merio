@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { SelectIcon, SelectTrigger, useForwardProps } from 'radix-vue'
-import { CaretSortIcon } from '@radix-icons/vue'
+import { ChevronDown } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 
 const props = defineProps({
@@ -32,7 +32,7 @@ const forwardedProps = useForwardProps(delegatedProps)
   >
     <slot />
     <SelectIcon as-child>
-      <CaretSortIcon class="w-4 h-4 opacity-50" />
+      <ChevronDown class="w-4 h-4 opacity-50" />
     </SelectIcon>
   </SelectTrigger>
 </template>

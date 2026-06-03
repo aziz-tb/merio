@@ -99,7 +99,7 @@
 </template>
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { ChevronRightIcon, ClockIcon } from 'lucide-vue-next'
+import { ChevronRight as ChevronRightIcon, Clock as ClockIcon } from '@qall/icons'
 import { format, parseISO } from 'date-fns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Badge } from '@shared-ui/components/ui/badge'

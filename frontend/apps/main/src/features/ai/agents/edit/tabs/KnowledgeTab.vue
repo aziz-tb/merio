@@ -110,12 +110,7 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  FileText,
-} from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Folder, FileLines as FileText } from '@qall/icons'
 import { Input } from '@shared-ui/components/ui/input'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import api from '@/api'

@@ -44,7 +44,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Plus } from 'lucide-vue-next'
+import { Plus } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import FolderTreeNode from './FolderTreeNode.vue'
 

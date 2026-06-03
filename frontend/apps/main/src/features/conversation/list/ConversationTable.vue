@@ -228,17 +228,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDraggable } from 'vue-draggable-plus'
 import { useI18n } from 'vue-i18n'
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  EyeOff,
-  GripVertical,
-  Loader,
-  Plus,
-  Search
-} from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Check, ChevronDown, EyeSlash as EyeOff, GripVertical, Loader, Plus, MagnifyingGlass as Search } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'

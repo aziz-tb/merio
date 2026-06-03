@@ -113,7 +113,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, MessageSquare, Reply, MailOpen, FilePen } from 'lucide-vue-next'
+import { Envelope as Mail, Message as MessageSquare, Reply, EnvelopeOpen as MailOpen, FilePen } from '@qall/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,

@@ -38,7 +38,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import ArticleForm from '@/features/knowledge/ArticleForm.vue'
 import { useKnowledgeStore } from '@main/stores/knowledge'

@@ -113,25 +113,8 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@shared-ui/components/ui/popover/index.js'
-import {
-  AlignCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
-  Bold,
-  Code,
-  Italic,
-  Link as LinkIcon,
-  List,
-  ListOrdered,
-  Minus,
-  Quote,
-  Redo2,
-  SquareCode,
-  Strikethrough,
-  Underline as UnderlineIcon,
-  Undo2
-} from 'lucide-vue-next'
+import { ArrowRotateLeft as Undo2, ListOl as ListOrdered } from '@qall/icons'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Code, Italic, Link as LinkIcon, List, Minus, BlockQuote as Quote, ArrowRotateRight as Redo2, SquareCode, Strikethrough, Underline as UnderlineIcon } from '@qall/icons'
 import { getBody } from './utils/bodyConvert.js'
 
 const { t } = useI18n()

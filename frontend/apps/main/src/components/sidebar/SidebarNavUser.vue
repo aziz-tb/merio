@@ -111,7 +111,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
-import { CircleUserRound, LogOut } from 'lucide-vue-next'
+import { CircleUser as CircleUserRound, RightFromBracket as LogOut } from '@qall/icons'
 import { useUserStore } from '../../stores/user'
 import { useRouter } from 'vue-router'
 

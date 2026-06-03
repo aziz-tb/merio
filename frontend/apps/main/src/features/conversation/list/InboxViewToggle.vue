@@ -39,7 +39,7 @@
 <script setup>
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { PanelLeft, Columns3 } from 'lucide-vue-next'
+import { Sidebar as PanelLeft, Columns3 } from '@qall/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { INBOX_VIEW_MODES, useInboxView } from '@main/composables/useInboxView'
 

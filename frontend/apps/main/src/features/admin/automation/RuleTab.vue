@@ -69,7 +69,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { Settings } from 'lucide-vue-next'
+import { Gear as Settings } from '@qall/icons'
 import draggable from 'vuedraggable'
 import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'

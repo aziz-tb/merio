@@ -26,7 +26,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useSla } from '../../composables/useSla'
-import { AlertCircle, CheckCircle, Clock } from 'lucide-vue-next'
+import { CircleExclamation as AlertCircle, CircleCheck as CheckCircle, Clock } from '@qall/icons'
 const props = defineProps({
   dueAt: String,
   actualAt: String,

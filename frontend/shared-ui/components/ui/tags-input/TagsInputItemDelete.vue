@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { TagsInputItemDelete, useForwardProps } from 'radix-vue'
-import { Cross2Icon } from '@radix-icons/vue'
+import { X } from '@qall/icons'
 import { cn } from '../../../lib/utils'
 
 const props = defineProps({
@@ -25,7 +25,7 @@ const forwardedProps = useForwardProps(delegatedProps)
     :class="cn('flex rounded bg-transparent mr-1', props.class)"
   >
     <slot>
-      <Cross2Icon class="w-4 h-4" />
+      <X class="w-4 h-4" />
     </slot>
   </TagsInputItemDelete>
 </template>

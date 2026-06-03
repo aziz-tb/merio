@@ -165,7 +165,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useConversationStore } from '../../../stores/conversation'
-import { MessageCircleQuestion, MessageCircleWarning, ChevronDown } from 'lucide-vue-next'
+import { MessageQuestion as MessageCircleQuestion, MessageExclamation as MessageCircleWarning, ChevronDown, LayoutLeft, Loader } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -182,7 +182,7 @@ import { useInboxView } from '@main/composables/useInboxView'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
-import { LayoutLeft, Loader } from '@qall/icons'
+
 import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
 
 const conversationStore = useConversationStore()

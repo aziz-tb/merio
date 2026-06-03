@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { BookOpen, ChevronDown } from 'lucide-vue-next'
+import { BookOpen, ChevronDown } from '@qall/icons'
 import { RouterLink } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import MarkdownText from '@shared-ui/components/MarkdownText.vue'

@@ -16,7 +16,7 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { X } from 'lucide-vue-next'
+import { X } from '@qall/icons'
 
 defineEmits(['close'])
 const { t } = useI18n()

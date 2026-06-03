@@ -129,7 +129,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
-import { Plus } from 'lucide-vue-next'
+import { Plus } from '@qall/icons'
 import {
   Select,
   SelectContent,

@@ -226,7 +226,7 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { useEmitter } from '@main/composables/useEmitter'
 import { formatDateTime } from '@main/utils/date'
 import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
-import { Check } from 'lucide-vue-next'
+import { Check } from '@qall/icons'
 
 const props = defineProps({
   columnId: { type: String, required: true },

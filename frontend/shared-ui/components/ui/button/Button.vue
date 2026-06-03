@@ -2,7 +2,7 @@
 import { Primitive } from 'reka-ui'
 import { cn } from '../../../lib/utils'
 import { buttonVariants } from '.'
-import { Loader2 } from 'lucide-vue-next'
+import { Loader } from '@qall/icons'
 const props = defineProps({
   variant: { type: null, required: false },
   size: { type: null, required: false },
@@ -33,7 +33,7 @@ const props = defineProps({
       v-if="isLoading"
       class="absolute inset-0 flex items-center justify-center pointer-events-none text-background"
     >
-      <Loader2 class="h-5 w-5 animate-spin" />
+      <Loader class="h-5 w-5 animate-spin" />
     </span>
   </Primitive>
 </template>

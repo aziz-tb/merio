@@ -404,20 +404,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  AlertCircle,
-  Brain,
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  CircleAlert,
-  FileText,
-  History,
-  Loader2,
-  Search,
-  WifiOff,
-  Wrench,
-} from 'lucide-vue-next'
+import { CircleExclamation as AlertCircle, BrainCircuit, CircleCheck as CheckCircle2, ChevronDown, ChevronRight, CircleExclamation as CircleAlert, FileLines as FileText, ClockRotateLeft as History, Loader as Loader2, MagnifyingGlass as Search, WifiSlash as WifiOff, Wrench } from '@qall/icons'
 import { Alert, AlertDescription, AlertTitle } from '@shared-ui/components/ui/alert'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
@@ -511,7 +498,7 @@ const canExpandThinking = (item) => {
 }
 
 const iconFor = (item) => {
-  if (item.type === 'thinking') return Brain
+  if (item.type === 'thinking') return BrainCircuit
   if (item.type === 'draft') return FileText
   if (item.toolId === 'kb_search') return Search
   return item.status === 'success' && item.phase === 'completed' ? CheckCircle2 : Wrench

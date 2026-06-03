@@ -82,7 +82,7 @@
             :title="detailsPaneOpen ? t('conversation.layoutTwoPane') : t('conversation.layoutThreePane')"
             @click="detailsPaneOpen = !detailsPaneOpen"
           >
-            <PanelRight class="size-4" />
+            <LayoutRight class="size-4" />
           </button>
         </template>
       </div>
@@ -119,7 +119,7 @@ import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
-import { Check, PanelRight } from 'lucide-vue-next'
+import { Check, LayoutRight } from '@qall/icons'
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()

@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { Info, X } from 'lucide-vue-next'
+import { Info, X } from '@qall/icons'
 import { useI18n } from 'vue-i18n'
 
 defineProps({

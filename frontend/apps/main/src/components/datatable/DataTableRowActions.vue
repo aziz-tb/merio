@@ -64,7 +64,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { MoreHorizontal } from 'lucide-vue-next'
+import { Ellipsis as MoreHorizontal } from '@qall/icons'
 import {
   DropdownMenu,
   DropdownMenuContent,

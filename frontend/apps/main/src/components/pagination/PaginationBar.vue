@@ -93,7 +93,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-vue-next'
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from '@qall/icons'
 import { useI18n } from 'vue-i18n'
 import { getVisiblePages } from '@main/utils/pagination'
 

@@ -300,7 +300,7 @@ import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
-import { Clock, LogIn, Key, RotateCcw, Trash2, Plus, AlertTriangle } from 'lucide-vue-next'
+import { Clock, RightToBracket as LogIn, Key, ArrowRotateLeft as RotateCcw, TrashCan as Trash2, Plus, TriangleExclamation as AlertTriangle } from '@qall/icons'
 import {
   FormControl,
   FormField,

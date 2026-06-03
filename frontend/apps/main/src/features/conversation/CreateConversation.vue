@@ -300,7 +300,7 @@ import Editor from '@/components/editor/TextEditor.vue'
 import { useMacroStore } from '@/stores/macro'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { UserTypeAgent } from '@/constants/user'
-import { IdCard } from 'lucide-vue-next'
+import { IdCard } from '@qall/icons'
 import api from '@/api'
 
 const dialogOpen = defineModel({

@@ -99,7 +99,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import FilterBuilder from '@main/components/filter/FilterBuilder.vue'
 import { Button } from '@shared-ui/components/ui/button'
-import { ListFilter, ArrowDownWideNarrow } from 'lucide-vue-next'
+import { BarsFilter as ListFilter, ArrowDownWideShort as ArrowDownWideNarrow } from '@qall/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useActivityLogFilters } from '../../../composables/useActivityLogFilters'
 import { useI18n } from 'vue-i18n'

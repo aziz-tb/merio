@@ -21,7 +21,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown } from '@qall/icons'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import { formatValue, humanizeKey } from '@/utils/fieldRendering'
 

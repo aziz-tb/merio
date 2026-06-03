@@ -108,12 +108,7 @@
 <script setup>
 import { computed, inject, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-vue-next'
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from '@qall/icons'
 import { Input } from '@shared-ui/components/ui/input'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {

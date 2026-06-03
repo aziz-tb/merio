@@ -102,7 +102,7 @@ import {
   DialogTitle,
   DialogFooter
 } from '@shared-ui/components/ui/dialog'
-import { Upload } from 'lucide-vue-next'
+import { Upload } from '@qall/icons'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import CopyButton from '@/components/button/CopyButton.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
