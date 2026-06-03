@@ -23,7 +23,7 @@
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" class="px-2 text-xs text-muted-foreground hover:text-foreground gap-1">
               <span>{{ conversationStore.conversations.total }}</span>
-              <span>{{ conversationStore.getListStatus }}</span>
+              <span>{{ listStatusLabel }}</span>
               <ChevronDown class="size-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
@@ -33,7 +33,7 @@
               :key="status.value"
               @click="handleStatusChange(status)"
             >
-              {{ status.label }}
+              {{ statusDisplayLabel(status) }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -183,12 +183,15 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
 import { LayoutLeft, Loader } from '@qall/icons'
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
 
 const conversationStore = useConversationStore()
 const route = useRoute()
 const { t } = useI18n()
 const { toggle: toggleSidebar } = useLayoutSidebar()
 const { isTableView } = useInboxView()
+const statusDisplayLabel = (status) => getStatusDisplayLabel(status, t)
+const listStatusLabel = computed(() => statusDisplayLabel(conversationStore.getListStatus))
 
 const title = computed(() => {
   const typeKey = route.meta?.typeKey?.(route)

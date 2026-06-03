@@ -84,15 +84,34 @@
     :class="editableCellClass"
     @click.stop
   >
-    <SelectComboBox
-      :model-value="statusModelValue"
-      :items="statusOptions"
-      :placeholder="missing"
-      @select="selectStatus"
-      type="status"
-      trigger-variant="inline"
-      button-class="w-full px-2 py-1 flex justify-center"
-    />
+    <DropdownMenu>
+      <DropdownMenuTrigger as-child>
+        <StatusPill
+          as="button"
+          type="button"
+          :status="currentStatusOption"
+          :label="statusDisplayLabel(currentStatusOption)"
+          size="sm"
+          class="cursor-pointer justify-center transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" class="min-w-44" @click.stop>
+        <DropdownMenuItem
+          v-for="status in statusOptions"
+          :key="status.value"
+          class="gap-2"
+          @click.stop="selectStatus(status)"
+        >
+          <StatusPill :status="status" :label="statusDisplayLabel(status)" size="sm" />
+          <Check
+            :class="[
+              'ml-auto size-4',
+              isSelectedStatus(status) ? 'opacity-100' : 'opacity-0'
+            ]"
+          />
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   </div>
 
   <div
@@ -187,9 +206,16 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { format } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@shared-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 import TagPill from '@shared-ui/components/TagPill.vue'
+import StatusPill from '@main/components/status/StatusPill.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useTeamStore } from '@main/stores/team'
@@ -199,6 +225,8 @@ import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { useEmitter } from '@main/composables/useEmitter'
 import { formatDateTime } from '@main/utils/date'
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
+import { Check } from 'lucide-vue-next'
 
 const props = defineProps({
   columnId: { type: String, required: true },
@@ -284,9 +312,13 @@ const priorityModelValue = computed(() =>
 // Status
 const statusName = computed(() => stringValue(props.conversation.status))
 const statusOptions = computed(() => conversationStore.statusOptions)
-const statusModelValue = computed(() =>
-  findOptionByLabel(statusOptions.value, statusName.value)?.value || props.conversation.status_id || ''
+const currentStatusOption = computed(() =>
+  findOptionByLabel(statusOptions.value, statusName.value) || {
+    label: statusName.value
+  }
 )
+const statusDisplayLabel = (status) => getStatusDisplayLabel(status, t)
+const isSelectedStatus = (status) => sameValue(status?.label, statusName.value)
 
 // Team / assignee mirror the canonical conversation payload: IDs on the row,
 // names resolved from app-level stores that are already loaded by App.vue.

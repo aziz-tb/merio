@@ -2,7 +2,9 @@
 select id,
     created_at,
     name,
-    category
+    category,
+    color,
+    icon
 from conversation_statuses
 where id = $1;
 
@@ -10,14 +12,25 @@ where id = $1;
 select id,
     created_at,
     name,
-    category
+    category,
+    color,
+    icon
 from conversation_statuses;
 
 -- name: insert-status
-INSERT into conversation_statuses(name, category) values ($1, $2) RETURNING *;
+INSERT into conversation_statuses(name, category, color, icon)
+values ($1, $2, $3, $4)
+RETURNING id, created_at, name, category, color, icon;
 
 -- name: delete-status
 DELETE from conversation_statuses where id = $1;
 
 -- name: update-status
-UPDATE conversation_statuses set name = $2, category = $3 where id = $1 RETURNING *;
+UPDATE conversation_statuses
+set name = $2,
+    category = $3,
+    color = $4,
+    icon = $5,
+    updated_at = NOW()
+where id = $1
+RETURNING id, created_at, name, category, color, icon;

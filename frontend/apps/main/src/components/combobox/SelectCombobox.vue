@@ -32,14 +32,28 @@
           </AvatarFallback>
         </Avatar>
 
-        <!-- Others -->
-        <component
-          v-else-if="item.icon && PRIORITY_ICONS[item.icon]"
-          :is="PRIORITY_ICONS[item.icon]"
-          class="size-4 shrink-0"
+        <span v-if="type === 'user' || type === 'team'" class="min-w-0 truncate text-sm">
+          {{ item.label }}
+        </span>
+
+        <!-- STATUS -->
+        <StatusPill
+          v-else-if="type === 'status'"
+          :status="item"
+          size="sm"
+          class="max-w-full"
         />
-        <span v-else-if="item.emoji">{{ item.emoji }}</span>
-        <span>{{ item.label }}</span>
+
+        <!-- Others -->
+        <template v-else>
+          <component
+            v-if="item.icon && PRIORITY_ICONS[item.icon]"
+            :is="PRIORITY_ICONS[item.icon]"
+            class="size-4 shrink-0"
+          />
+          <span v-else-if="item.emoji">{{ item.emoji }}</span>
+          <span>{{ item.label }}</span>
+        </template>
         <span v-if="isCurrentUser(item)" class="text-muted-foreground text-xs"
           >({{ t('globals.terms.you') }})</span
         >
@@ -77,6 +91,17 @@
             </AvatarFallback>
           </Avatar>
           <span class="truncate text-sm">{{ selected.label }}</span>
+        </div>
+
+        <div
+          v-else-if="selected && type === 'status'"
+          class="flex min-w-0"
+        >
+          <StatusPill
+            :status="selected"
+            :size="selectedStatusPillSize"
+            class="max-w-full"
+          />
         </div>
 
         <div
@@ -148,6 +173,7 @@ import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { User, Users } from '@qall/icons'
 import { FALLBACK_PRIORITY_VISUAL, PRIORITY_ICONS } from '@/utils/priorityVisuals'
+import StatusPill from '@main/components/status/StatusPill.vue'
 const { t } = useI18n()
 const userStore = useUserStore()
 
@@ -173,6 +199,7 @@ const normalizedValue = computed(() => String(props.modelValue || ''))
 const isInlineTrigger = computed(() => props.triggerVariant === 'inline')
 const selectedAvatarClass = computed(() => isInlineTrigger.value ? 'w-5 h-5' : 'w-7 h-7')
 const selectedFallbackClass = computed(() => isInlineTrigger.value ? 'text-[10px]' : '')
+const selectedStatusPillSize = computed(() => isInlineTrigger.value ? 'xs' : 'sm')
 const priorityPlaceholderIcon = computed(() => PRIORITY_ICONS[FALLBACK_PRIORITY_VISUAL.icon])
 
 const isCurrentUser = (item) => {

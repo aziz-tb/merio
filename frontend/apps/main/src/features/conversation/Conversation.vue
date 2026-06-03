@@ -45,31 +45,32 @@
             </span>
           </div>
 
-          <!-- Snooze -->
-          <button
-            type="button"
-            class="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            :title="t('globals.terms.snooze')"
-            @click="handleSnoozeClick"
-          >
-            <Moon class="size-4" />
-          </button>
-
           <!-- Status pill — icon + label always inline. Dropdown anchors to this Button. -->
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
-              <Button size="sm" class="h-8 rounded-full px-3 gap-1.5">
-                <CircleSlash class="size-4" />
-                <span>{{ statusButtonLabel }}</span>
-              </Button>
+              <StatusPill
+                as="button"
+                type="button"
+                :status="currentStatusOption"
+                :label="statusDisplayLabel(currentStatusOption)"
+                size="md"
+                class="shrink-0 cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+              />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="min-w-44">
               <DropdownMenuItem
                 v-for="status in conversationStore.statusOptions"
                 :key="status.value"
-                @click="handleUpdateStatus(status.label)"
+                class="gap-2"
+                @click="handleUpdateStatus(status)"
               >
-                {{ status.label }}
+                <StatusPill :status="status" :label="statusDisplayLabel(status)" size="sm" />
+                <Check
+                  :class="[
+                    'ml-auto size-4',
+                    isSelectedStatus(status) ? 'opacity-100' : 'opacity-0'
+                  ]"
+                />
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -110,14 +111,15 @@ import {
 } from '@shared-ui/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Button } from '@shared-ui/components/ui/button'
+import StatusPill from '@main/components/status/StatusPill.vue'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
 import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
 import { CONVERSATION_DEFAULT_STATUSES } from '../../constants/conversation'
 import { useEmitter } from '../../composables/useEmitter'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
-import { CircleSlash, Moon, PanelRight } from 'lucide-vue-next'
+import { getStatusDisplayLabel } from '@main/utils/statusVisuals'
+import { Check, PanelRight } from 'lucide-vue-next'
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
@@ -127,6 +129,13 @@ const { t } = useI18n()
 const detailsPaneOpen = useStorage('conversationSidebarOpen', true)
 
 const statusButtonLabel = computed(() => conversationStore.current?.status || '')
+const currentStatusOption = computed(() =>
+  conversationStore.statusOptions.find((status) => status.label === statusButtonLabel.value) || {
+    label: statusButtonLabel.value
+  }
+)
+const statusDisplayLabel = (status) => getStatusDisplayLabel(status, t)
+const isSelectedStatus = (status) => status?.label === statusButtonLabel.value
 
 // Other agents currently viewing this conversation (excludes self).
 // Reactively reads the conversation store's `viewers` map (updated by the WS handler) and
@@ -142,21 +151,15 @@ const otherViewers = computed(() => {
     .filter(Boolean)
 })
 
-const handleSnoozeClick = () => {
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: 'snooze',
-    open: true
-  })
-}
-
 const handleUpdateStatus = (status) => {
-  if (status === CONVERSATION_DEFAULT_STATUSES.SNOOZED) {
+  const statusLabel = status?.label || status
+  if (statusLabel === CONVERSATION_DEFAULT_STATUSES.SNOOZED) {
     emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
       command: 'snooze',
       open: true
     })
     return
   }
-  conversationStore.updateStatus(status)
+  conversationStore.updateStatus(statusLabel)
 }
 </script>

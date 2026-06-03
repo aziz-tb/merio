@@ -208,7 +208,9 @@ CREATE TABLE conversation_statuses (
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	"name" TEXT NOT NULL UNIQUE,
-	category conversation_status_category NOT NULL DEFAULT 'open'
+	category conversation_status_category NOT NULL DEFAULT 'open',
+	color TEXT NOT NULL DEFAULT 'blue',
+	icon TEXT NOT NULL DEFAULT 'CircleDot'
 );
 
 DROP TABLE IF EXISTS conversation_priorities CASCADE;
@@ -1621,11 +1623,11 @@ INSERT INTO conversation_priorities (name) VALUES
 ('Urgent');
 
 -- Default conversation statuses
-INSERT INTO conversation_statuses (name, category) VALUES
-('Open', 'open'),
-('Snoozed', 'waiting'),
-('Resolved', 'resolved'),
-('Closed', 'resolved');
+INSERT INTO conversation_statuses (name, category, color, icon) VALUES
+('Open', 'open', 'blue', 'CircleDot'),
+('Snoozed', 'waiting', 'yellow', 'Moon'),
+('Resolved', 'resolved', 'green', 'CircleCheck'),
+('Closed', 'resolved', 'grey', 'CircleSlash');
 
 -- Default roles
 INSERT INTO
