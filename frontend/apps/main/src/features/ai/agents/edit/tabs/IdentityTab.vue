@@ -21,18 +21,18 @@
   on the PUT and surfaces via the toast.
 -->
 <template>
-  <div class="max-w-xl px-6 py-6 space-y-5">
+  <div class="px-6 py-6  max-w-5xl mx-auto">
     <div v-if="!agent" class="text-sm text-muted-foreground">…</div>
 
     <template v-else>
       <!-- Name -->
-      <div class="space-y-1.5">
+      <div class="space-y-1.5 my-4">
         <Label>{{ t('globals.terms.name') }}</Label>
         <Input v-model="agent.name" type="text" @keydown.enter.prevent />
       </div>
 
       <!-- Slug -->
-      <div class="space-y-1.5">
+      <div class="space-y-1.5 my-4">
         <Label :class="!isCreateMode ? 'text-muted-foreground' : ''">
           {{ t('globals.terms.slug') }}
         </Label>
@@ -48,13 +48,13 @@
       </div>
 
       <!-- Description -->
-      <div class="space-y-1.5">
+      <div class="space-y-1.5 my-4">
         <Label>{{ t('globals.terms.description') }}</Label>
         <Input v-model="agent.description" type="text" @keydown.enter.prevent />
       </div>
 
       <!-- Verification gate -->
-      <div class="space-y-1.5">
+      <div class="space-y-1.5 mt-8 mb-4">
         <div class="flex items-center justify-between gap-3">
           <Label>{{ t('admin.ai.agent.requiresVerifiedCustomer') }}</Label>
           <Switch
@@ -68,7 +68,7 @@
       </div>
 
       <!-- Enabled -->
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center justify-between gap-3 mt-8 mb-4">
         <Label class="text-foreground">{{ t('globals.terms.enabled') }}</Label>
         <Switch :checked="agent.enabled" @update:checked="(v) => (agent.enabled = v)" />
       </div>

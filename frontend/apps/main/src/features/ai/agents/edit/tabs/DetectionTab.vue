@@ -1,5 +1,5 @@
 <template>
-  <div class="px-6 py-6 max-w-4xl space-y-4">
+  <div class="px-6 py-6  max-w-5xl mx-auto">
     <div>
       <h2 class="text-lg font-semibold">{{ t('admin.ai.agent.tab.detection') }}</h2>
       <p class="text-sm text-muted-foreground mt-1">

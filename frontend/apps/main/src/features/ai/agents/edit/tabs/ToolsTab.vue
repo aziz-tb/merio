@@ -13,7 +13,7 @@
   it lands the field is absent and the badge is omitted.
 -->
 <template>
-  <div class="px-6 py-6 max-w-3xl">
+  <div class="mx-auto px-6 py-6 max-w-5xl">
     <div class="flex items-center justify-between gap-4 mb-3">
       <h2 class="text-lg font-semibold">{{ t('admin.ai.agent.tab.tools') }}</h2>
       <span class="text-xs text-muted-foreground">
