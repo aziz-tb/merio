@@ -157,8 +157,9 @@ import requests
 resp = requests.get("https://api.example.com/data", timeout=10)
 ```
 
-The script's `allowed_domains` (set at dispatch time by the platform)
-controls which hosts are reachable from the VM.
+Outbound network is enabled for sandbox scripts in this deployment. The
+legacy `allowed_domains` request field is retained for compatibility but is
+not enforced by the runner.
 
 The SDK is for **platform** calls only. External calls are not the SDK's
 job, and shouldn't be — this keeps the SDK narrow.

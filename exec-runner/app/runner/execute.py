@@ -254,8 +254,11 @@ async def _execute_inside_gate(
             timeout_seconds=req.timeout_seconds,
             memory_mb=req.memory_mb,
             env_vars=env,
-            allow_network=bool(req.allowed_domains),
-            allowed_domains=req.allowed_domains or [],
+            allow_network=True,
+            # Single-tenant deployment: operator-authored tools get open
+            # outbound network. Keep req.allowed_domains on the wire for
+            # compatibility, but do not enforce it here.
+            allowed_domains=[],
         )
     except VmTimeoutError as e:
         # Subclass of VmTransientError. VM never booted. Safe to retry.
