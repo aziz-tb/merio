@@ -107,6 +107,15 @@ func isKBScopeEmpty(s builtin.KBScope) bool {
 	return len(s.FolderIDs) == 0 && len(s.ArticleIDs) == 0
 }
 
+func hasResolvedTool(out []ResolvedTool, id string) bool {
+	for _, tool := range out {
+		if tool.ID() == id {
+			return true
+		}
+	}
+	return false
+}
+
 // Resolve turns agent.Tools (raw JSONB) into a list of ResolvedTool.
 // Tool-level verification gating was dropped (agents gate their tools), so
 // the only drops here are unregistered/missing internal capabilities,
@@ -118,19 +127,14 @@ func isKBScopeEmpty(s builtin.KBScope) bool {
 // shape (which the agent handler validates at save time, so this should
 // be unreachable from the runtime path).
 func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([]ResolvedTool, map[int]string, error) {
-	if len(rawTools) == 0 || string(rawTools) == "null" || string(rawTools) == "[]" {
-		return nil, nil, nil
-	}
-
 	var refs []agentmodels.ToolRef
-	if err := json.Unmarshal(rawTools, &refs); err != nil {
-		return nil, nil, fmt.Errorf("resolver: agent.tools is not a valid array: %w", err)
-	}
-	if len(refs) == 0 {
-		return nil, nil, nil
+	if len(rawTools) > 0 && string(rawTools) != "null" && string(rawTools) != "[]" {
+		if err := json.Unmarshal(rawTools, &refs); err != nil {
+			return nil, nil, fmt.Errorf("resolver: agent.tools is not a valid array: %w", err)
+		}
 	}
 
-	out := make([]ResolvedTool, 0, len(refs))
+	out := make([]ResolvedTool, 0, len(refs)+1)
 	drops := make(map[int]string)
 
 	// Pre-fetch all custom tool ids in a single query — avoids N+1.
@@ -207,6 +211,15 @@ func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([
 
 		default:
 			drops[i] = fmt.Sprintf("unknown kind %q", ref.Kind)
+		}
+	}
+
+	if !isKBScopeEmpty(kbScope) && !hasResolvedTool(out, "kb_search") {
+		if cap, found := r.registry.Get("kb_search"); found {
+			out = append(out, ResolvedTool{
+				Kind:     agentmodels.ToolRefKindInternal,
+				Internal: cap,
+			})
 		}
 	}
 

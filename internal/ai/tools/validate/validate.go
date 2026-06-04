@@ -25,7 +25,7 @@ type Params = map[string]any
 
 // ParameterDef is one entry in a tool's input_parameters JSONB array.
 // Only the fields the validator needs are mapped — extra fields
-// (description, source, options, etc.) are ignored.
+// (description, options, etc.) are ignored.
 type ParameterDef struct {
 	Key      string `json:"key"`
 	Type     string `json:"type"`

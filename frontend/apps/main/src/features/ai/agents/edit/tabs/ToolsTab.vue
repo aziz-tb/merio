@@ -3,9 +3,6 @@
   tools. Single uniform list (no grouping). Each row toggles whether
   the tool ref lands in agent.tools.
 
-  Excludes kb_search per the plan: it's automatic when Knowledge scope
-  is non-empty.
-
   ToolRef shape (mirrors AgentToolsPicker for backend compatibility):
     { kind: 'internal' | 'custom', id: string | number, config_override? }
 
@@ -16,7 +13,7 @@
   it lands the field is absent and the badge is omitted.
 -->
 <template>
-  <div class="px-6 py-6 max-w-3xl">
+  <div class="mx-auto px-6 py-6 max-w-5xl">
     <div class="flex items-center justify-between gap-4 mb-3">
       <h2 class="text-lg font-semibold">{{ t('admin.ai.agent.tab.tools') }}</h2>
       <span class="text-xs text-muted-foreground">
@@ -92,16 +89,13 @@ const search = ref('')
 const loading = ref(true)
 const internalCaps = ref([])
 const customTools = ref([])
-
-// kb_search is auto-attached when Knowledge scope is non-empty —
-// hide it from the picker to avoid double-control.
-const HIDDEN_INTERNAL_IDS = new Set(['kb_search'])
+const HIDDEN_INTERNAL_TOOL_IDS = new Set(['kb_search'])
 
 onMounted(async () => {
   loading.value = true
   try {
     const r = await api.getAIInternalCapabilities()
-    internalCaps.value = (r.data.data || []).filter((c) => !HIDDEN_INTERNAL_IDS.has(c.id))
+    internalCaps.value = r.data.data || []
   } catch {
     internalCaps.value = []
   }
@@ -120,6 +114,7 @@ onMounted(async () => {
 const rows = computed(() => {
   const out = []
   for (const c of internalCaps.value) {
+    if (HIDDEN_INTERNAL_TOOL_IDS.has(String(c.id))) continue
     out.push({
       kind: 'internal',
       id: String(c.id),

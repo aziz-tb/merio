@@ -369,6 +369,8 @@ func main() {
 	// registry is populated before the agent runtime reads from it.
 	colorlog.Green("AI built-in capabilities: %v", aibuiltin.Default().IDs())
 
+	functionMgr.SetConversationStore(conversation)
+
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
 

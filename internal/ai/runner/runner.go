@@ -734,8 +734,13 @@ func encodeToolResult(log ToolCallLog) string {
 	// Error path — the model needs the failure reason to plan its
 	// next move (retry with different params, give up, etc.).
 	body := map[string]any{
-		"status": log.Status,
-		"error":  log.Error,
+		"status":    log.Status,
+		"code":      nil,
+		"error":     log.Error,
+		"retryable": log.Retryable,
+	}
+	if log.Code != "" {
+		body["code"] = log.Code
 	}
 	if log.Recovered {
 		body["recovered_from_panic"] = true

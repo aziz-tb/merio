@@ -557,9 +557,7 @@ type sandboxRequest struct {
 	Code             string            `json:"code"`
 	Language         string            `json:"language"`
 	Input            map[string]any    `json:"input,omitempty"`
-	ConversationData json.RawMessage   `json:"conversation_data,omitempty"`
-	CustomerData     json.RawMessage   `json:"customer_data,omitempty"`
-	ContractData     json.RawMessage   `json:"contract_data,omitempty"`
+	ConversationUUID string            `json:"conversation_uuid,omitempty"`
 	Secrets          map[string]string `json:"secrets,omitempty"`
 	CallbackToken    string            `json:"callback_token"`
 	CallbackBaseURL  string            `json:"callback_base_url"`
@@ -608,9 +606,7 @@ func buildSandboxPayload(
 		Code:             req.Code,
 		Language:         req.Language,
 		Input:            req.Input,
-		ConversationData: req.ConversationData,
-		CustomerData:     req.CustomerData,
-		ContractData:     req.ContractData,
+		ConversationUUID: req.ConversationUUID,
 		Secrets:          secretValues,
 		CallbackToken:    callbackToken,
 		CallbackBaseURL:  platformBase,

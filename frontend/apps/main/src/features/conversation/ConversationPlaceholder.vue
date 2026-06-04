@@ -11,7 +11,7 @@
           <div class="space-y-4 mb-6">
             <div class="checklist-item" :class="{ completed: hasInboxes }">
               <CheckCircle v-if="hasInboxes" class="check-icon completed" />
-              <Circle v-else class="w-5 h-5 text-muted-foreground" />
+              <CircleDot v-else class="w-5 h-5 text-muted-foreground" />
               <span class="flex-1 text-left ml-3 text-foreground">
                 {{ $t('setup.createFirstInbox') }}
               </span>
@@ -55,7 +55,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CircleCheck as CheckCircle, Circle } from '@qall/icons'
+import { CircleCheck as CheckCircle, Circle, CircleDot } from '@qall/icons'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useInboxStore } from '@/stores/inbox'

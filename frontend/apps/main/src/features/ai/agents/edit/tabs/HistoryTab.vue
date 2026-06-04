@@ -10,7 +10,7 @@
   live runs and ComposerTab uses for past composer runs.
 -->
 <template>
-  <div class="px-6 py-6 max-w-5xl">
+  <div class="px-6 py-6 max-w-5xl mx-auto">
     <div class="flex items-center justify-between gap-4 mb-3">
       <h2 class="text-lg font-semibold">{{ t('admin.ai.agent.tab.history') }}</h2>
       <span v-if="rows.length > 0" class="text-xs text-muted-foreground">

@@ -281,12 +281,9 @@ type ToolCallLog struct {
 	// validated against the tool's input_schema before dispatch).
 	Input map[string]any `json:"input,omitempty"`
 
-	// Status is the outcome envelope:
-	//   "success"          → Data is the tool's output
-	//   "validation_error" → Error explains the schema mismatch
-	//   "execution_error"  → Error explains why; Data may be partial
-	//   "unavailable"      → tool was registered but couldn't run
-	//                        (sandbox down, capability not yet ready, etc.)
+	// Status is the outcome envelope. Dispatcher/runtime errors use
+	// validation_error/execution_error/unavailable; SDK-controlled
+	// non-success results preserve their kind (failure/error/noop).
 	Status string `json:"status"`
 
 	// Data is populated on Status=success with the tool's output
@@ -296,6 +293,12 @@ type ToolCallLog struct {
 	// Error carries the human-readable failure reason on non-success.
 	// Same string the dispatcher returns from its sentinels.
 	Error string `json:"error,omitempty"`
+
+	// Code carries the SDK/runner result code for non-success script results.
+	Code string `json:"code,omitempty"`
+
+	// Retryable mirrors sdk.error(..., retryable=True) for LLM planning.
+	Retryable bool `json:"retryable,omitempty"`
 
 	// StartedAt is when dispatch entered Execute. Captured by
 	// dispatchOneTool. Stable across parallel execution; downstream

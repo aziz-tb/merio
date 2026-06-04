@@ -1364,7 +1364,7 @@
   "admin.ai.preset.placeholder": "Select a preset",
   "admin.ai.preset.defaultLabelPrefix": "Default — uses platform default",
   "admin.ai.agent.toolsPicker.internalHeading": "Internal capabilities",
-  "admin.ai.agent.toolsPicker.internalHelp": "Read-only platform tools (kb_search, get_customer_data, …). Always available regardless of verification; visibility is filtered per-call.",
+  "admin.ai.agent.toolsPicker.internalHelp": "Read-only platform tools (get_customer_data, get_conversation_history, …). Always available regardless of verification; visibility is filtered per-call.",
   "admin.ai.agent.toolsPicker.internalEmpty": "No internal capabilities registered.",
   "admin.ai.agent.toolsPicker.customHeading": "Custom tools",
   "admin.ai.agent.toolsPicker.customHelp": "Python- oder JavaScript-Tools, die unter KI → Tools erstellt wurden.",

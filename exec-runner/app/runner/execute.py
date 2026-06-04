@@ -118,15 +118,7 @@ def _build_env(req: ExecuteRequest) -> dict[str, str]:
     """
     return {
         "_INPUT_DATA": json.dumps(req.input, default=str),
-        "_CONVERSATION_DATA": json.dumps(req.conversation_data, default=str)
-        if req.conversation_data is not None
-        else "null",
-        "_CONTRACT_DATA": json.dumps(req.contract_data, default=str)
-        if req.contract_data is not None
-        else "null",
-        "_CUSTOMER_DATA": json.dumps(req.customer_data, default=str)
-        if req.customer_data is not None
-        else "null",
+        "_CONVERSATION_UUID": req.conversation_uuid or "",
         "_SECRETS_DATA": json.dumps(req.secrets, default=str),
         "_CALLBACK_TOKEN": req.callback_token,
         "_CALLBACK_BASE_URL": req.callback_base_url,
@@ -262,8 +254,11 @@ async def _execute_inside_gate(
             timeout_seconds=req.timeout_seconds,
             memory_mb=req.memory_mb,
             env_vars=env,
-            allow_network=bool(req.allowed_domains),
-            allowed_domains=req.allowed_domains or [],
+            allow_network=True,
+            # Single-tenant deployment: operator-authored tools get open
+            # outbound network. Keep req.allowed_domains on the wire for
+            # compatibility, but do not enforce it here.
+            allowed_domains=[],
         )
     except VmTimeoutError as e:
         # Subclass of VmTransientError. VM never booted. Safe to retry.

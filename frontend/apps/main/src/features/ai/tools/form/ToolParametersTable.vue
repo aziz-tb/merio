@@ -3,10 +3,10 @@
     <table class="w-full text-sm table-fixed">
       <thead>
         <tr class="text-left text-muted-foreground">
-          <th class="py-1 px-2 w-[20%] font-medium">
+          <th class="py-1 px-2 w-[24%] font-medium">
             {{ $t('admin.ai.tool.params.key') }}
           </th>
-          <th class="py-1 px-2 w-[140px] font-medium">
+          <th class="py-1 px-2 w-[120px] font-medium">
             {{ $t('admin.ai.tool.params.type') }}
           </th>
           <th class="py-1 px-2 font-medium">

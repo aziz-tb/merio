@@ -82,6 +82,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const internalCaps = ref([])
 const customTools = ref([])
+const HIDDEN_INTERNAL_TOOL_IDS = new Set(['kb_search'])
 
 const internalIndex = computed(() => {
   const m = new Map()
@@ -121,7 +122,7 @@ const toggleCustom = (id, on) => {
 onMounted(async () => {
   try {
     const r = await api.getAIInternalCapabilities()
-    internalCaps.value = r.data.data || []
+    internalCaps.value = (r.data.data || []).filter((c) => !HIDDEN_INTERNAL_TOOL_IDS.has(String(c.id)))
   } catch {
     internalCaps.value = []
   }

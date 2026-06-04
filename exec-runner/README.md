@@ -19,6 +19,27 @@ uv run sbx prefetch -q
 SERVICE_TOKEN=secret123 uv run uvicorn app.main:app --host 0.0.0.0 --port 8090
 ```
 
+## Docker on Linux/KVM
+
+The production compose stack runs exec-runner as `merio_exec_runner` on the
+same Docker network as `merio_app`. The Go containers should use:
+
+```env
+MERIO_EXEC__SANDBOX_URL=http://exec-runner:8090
+MERIO_EXEC__PLATFORM_BASE_URL=http://merio_app:9000
+```
+
+The container needs `/dev/kvm` and the host `kvm` group GID:
+
+```bash
+KVM_GID=$(getent group kvm | cut -d: -f3)
+docker compose -f docker-compose.prod.yml build exec-runner
+docker compose -f docker-compose.prod.yml up -d exec-runner
+```
+
+macOS Docker Desktop does not expose `/dev/kvm`; keep running the service on
+the host with `uv` for Mac development.
+
 ## Endpoints
 
 - `POST /v1/execute` — run a script

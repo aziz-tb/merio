@@ -47,4 +47,8 @@ class TimeoutError(ApiError):  # noqa: A001 — shadows builtin intentionally; n
 
 
 class DepthLimitError(SdkError):
-    """sdk.tools.call exceeded the maximum recursion depth."""
+    """Legacy tool-composition depth limit error."""
+
+
+class DeprecationError(SdkError):
+    """An SDK surface exists for compatibility but is no longer supported."""

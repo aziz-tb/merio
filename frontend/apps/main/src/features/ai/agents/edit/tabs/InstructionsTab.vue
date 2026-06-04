@@ -17,7 +17,7 @@
   good enough for "is the prompt huge?" feedback.
 -->
 <template>
-  <div class="min-h-full">
+  <div class="min-h-full  max-w-5xl mx-auto">
     <div v-if="!agent" class="px-6 py-6 text-sm text-muted-foreground">…</div>
 
     <template v-else>

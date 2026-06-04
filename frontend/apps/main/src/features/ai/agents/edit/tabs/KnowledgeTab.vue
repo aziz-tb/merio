@@ -25,7 +25,7 @@
   matching folders + articles; matching folders auto-expand.
 -->
 <template>
-  <div class="px-6 py-6 max-w-5xl">
+  <div class="px-6 py-6 max-w-5xl mx-auto">
     <div class="flex items-center justify-between gap-4 mb-3">
       <h2 class="text-lg font-semibold">{{ t('admin.ai.agent.tab.knowledge') }}</h2>
       <span class="text-xs text-muted-foreground">

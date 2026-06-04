@@ -8,14 +8,12 @@ services:
     environment:
       MERIO_SYSTEM_USER_PASSWORD: ${MERIO_SYSTEM_USER_PASSWORD:?required}
       MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?required}
-      MERIO_EXEC__SANDBOX_URL: http://host.docker.internal:8090
+      MERIO_EXEC__SANDBOX_URL: ${SANDBOX_URL:-http://exec-runner:8090}
       MERIO_EXEC__SANDBOX_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
-      MERIO_EXEC__PLATFORM_BASE_URL: http://127.0.0.1:9100
+      MERIO_EXEC__PLATFORM_BASE_URL: ${PLATFORM_BASE_URL:-http://merio_app:9000}
       MERIO_TEMPORAL__ENABLED: "true"
       MERIO_TEMPORAL__ADDRESS: temporal:7233
       MERIO_TEMPORAL__NAMESPACE: merio
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - merio
     depends_on:
@@ -23,6 +21,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      exec-runner:
+        condition: service_healthy
       temporal:
         condition: service_started
     volumes:
@@ -30,7 +30,7 @@ services:
       - ./config.toml:/merio/config.toml:ro
       - ./config:/merio/config:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/health 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/health 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -72,6 +72,43 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+
+  exec-runner:
+    build: ./exec-runner
+    container_name: merio_exec_runner
+    restart: unless-stopped
+    networks:
+      - merio
+    devices:
+      - /dev/kvm:/dev/kvm
+    group_add:
+      - "${KVM_GID:?required}"
+    environment:
+      SERVICE_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
+      WARM_POOL_SIZE_PYTHON: ${EXEC_WARM_POOL_PYTHON:-5}
+      WARM_POOL_SIZE_JS: ${EXEC_WARM_POOL_JS:-0}
+      WARM_POOL_SIZE_RAW: ${EXEC_WARM_POOL_RAW:-0}
+      DEFAULT_MEMORY_MB: ${EXEC_VM_MEMORY:-256}
+      DEFAULT_TIMEOUT_SECONDS: ${EXEC_TIMEOUT:-60}
+      EXEC_SANDBOX_OFFLINE: "1"
+      LOG_LEVEL: ${EXEC_LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+    volumes:
+      - exec-sandbox-cache:/root/.cache/exec-sandbox
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 3G
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8090/v1/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 90s
 
   temporal-postgresql:
     image: postgres:17-alpine
@@ -138,14 +175,12 @@ services:
     restart: unless-stopped
     environment:
       MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?required}
-      MERIO_EXEC__SANDBOX_URL: http://host.docker.internal:8090
+      MERIO_EXEC__SANDBOX_URL: ${SANDBOX_URL:-http://exec-runner:8090}
       MERIO_EXEC__SANDBOX_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
-      MERIO_EXEC__PLATFORM_BASE_URL: http://127.0.0.1:9100
+      MERIO_EXEC__PLATFORM_BASE_URL: ${PLATFORM_BASE_URL:-http://merio_app:9000}
       MERIO_TEMPORAL__ENABLED: "true"
       MERIO_TEMPORAL__ADDRESS: temporal:7233
       MERIO_TEMPORAL__NAMESPACE: merio
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./config.toml:/worker/config.toml:ro
       - ./config:/worker/config:ro
@@ -153,6 +188,8 @@ services:
       - merio
     depends_on:
       db:
+        condition: service_healthy
+      exec-runner:
         condition: service_healthy
       temporal:
         condition: service_started
@@ -170,3 +207,4 @@ volumes:
   postgres-data:
   redis-data:
   temporal-postgresql-data:
+  exec-sandbox-cache:
