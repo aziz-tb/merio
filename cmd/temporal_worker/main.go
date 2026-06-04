@@ -605,6 +605,9 @@ func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activi
 		if err != nil {
 			log.Fatalf("temporal-worker: contract manager: %v", err)
 		}
+		if deps.Functions != nil {
+			deps.Functions.SetConversationStore(deps.Conversation)
+		}
 	}
 	if needsAIRuns || needsPipeline {
 		var err error

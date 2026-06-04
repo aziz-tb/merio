@@ -118,15 +118,7 @@ def _build_env(req: ExecuteRequest) -> dict[str, str]:
     """
     return {
         "_INPUT_DATA": json.dumps(req.input, default=str),
-        "_CONVERSATION_DATA": json.dumps(req.conversation_data, default=str)
-        if req.conversation_data is not None
-        else "null",
-        "_CONTRACT_DATA": json.dumps(req.contract_data, default=str)
-        if req.contract_data is not None
-        else "null",
-        "_CUSTOMER_DATA": json.dumps(req.customer_data, default=str)
-        if req.customer_data is not None
-        else "null",
+        "_CONVERSATION_UUID": req.conversation_uuid or "",
         "_SECRETS_DATA": json.dumps(req.secrets, default=str),
         "_CALLBACK_TOKEN": req.callback_token,
         "_CALLBACK_BASE_URL": req.callback_base_url,

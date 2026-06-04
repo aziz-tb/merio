@@ -66,9 +66,9 @@ type DispatchRequest struct {
 	Parameters map[string]any
 
 	// ConversationID, when non-zero, is plumbed to the runner so the
-	// SDK's sdk.api callbacks get default-scoping (custom tools), and
-	// populated into the ToolRuntimeContext for internal capabilities.
-	// Not used to source parameters — that's the agent runtime's job.
+	// SDK's sdk.api callbacks get default-scoping (custom tools), populated
+	// into the ToolRuntimeContext for internal capabilities, and converted
+	// into _CONVERSATION_UUID for sdk.context.* helpers.
 	ConversationID int
 
 	// RuntimeCtx is supplied by callers invoking internal capabilities

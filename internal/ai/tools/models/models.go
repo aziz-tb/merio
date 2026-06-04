@@ -20,8 +20,9 @@ import (
 // admin API the linked code is reconstructed into Implementation so the
 // request/response JSON shape is unchanged from before the framework batch.
 //
-//   - InputParameters: array of {key, name, type, source, source_key,
-//     required, visibility, description, options}
+//   - InputParameters: array of {key, name, type, required, visibility,
+//     description, options}. Extra fields are ignored for compatibility
+//     with older saved JSON shapes.
 //   - OutputSchema: JSON Schema describing the tool's structured output
 //   - Implementation: {code, language, packages} — reconstructed from the
 //     functions row on reads, parsed into the functions row on writes. NOT

@@ -45,20 +45,9 @@ type Request struct {
 	// to get its arguments.
 	Input map[string]any
 
-	// ConversationData (optional) becomes sdk.conversation_data. When set,
-	// it must be the platform's full Conversation JSON shape (the runner
-	// doesn't transform it). Pass the raw bytes from the existing
-	// conversation manager's serialization to keep the shape consistent.
-	ConversationData json.RawMessage
-
-	// CustomerData (optional) becomes sdk.customer_data. Reserved for
-	// future per-org executor output; v1 leaves this nil and the SDK
-	// exposes None.
-	CustomerData json.RawMessage
-
-	// ContractData (optional) becomes sdk.contract_data. Reserved like
-	// CustomerData; v1 leaves this nil.
-	ContractData json.RawMessage
+	// ConversationUUID becomes _CONVERSATION_UUID inside the sandbox. The SDK
+	// uses this public identifier for lazy sdk.context.* API reads.
+	ConversationUUID string
 
 	// Recursion + tracing.
 	//

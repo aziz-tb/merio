@@ -14,6 +14,7 @@ import (
 	"errors"
 	"strings"
 
+	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	"github.com/aziz-tb/merio/internal/dbutil"
 	"github.com/aziz-tb/merio/internal/envelope"
 	execModels "github.com/aziz-tb/merio/internal/exec/runner/models"
@@ -40,12 +41,17 @@ type Runner interface {
 	Execute(ctx context.Context, req execModels.Request) (*execModels.Result, error)
 }
 
+type ConversationStore interface {
+	GetConversation(id int, uuid, refNum string) (convmodels.Conversation, error)
+}
+
 // Manager is the DB-backed façade for the functions table.
 type Manager struct {
-	q      queries
-	runner Runner
-	lo     *logf.Logger
-	i18n   *i18n.I18n
+	q            queries
+	runner       Runner
+	conversation ConversationStore
+	lo           *logf.Logger
+	i18n         *i18n.I18n
 }
 
 // Opts wires dependencies into the Manager.
@@ -77,6 +83,10 @@ func New(opts Opts) (*Manager, error) {
 		lo:     opts.Lo,
 		i18n:   opts.I18n,
 	}, nil
+}
+
+func (m *Manager) SetConversationStore(conversation ConversationStore) {
+	m.conversation = conversation
 }
 
 // GetByName returns one function by its globally-unique name.
@@ -247,21 +257,54 @@ func (m *Manager) Run(ctx context.Context, req RunRequest) (*execModels.Result, 
 		timeoutSec = 1
 	}
 
+	payload, err := m.buildContextPayload(req)
+	if err != nil {
+		return nil, err
+	}
+
 	rReq := execModels.Request{
-		InvokerUserID:  req.InvokerUserID,
-		Code:           f.Code,
-		Language:       f.Language,
-		Packages:       SplitPackages(f.Packages),
-		TimeoutSeconds: timeoutSec,
-		Input:          req.Input,
-		ToolName:       f.Name,
-		ToolDepth:      0,
-		TraceID:        req.TraceID,
+		InvokerUserID:    req.InvokerUserID,
+		Code:             f.Code,
+		Language:         f.Language,
+		Packages:         SplitPackages(f.Packages),
+		TimeoutSeconds:   timeoutSec,
+		Input:            payload.Input,
+		ConversationUUID: payload.ConversationUUID,
+		ToolName:         f.Name,
+		ToolDepth:        0,
+		TraceID:          req.TraceID,
 	}
 	if req.ConversationID > 0 {
 		rReq.ConversationID = &req.ConversationID
 	}
 	return m.runner.Execute(ctx, rReq)
+}
+
+type contextPayload struct {
+	Input            map[string]any
+	ConversationUUID string
+}
+
+func (m *Manager) buildContextPayload(req RunRequest) (contextPayload, error) {
+	payload := contextPayload{Input: cloneInput(req.Input)}
+
+	if req.ConversationID > 0 && m.conversation != nil {
+		row, err := m.conversation.GetConversation(req.ConversationID, "", "")
+		if err != nil {
+			return payload, err
+		}
+		payload.ConversationUUID = row.UUID
+	}
+
+	return payload, nil
+}
+
+func cloneInput(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 // defaults fills columns whose zero value would violate a NOT NULL / CHECK

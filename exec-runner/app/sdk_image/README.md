@@ -13,16 +13,17 @@ if contract_id is None:
     sdk.failure("contract_id is required", code="MISSING_INPUT")
     raise SystemExit
 
-# Read context (already pre-fetched by the platform)
-if sdk.conversation_data is None:
+# Read context lazily only if this tool needs it
+conversation = sdk.context.conversation()
+if conversation is None:
     sdk.error("no ticket attached")
     raise SystemExit
 
-ticket_id = sdk.conversation_data["id"]
+ticket_id = conversation["id"]
 
 # Call the platform
 try:
-    contract = sdk.api.get(f"/sdk/contracts/{contract_id}")
+    contract = sdk.api.get(f"/api/v1/contracts/{contract_id}", system=True)
 except sdk.NotFoundError:
     sdk.failure(f"contract {contract_id} not found", code="NO_CONTRACT")
     raise SystemExit
@@ -30,8 +31,9 @@ except sdk.NotFoundError:
 # Do work
 if contract["delivery_state"] == "active":
     sdk.api.post(
-        f"/sdk/tickets/{ticket_id}/notes",
-        {"content": f"Active contract: {contract['rate']}"}
+        f"/api/v1/contacts/{conversation['contact_id']}/notes",
+        {"content": f"Active contract: {contract['rate']}"},
+        system=True,
     )
     sdk.success(data={"contract_id": contract_id, "rate": contract["rate"]})
 else:
@@ -42,13 +44,21 @@ else:
 
 ```python
 sdk.input          # dict of LLM-provided tool arguments (always a dict, never None)
-sdk.conversation_data    # dict of the current ticket, or None if not in a ticket context
-sdk.contract_data  # dict of the resolved contract, or None
-sdk.customer_data  # dict of the resolved customer, or None
 ```
 
-These are plain dicts. Use `.get("key")` for safe access — fields can be
-absent or null depending on what the platform was able to resolve.
+Use lazy context helpers when a tool needs conversation, contract, or customer
+context:
+
+```python
+conversation = sdk.context.conversation()  # full Conversation dict, or None
+contract = sdk.context.contract()          # linked contract dict, or None
+customer = sdk.context.customer()          # linked customer dict, or None
+```
+
+The helpers return `None` outside conversation scope. `contract()` and
+`customer()` also return `None` when the conversation is unverified or has no
+linked record. Results are memoized within one execution, so repeated calls do
+not repeat platform reads.
 
 ## Secrets
 
@@ -101,7 +111,7 @@ Returns parsed JSON for 2xx responses. Raises typed exceptions for errors:
 
 ```python
 try:
-    customer = sdk.api.get("/sdk/customers/999")
+    customer = sdk.api.get("/api/v1/customers/999", system=True)
 except sdk.NotFoundError:
     # 404
     pass
@@ -127,14 +137,15 @@ emitting `__RESULT__`, the retry will not double-execute the write.
 
 You don't need to opt in. There's no `idempotency_key` parameter. It just works.
 
-## Tool composition
+## Deprecated tool composition
 
 ```python
-result = sdk.tools.call("search_glossary", {"term": "BNetzA"})
+sdk.tools.call("search_glossary", {"term": "BNetzA"})
 ```
 
-Calls another registered tool through the platform. Depth is capped at 3
-to prevent loops; exceeding the cap raises `sdk.DepthLimitError`.
+`sdk.tools.call` is deprecated and always raises `sdk.DeprecationError`.
+Use `sdk.api.get/post/patch/delete` for platform calls, or
+`sdk.context.conversation()/contract()/customer()` for execution context.
 
 ## External APIs
 

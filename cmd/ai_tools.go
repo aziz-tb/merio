@@ -171,12 +171,12 @@ func handleDeleteAITool(r *fastglue.Request) error {
 
 // invokeAIToolReq is the request body for POST /api/v1/ai/tools/{slug}/invoke.
 //
-// Manual invocation: the caller fills `parameters` directly (no source
-// resolution); `conversation_id` is plumbed to the runner / runtime
-// context so SDK callbacks and capabilities reading conversation scope
-// get default-scoping. `verification_level` is a manual-test affordance
-// for internal capabilities that shape PII by conversation verification
-// state. `kind` defaults to "custom" for back-compat with F9 callers.
+// Manual invocation: the caller fills `parameters` directly. `conversation_id`
+// is plumbed to the runner / runtime context so SDK callbacks and capabilities
+// reading conversation scope get default-scoping. `verification_level` is a
+// manual-test affordance for internal capabilities that shape PII by
+// conversation verification state. `kind` defaults to "custom" for back-compat
+// with F9 callers.
 type invokeAIToolReq struct {
 	Kind              string         `json:"kind"`
 	Parameters        map[string]any `json:"parameters"`
@@ -318,7 +318,6 @@ func validateAITool(t *toolmodels.Tool) error {
 	if t.Category != "read" && t.Category != "write" {
 		return envelope.NewError(envelope.InputError, "category must be 'read' or 'write'", nil)
 	}
-
 	// Implementation JSONB: custom tools dispatch to the F6 exec runner,
 	// which supports python + javascript (the JS lane runs without the
 	// SDK in v1 — admins compose stateless transforms there). Validate

@@ -240,7 +240,9 @@ func (r *Runner) dispatchOneTool(
 			r.invalidateLinkedCaches(conversationID, traceID, tu.ToolName)
 		}
 	} else {
-		logEntry.Status = "execution_error"
+		logEntry.Status = string(result.Kind)
+		logEntry.Code = result.Code
+		logEntry.Retryable = result.Retryable
 		if result.Message != "" {
 			logEntry.Error = result.Message
 		} else {
