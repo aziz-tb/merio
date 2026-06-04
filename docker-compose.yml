@@ -14,7 +14,8 @@ services:
     environment:
       MERIO_SYSTEM_USER_PASSWORD: ${MERIO_SYSTEM_USER_PASSWORD:-}
       MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?set MERIO_SECRETS_KEK to openssl rand -base64 32}
-      MERIO_EXEC__SANDBOX_URL: http://host.docker.internal:8090
+      MERIO_EXEC__SANDBOX_URL: ${SANDBOX_URL:-http://host.docker.internal:8090}
+      MERIO_EXEC__PLATFORM_BASE_URL: ${PLATFORM_BASE_URL:-http://localhost:9000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -31,12 +32,55 @@ services:
     healthcheck:
       # Hits a known-cheap endpoint. If 9000 doesn't respond, the app
       # is considered unhealthy and restart policy applies.
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/health 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/health 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
     command: [sh, -c, "./merio --install --idempotent-install --yes --config /merio/config.toml && ./merio --upgrade --yes --config /merio/config.toml && ./merio --config /merio/config.toml"]
+
+  # Exec-runner sandbox service.
+  #
+  # This profile is for Linux hosts with /dev/kvm. macOS Docker Desktop does
+  # not expose KVM, so local Mac development keeps using a host uv process.
+  exec-runner:
+    profiles:
+      - linux-kvm
+    build: ./exec-runner
+    container_name: merio_exec_runner
+    restart: unless-stopped
+    networks:
+      - merio
+    devices:
+      - /dev/kvm:/dev/kvm
+    group_add:
+      - "${KVM_GID:-109}"
+    environment:
+      SERVICE_TOKEN: ${EXEC_RUNNER_TOKEN:-devsecret}
+      WARM_POOL_SIZE_PYTHON: ${EXEC_WARM_POOL_PYTHON:-5}
+      WARM_POOL_SIZE_JS: ${EXEC_WARM_POOL_JS:-0}
+      WARM_POOL_SIZE_RAW: ${EXEC_WARM_POOL_RAW:-0}
+      DEFAULT_MEMORY_MB: ${EXEC_VM_MEMORY:-256}
+      DEFAULT_TIMEOUT_SECONDS: ${EXEC_TIMEOUT:-60}
+      EXEC_SANDBOX_OFFLINE: "1"
+      LOG_LEVEL: ${EXEC_LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+    volumes:
+      - exec-sandbox-cache:/root/.cache/exec-sandbox
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 3G
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8090/v1/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 90s
 
   # PostgreSQL — main application database.
   db:
@@ -158,6 +202,8 @@ services:
       MERIO_TEMPORAL__ENABLED: "true"
       MERIO_TEMPORAL__ADDRESS: "temporal:7233"
       MERIO_TEMPORAL__NAMESPACE: "merio"
+      MERIO_EXEC__SANDBOX_URL: ${SANDBOX_URL:-http://host.docker.internal:8090}
+      MERIO_EXEC__PLATFORM_BASE_URL: ${PLATFORM_BASE_URL:-http://localhost:9000}
     volumes:
       - ./config.toml:/worker/config.toml:ro
       - ./config:/worker/config:ro
@@ -182,3 +228,4 @@ volumes:
   postgres-data:
   redis-data:
   temporal-postgresql-data:
+  exec-sandbox-cache:

@@ -1,6 +1,6 @@
 The Makefile additions:
 makefile# Exec-runner sandbox service (Python microVM execution)
-EXEC_RUNNER_DIR := services/exec-runner
+EXEC_RUNNER_DIR := exec-runner
 
 .PHONY: exec-runner-deps
 exec-runner-deps:
@@ -37,8 +37,9 @@ services:
     # ... existing config ...
     environment:
       # ... existing env ...
-      EXEC_RUNNER_URL: http://exec-runner:8090
-      EXEC_RUNNER_TOKEN: ${SERVICE_TOKEN:?SERVICE_TOKEN must be set in .env}
+      MERIO_EXEC__SANDBOX_URL: ${SANDBOX_URL:-http://exec-runner:8090}
+      MERIO_EXEC__SANDBOX_TOKEN: ${EXEC_RUNNER_TOKEN:?EXEC_RUNNER_TOKEN must be set in .env}
+      MERIO_EXEC__PLATFORM_BASE_URL: ${PLATFORM_BASE_URL:-http://merio_app:9000}
     depends_on:
       db:
         condition: service_healthy
@@ -48,7 +49,7 @@ services:
         condition: service_healthy
 
   exec-runner:
-    build: ./services/exec-runner
+    build: ./exec-runner
     container_name: merio_exec_runner
     restart: unless-stopped
     networks:
@@ -60,7 +61,7 @@ services:
     group_add:
       - "${KVM_GID:-108}"   # match host kvm group GID; varies by distro
     environment:
-      SERVICE_TOKEN: ${SERVICE_TOKEN:?SERVICE_TOKEN must be set in .env}
+      SERVICE_TOKEN: ${EXEC_RUNNER_TOKEN:?EXEC_RUNNER_TOKEN must be set in .env}
       WARM_POOL_SIZE_PYTHON: ${EXEC_WARM_POOL_PYTHON:-10}
       WARM_POOL_SIZE_JS: ${EXEC_WARM_POOL_JS:-5}
       DEFAULT_MEMORY_MB: ${EXEC_VM_MEMORY:-256}

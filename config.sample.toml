@@ -147,15 +147,21 @@ evaluation_interval = "5m"
 
 [exec]
 # Sandbox HTTP endpoint (the Python exec-runner service).
+# Override with MERIO_EXEC__SANDBOX_URL in compose:
+#   - Mac/dev host runner: http://host.docker.internal:8090
+#   - VPS Docker runner:  http://exec-runner:8090
 sandbox_url = "http://localhost:8090"
 
 # Shared service token authorizing this Go binary to call exec-runner.
 # Must match the SERVICE_TOKEN env var on the Python service.
+# Override with MERIO_EXEC__SANDBOX_TOKEN in compose.
 # Generate with: openssl rand -hex 32
 sandbox_token = "<replace-with-openssl-rand-hex-32>"
 
-# Where exec-runner sends scripts' SDK callbacks. Typically the same
-# host:port the Go binary listens on, localhost-only.
+# Where exec-runner sends scripts' SDK callbacks.
+# Override with MERIO_EXEC__PLATFORM_BASE_URL in compose:
+#   - Mac/dev host runner: http://<host-lan-ip>:9000
+#   - VPS Docker runner:  http://merio_app:9000
 platform_base_url = "http://localhost:9000"
 
 # Temporal — durable workflow infrastructure. Used by all async work

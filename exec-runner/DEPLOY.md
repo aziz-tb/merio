@@ -11,24 +11,34 @@ How to run `exec-runner` in production.
 
 ## Recommended deployment shape
 
-Same host as the Go binary, supervised by systemd. The Go binary talks to
-the sandbox over `http://127.0.0.1:8090`. Sub-millisecond network latency.
+On the VPS, run exec-runner in Docker Compose on the same `merio` network as
+the app. The Go containers talk to the sandbox over
+`http://exec-runner:8090`, and sandbox VMs call back to Merio through Docker
+DNS at `http://merio_app:9000`.
 
 ```
-┌─────────────────────────────────┐
-│  Host                            │
-│  ┌──────────┐    ┌────────────┐ │
-│  │   Go     │ ─▶ │ exec-runner│ │
-│  │  binary  │    │  (Python)  │ │
-│  └──────────┘    └────────────┘ │
-│       │                │         │
-│       └─────┬──────────┘         │
-│             │                    │
-│       Postgres + Redis           │
-└─────────────────────────────────┘
+Docker network: merio
+
+merio_app ─────▶ exec-runner:8090
+   ▲                 │
+   └──── sandbox VM ◀┘
 ```
 
-## Linux production setup (systemd)
+Keep the old systemd setup disabled but available for rollback:
+
+```bash
+sudo systemctl stop exec-runner.service
+sudo systemctl disable exec-runner.service
+```
+
+If the Docker migration needs rollback:
+
+```bash
+docker compose -f docker-compose.prod.yml stop exec-runner
+sudo systemctl start exec-runner.service
+```
+
+## Linux production setup (systemd rollback)
 
 ### 1. Create the qemu-vm system user
 
@@ -153,24 +163,59 @@ is shown.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm
 
 # Install QEMU
-RUN apt-get update && apt-get install -y qemu-system && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    qemu-system-x86 qemu-utils curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Install Python dependencies
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen
+COPY pyproject.toml uv.lock* README.md ./
+RUN uv sync --frozen --no-dev
+
+# Copy application code
+COPY app /app/app
 
 # Pre-fetch VM images at build time so first start is fast and offline-safe
 RUN uv run sbx prefetch -q
 ENV EXEC_SANDBOX_OFFLINE=1
 
-# Copy application code
-COPY app/ /app/app/
-
-EXPOSE 8090 9090
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8090", "--workers", "1"]
+EXPOSE 8090
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8090"]
 ```
+
+Compose sets the runtime shape:
+
+```yaml
+services:
+  exec-runner:
+    build: ./exec-runner
+    devices:
+      - /dev/kvm:/dev/kvm
+    group_add:
+      - "${KVM_GID:?required}"
+    environment:
+      SERVICE_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
+      EXEC_SANDBOX_OFFLINE: "1"
+    expose:
+      - "8090"
+```
+
+The app and Temporal worker should use:
+
+```env
+MERIO_EXEC__SANDBOX_URL=http://exec-runner:8090
+MERIO_EXEC__PLATFORM_BASE_URL=http://merio_app:9000
+MERIO_EXEC__SANDBOX_TOKEN=<same value as EXEC_RUNNER_TOKEN>
+```
+
+Known container limitations for this migration:
+
+- L1 snapshot save can fail inside Docker, so first execution may cold-boot.
+- cgroup v2 may not be exposed inside the container, reducing exec-sandbox's
+  internal resource enforcement.
+- Docker's default seccomp can block `unshare` and `io_uring`. QEMU/KVM
+  isolation still provides the main boundary for operator-authored tools.
 
 ### Kubernetes Pod (sidecar pattern)
 
