@@ -162,6 +162,21 @@ func handleAssignConversationCustomer(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	if manualVerifyRequested(r) {
+		if !conv.CustomerID.Valid {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "customer is not linked", nil, envelope.InputError)
+		}
+		auser := r.RequestCtx.UserValue("user").(amodels.User)
+		if err := persistManualCustomerVerify(r.RequestCtx, app, conv, auser.ID); err != nil {
+			return sendCustomerContractError(r, app, err)
+		}
+		updated, err := app.conversation.GetConversation(conv.ID, "", "")
+		if err != nil {
+			return sendCustomerContractError(r, app, err)
+		}
+		return r.SendEnvelope(updated)
+	}
+
 	var req assignConversationCustomerReq
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
@@ -195,6 +210,10 @@ func handleAssignConversationCustomer(r *fastglue.Request) error {
 		return sendCustomerContractError(r, app, err)
 	}
 	return r.SendEnvelope(out)
+}
+
+func manualVerifyRequested(r *fastglue.Request) bool {
+	return strings.EqualFold(strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("manual_verify"))), "true")
 }
 
 func handleRemoveConversationCustomer(r *fastglue.Request) error {
@@ -467,6 +486,46 @@ func persistManualCustomerLink(ctx context.Context, app *App, conv *cmodels.Conv
 	return tx.Commit()
 }
 
+func persistManualCustomerVerify(ctx context.Context, app *App, conv *cmodels.Conversation, operatorID int) error {
+	tx, err := app.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE conversations
+		SET verification_level = $2,
+		    verification_message = NULL,
+		    updated_at = NOW()
+		WHERE id = $1;
+	`, conv.ID, int(verificationmodels.VerificationLevelManual)); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE users
+		SET linked_customer_id = $2,
+		    linked_customer_id_at = CASE
+		        WHEN linked_customer_id IS DISTINCT FROM $2 THEN NOW()
+		        ELSE COALESCE(linked_customer_id_at, NOW())
+		    END,
+		    updated_at = NOW()
+		WHERE id = $1;
+	`, conv.ContactID, conv.CustomerID.String); err != nil {
+		return err
+	}
+
+	payload, err := manualVerifyPayload(conv)
+	if err != nil {
+		return err
+	}
+	if err := insertManualAIOperation(ctx, tx, int64(conv.ID), operatorID, payload); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func persistManualCustomerRemove(ctx context.Context, app *App, conv *cmodels.Conversation, operatorID int) error {
 	tx, err := app.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -540,6 +599,25 @@ func manualLinkPayload(conv *cmodels.Conversation, contractRow contractmodels.Co
 		},
 		"verification": map[string]any{
 			"level":   verificationLevel,
+			"source":  "manual",
+			"message": nil,
+		},
+	})
+}
+
+func manualVerifyPayload(conv *cmodels.Conversation) (json.RawMessage, error) {
+	return json.Marshal(map[string]any{
+		"method":  "manual",
+		"channel": conv.InboxChannel,
+		"action":  "manual_verify",
+		"verify": map[string]any{
+			"customer_id":                   nullStringValue(conv.CustomerID),
+			"contract_id":                   nullStringValue(conv.ContractID),
+			"previous_verification_level":   conv.VerificationLevel,
+			"previous_verification_message": nullStringValue(conv.VerificationMessage),
+		},
+		"verification": map[string]any{
+			"level":   int(verificationmodels.VerificationLevelManual),
 			"source":  "manual",
 			"message": nil,
 		},

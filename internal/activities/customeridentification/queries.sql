@@ -37,6 +37,7 @@ SELECT
     contact_id,
     customer_id,
     contract_id,
+    verification_level,
     (
         SELECT linked_customer_id
         FROM users

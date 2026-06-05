@@ -15,11 +15,12 @@ import (
 )
 
 type previousLinks struct {
-	UUID             string         `db:"uuid"`
-	ContactID        int            `db:"contact_id"`
-	CustomerID       sql.NullString `db:"customer_id"`
-	ContractID       sql.NullString `db:"contract_id"`
-	LinkedCustomerID sql.NullString `db:"linked_customer_id"`
+	UUID              string         `db:"uuid"`
+	ContactID         int            `db:"contact_id"`
+	CustomerID        sql.NullString `db:"customer_id"`
+	ContractID        sql.NullString `db:"contract_id"`
+	VerificationLevel int            `db:"verification_level"`
+	LinkedCustomerID  sql.NullString `db:"linked_customer_id"`
 }
 
 func (a *Activities) PersistResultActivity(ctx context.Context, in cimodels.PersistResultInput) (cimodels.PersistResultOutput, error) {
@@ -34,7 +35,8 @@ func (a *Activities) PersistResultActivity(ctx context.Context, in cimodels.Pers
 		return cimodels.PersistResultOutput{}, err
 	}
 
-	if in.Status == cimodels.StatusSuccess || in.Status == cimodels.StatusNoMatch {
+	manualVerificationSticky := prev.VerificationLevel >= int(verificationmodels.VerificationLevelManual)
+	if !manualVerificationSticky && (in.Status == cimodels.StatusSuccess || in.Status == cimodels.StatusNoMatch) {
 		var verificationMessage any
 		if in.Verification.Message != "" {
 			verificationMessage = in.Verification.Message

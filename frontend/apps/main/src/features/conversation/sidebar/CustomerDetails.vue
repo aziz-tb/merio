@@ -281,10 +281,29 @@
           </template>
         </div>
 
-        <div v-if="isPartial && stringValue(conversation.verification_message)" class="rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-100">
+        <div v-if="isPartial" class="rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-100">
           <div class="flex items-start gap-2">
             <AlertTriangle class="mt-0.5 size-4 shrink-0" />
-            <p class="whitespace-pre-wrap">{{ stringValue(conversation.verification_message) }}</p>
+            <div class="min-w-0 flex-1 space-y-2">
+              <MarkdownText
+                v-if="verificationMessage"
+                :source="verificationMessage"
+                wrap
+                class="max-w-none text-xs text-yellow-900 dark:text-yellow-100"
+              />
+              <p v-else>{{ t('conversation.customer.partialVerification') }}</p>
+              <Button
+                v-if="canManualVerify"
+                type="button"
+                variant="outline"
+                size="sm"
+                class="h-7 border-yellow-300 bg-yellow-100 px-2 text-xs text-yellow-950 hover:bg-yellow-200 dark:border-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-100 dark:hover:bg-yellow-900/60"
+                :disabled="assigning"
+                @click="manualVerifyCustomer"
+              >
+                {{ t('conversation.customer.manualVerify') }}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -379,6 +398,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/av
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Popover, PopoverAnchor, PopoverContent } from '@shared-ui/components/ui/popover'
 import { PillSwitcher, PillSwitcherItem } from '@shared-ui/components/ui/pill-switcher'
+import MarkdownText from '@shared-ui/components/MarkdownText.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@/api'
 import { useConversationStore } from '@/stores/conversation'
@@ -477,6 +497,8 @@ const parsedUA = computed(() => {
 })
 const verificationLevel = computed(() => Number(conversation.value?.verification_level || 0))
 const isPartial = computed(() => verificationLevel.value > 0 && verificationLevel.value < 2)
+const verificationMessage = computed(() => stringValue(conversation.value?.verification_message))
+const canManualVerify = computed(() => isPartial.value && Boolean(customer.value?.customer_id) && userStore.can('customers:assign'))
 const showSearchState = computed(() => searchMode.value || verificationLevel.value <= 0 || !customer.value)
 const contracts = computed(() => Array.isArray(customer.value?.contracts) ? customer.value.contracts : [])
 const selectedContractID = computed(() => contract.value?.contract_id || conversation.value?.contract_id || null)
@@ -529,9 +551,8 @@ const refresh = async () => {
   if (!uuid.value) return
   loading.value = true
   try {
-    const [customerResp, contractResp, latestResp] = await Promise.allSettled([
+    const [customerResp, latestResp] = await Promise.allSettled([
       api.getConversationCustomer(uuid.value),
-      api.getConversationContract(uuid.value),
       api.getLatestCustomerIdentification(uuid.value),
     ])
 
@@ -539,10 +560,6 @@ const refresh = async () => {
     if (customerResp.status === 'rejected') {
       failures.push('customer')
       console.warn('CustomerDetails refresh: customer fetch failed', customerResp.reason)
-    }
-    if (contractResp.status === 'rejected') {
-      failures.push('contract')
-      console.warn('CustomerDetails refresh: contract fetch failed', contractResp.reason)
     }
     if (latestResp.status === 'rejected') {
       failures.push('latest operation')
@@ -555,8 +572,16 @@ const refresh = async () => {
       })
     }
 
-    customer.value = customerResp.status === 'fulfilled' ? customerResp.value.data?.data || null : null
-    contract.value = contractResp.status === 'fulfilled' ? contractResp.value.data?.data || null : null
+    customer.value = customerResp.status === 'fulfilled' ? customerFromResponse(customerResp.value) : null
+    contract.value = contractFromCustomer(customer.value)
+    if (customer.value && stringValue(conversation.value?.contract_id) && !contract.value) {
+      try {
+        const contractResp = await api.getConversationContract(uuid.value)
+        contract.value = contractResp.data?.data || null
+      } catch (error) {
+        console.warn('CustomerDetails refresh: contract fallback fetch failed', error)
+      }
+    }
     const ops = latestResp.status === 'fulfilled' ? latestResp.value.data?.data || [] : []
     latestOperation.value = Array.isArray(ops) ? ops[0] || null : ops || null
     await loadLinkedCustomerForReconnect()
@@ -566,6 +591,22 @@ const refresh = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const customerFromResponse = (resp) => {
+  const data = resp?.data?.data || null
+  return data?.customer_id ? data : null
+}
+
+const contractFromCustomer = (row) => {
+  const list = Array.isArray(row?.contracts) ? row.contracts : []
+  if (!list.length) return null
+  const desiredID = stringValue(conversation.value?.contract_id)
+  if (desiredID) {
+    const match = list.find((item) => String(item.contract_id) === String(desiredID))
+    if (match) return match
+  }
+  return list[0]
 }
 
 async function loadLinkedCustomerForReconnect () {
@@ -758,6 +799,27 @@ const reconnectLinkedCustomer = () => {
   const firstContractID = firstContractIDForCustomer(linkedCustomer.value)
   if (!firstContractID) return
   assignContract(firstContractID, linkedCustomer.value, null, 1)
+}
+
+const manualVerifyCustomer = async () => {
+  if (!uuid.value || assigning.value) return
+  if (!window.confirm(t('conversation.customer.confirmManualVerify'))) return
+  assigning.value = true
+  try {
+    await api.verifyConversationCustomerManually(uuid.value)
+    await conversationStore.fetchConversation(uuid.value)
+    await refresh()
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('conversation.customer.manualVerifySuccess'),
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message || t('conversation.customer.manualVerifyFailed'),
+    })
+  } finally {
+    assigning.value = false
+  }
 }
 
 const removeCustomer = async () => {

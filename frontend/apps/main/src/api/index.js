@@ -318,6 +318,16 @@ const assignCustomerToConversation = (uuid, contractId, verificationLevel = unde
     { headers: { 'Content-Type': 'application/json' } }
   )
 
+const verifyConversationCustomerManually = (uuid) =>
+  http.post(
+    `/api/v1/conversations/${uuid}/customer`,
+    {},
+    {
+      params: { manual_verify: true },
+      headers: { 'Content-Type': 'application/json' }
+    }
+  )
+
 const removeCustomerFromConversation = (uuid) =>
   http.delete(`/api/v1/conversations/${uuid}/customer`)
 
@@ -561,6 +571,7 @@ const getMentionedConversations = (params) =>
   http.get('/api/v1/conversations/mentioned', { params, abortOnRoute: true })
 const getViewConversations = (id, params) =>
   http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute: true })
+const getConversationStats = () => http.get('/api/v1/conversations/stats')
 const uploadMedia = (data) =>
   http.post('/api/v1/media', data, {
     headers: {
@@ -753,6 +764,7 @@ export default {
   getMentionedConversations,
   getTeamUnassignedConversations,
   getViewConversations,
+  getConversationStats,
   getOverviewCharts,
   getOverviewCounts,
   getOverviewSLA,
@@ -918,6 +930,7 @@ export default {
   getConversationCustomer,
   getConversationContract,
   assignCustomerToConversation,
+  verifyConversationCustomerManually,
   removeCustomerFromConversation,
   identifyCustomer,
   searchCustomers,
