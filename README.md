@@ -105,8 +105,3 @@ Images are published to GHCR as `ghcr.io/aziz-tb/merio`,
 - For planned features and project direction, see [ROADMAP.md](./ROADMAP.md).
 
 The backend is written in Go and the frontend is Vue.js 3 with Shadcn UI.
-
-
-
-## Translators
-You can help translate merio into your language on [Crowdin](https://crowdin.com/project/merio).
