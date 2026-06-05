@@ -19,7 +19,6 @@ jobs:
       matrix:
         arch:
           - amd64
-          - arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,6 +45,8 @@ jobs:
           file: ./exec-runner/Dockerfile
           platforms: linux/${{ matrix.arch }}
           push: true
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           tags: |
             ${{ env.IMAGE }}:latest-${{ matrix.arch }}
             ${{ env.IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}

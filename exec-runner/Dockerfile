@@ -11,6 +11,10 @@ RUN uv sync --frozen --no-dev
 
 COPY app /app/app
 
+# Allow GITHUB_TOKEN to be passed in for sbx prefetch rate limits
+ARG GITHUB_TOKEN
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+
 RUN uv run sbx prefetch -q
 
 ENV EXEC_SANDBOX_OFFLINE=1
