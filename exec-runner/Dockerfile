@@ -1,7 +1,12 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    qemu-system-x86 qemu-utils curl ca-certificates && \
+# Enable bookworm-backports to get QEMU 10.x (required for L1 memory snapshots)
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+      > /etc/apt/sources.list.d/backports.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends -t bookworm-backports \
+      qemu-system-x86 qemu-utils && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -11,11 +16,11 @@ RUN uv sync --frozen --no-dev
 
 COPY app /app/app
 
-# Allow GITHUB_TOKEN to be passed in for sbx prefetch rate limits
-ARG GITHUB_TOKEN
-ENV GITHUB_TOKEN=${GITHUB_TOKEN}
-
-RUN uv run sbx prefetch -q
+RUN --mount=type=secret,id=github_token \
+    if [ -f /run/secrets/github_token ]; then \
+      export GITHUB_TOKEN=$(cat /run/secrets/github_token); \
+    fi && \
+    uv run sbx prefetch -q
 
 ENV EXEC_SANDBOX_OFFLINE=1
 
