@@ -133,6 +133,7 @@ const initStores = async () => {
     sharedViewStore.loadSharedViews(),
     conversationStore.fetchStatuses(),
     conversationStore.fetchPriorities(),
+    conversationStore.fetchConversationStats(),
     conversationStore.fetchAllDrafts(),
     usersStore.fetchUsers(),
     teamStore.fetchTeams(),
@@ -206,6 +207,7 @@ const refreshViews = async (data) => {
       conversationStore.resetConversations()
       conversationStore.fetchConversationsList(true, CONVERSATION_LIST_TYPE.VIEW, 0, [], openID)
     }
+    conversationStore.fetchConversationStats()
   }
 }
 </script>

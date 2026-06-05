@@ -237,34 +237,38 @@
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/assigned')" @click="navigateToInbox('assigned')">
                     <InboxIcon />
-                    <span>{{ t('globals.terms.myInbox') }}</span>
+                    <span class="min-w-0 flex-1 truncate">{{ t('globals.terms.myInbox') }}</span>
+                    <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('lists', 'assigned') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/mentioned')" @click="navigateToInbox('mentioned')">
                     <At />
-                    <span>
+                    <span class="min-w-0 flex-1 truncate">
                       {{ t('globals.terms.mention', 2) }}
                     </span>
+                    <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('lists', 'mentioned') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/unassigned')" @click="navigateToInbox('unassigned')">
                     <CircleDashed />
-                    <span>
+                    <span class="min-w-0 flex-1 truncate">
                       {{ t('globals.terms.unassigned') }}
                     </span>
+                    <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('lists', 'unassigned') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
                     <LayerGroup />
-                    <span>
+                    <span class="min-w-0 flex-1 truncate">
                       {{ t('globals.messages.all') }}
                     </span>
+                    <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('lists', 'all') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -294,7 +298,9 @@
                           :is-active="route.params.teamID == team.id"
                           @click="navigateToTeamInbox(team.id)"
                         >
-                          {{ team.emoji }}<span>{{ team.name }}</span>
+                          <span class="shrink-0">{{ team.emoji }}</span>
+                          <span class="min-w-0 flex-1 truncate" :title="team.name">{{ team.name }}</span>
+                          <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('teams', team.id) }}</span>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -336,7 +342,8 @@
                           :isActive="route.params.viewID == view.id"
                           @click="navigateToViewInbox(view.id)"
                         >
-                          <span class="flex-1 truncate" :title="view.name">{{ view.name }}</span>
+                          <span class="min-w-0 flex-1 truncate" :title="view.name">{{ view.name }}</span>
+                          <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('views', view.id) }}</span>
                         </SidebarMenuButton>
                         <SidebarMenuAction
                           :class="[
@@ -393,9 +400,10 @@
                           :isActive="route.params.viewID == view.id"
                           @click="navigateToViewInbox(view.id)"
                         >
-                          <span class="flex-1 truncate" :title="view.name">{{
+                          <span class="min-w-0 flex-1 truncate" :title="view.name">{{
                             view.name
                           }}</span>
+                          <span class="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{{ sidebarStatCount('views', view.id) }}</span>
                         </SidebarMenuButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -512,6 +520,10 @@ const isActiveParent = (parentHref) => {
 
 const isInboxRoute = (path) => {
   return path.startsWith('/inboxes')
+}
+
+const sidebarStatCount = (section, key) => {
+  return conversationStore.stats?.[section]?.[String(key)] ?? 0
 }
 
 const openCreateViewDialog = () => {

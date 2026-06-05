@@ -1,5 +1,5 @@
 <template>
-  <div class="inline-flex items-center gap-0.5 rounded-full border border-border bg-white dark:bg-accent border-secondary p-1 shadow-md">
+  <div class="inline-flex items-center gap-0.5 rounded-full border border-border bg-white dark:bg-accent border-secondary p-1 shadow-lg">
     <Tooltip>
       <TooltipTrigger as-child>
         <button
@@ -8,7 +8,7 @@
           :aria-pressed="viewMode === INBOX_VIEW_MODES.COLUMNS"
           @click="switchToColumns"
         >
-          <Columns3 class="size-5" />
+          <PanelLeft class="size-5" />
           <span class="sr-only">{{ t('conversation.table.viewColumns') }}</span>
         </button>
       </TooltipTrigger>
@@ -25,7 +25,7 @@
           :aria-pressed="viewMode === INBOX_VIEW_MODES.TABLE"
           @click="switchToTable"
         >
-          <PanelLeft class="size-5" />
+          <Columns3 class="size-5" />
           <span class="sr-only">{{ t('conversation.table.viewTable') }}</span>
         </button>
       </TooltipTrigger>

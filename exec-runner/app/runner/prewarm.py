@@ -25,6 +25,24 @@ COMMON_SNAPSHOTS: list[dict] = [
 ]
 
 
+# Language-appropriate no-op code for snapshot baking. The goal is just to
+# get the REPL loaded so the L1 memory snapshot captures a warm interpreter.
+# The output is irrelevant; exit code 0 with a warm REPL is all we need.
+_SNAPSHOT_PROBE_CODE: dict[str, str] = {
+    "python": "print('snapshot_ready')",
+    "javascript": "console.log('snapshot_ready')",
+    "raw": "echo 'snapshot_ready'",
+}
+
+
+def _probe_code_for(language: str) -> str:
+    """Return language-appropriate code that produces exit 0 with a warm REPL."""
+    code = _SNAPSHOT_PROBE_CODE.get(language)
+    if code is None:
+        raise ValueError(f"No snapshot probe defined for language={language!r}")
+    return code
+
+
 async def prewarm_common_snapshots() -> None:
     """Pre-build L1 snapshots for commonly-used package sets."""
     logger.info("prewarm.common.start", count=len(COMMON_SNAPSHOTS))
@@ -58,7 +76,7 @@ async def prewarm_tool_snapshot(
 
     try:
         result = await scheduler.run(
-            code="print('snapshot_ready')",
+            code=_probe_code_for(language),
             language=language,
             packages=packages,
             timeout_seconds=180,  # package install can be slow

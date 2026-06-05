@@ -74,7 +74,7 @@ services:
       retries: 6
 
   exec-runner:
-    build: ./exec-runner
+    image: ghcr.io/aziz-tb/merio-exec-runner:${IMAGE_TAG:-latest}
     container_name: merio_exec_runner
     restart: unless-stopped
     networks:
@@ -90,6 +90,8 @@ services:
       WARM_POOL_SIZE_RAW: ${EXEC_WARM_POOL_RAW:-0}
       DEFAULT_MEMORY_MB: ${EXEC_VM_MEMORY:-256}
       DEFAULT_TIMEOUT_SECONDS: ${EXEC_TIMEOUT:-60}
+      CPU_OVERCOMMIT_RATIO: ${CPU_OVERCOMMIT_RATIO:-2.0}
+      MEMORY_OVERCOMMIT_RATIO: ${MEMORY_OVERCOMMIT_RATIO:-5.0}
       EXEC_SANDBOX_OFFLINE: "1"
       LOG_LEVEL: ${EXEC_LOG_LEVEL:-INFO}
       LOG_FORMAT: json
@@ -101,6 +103,11 @@ services:
           memory: 8G
         reservations:
           memory: 3G
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 65536
+        hard: 65536
     expose:
       - "8090"
     healthcheck:

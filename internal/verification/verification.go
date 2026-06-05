@@ -59,7 +59,7 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 
 	matchedAny := false
 	allSatisfied := true
-	var failReasons []string
+	var partialGroups []partialGroupMessage
 
 	for _, g := range channel.Groups {
 		customByLabel := make(map[string]models.CustomCriterion, len(g.CustomCriteria))
@@ -68,6 +68,7 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 		}
 
 		matchedInGroup := 0
+		var groupMatched []models.CriterionResult
 		var groupFailed []models.CriterionResult
 
 		for _, crit := range g.Criteria {
@@ -98,6 +99,7 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 				matchedInGroup++
 				matchedAny = true
 				out.Matched = append(out.Matched, res)
+				groupMatched = append(groupMatched, res)
 			} else {
 				out.Failed = append(out.Failed, res)
 				groupFailed = append(groupFailed, res)
@@ -106,12 +108,13 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 
 		if matchedInGroup < g.MinCount {
 			allSatisfied = false
-			// Only partially-satisfied groups contribute to the message.
-			for _, f := range groupFailed {
-				if f.Reason != "" {
-					failReasons = append(failReasons, f.Reason)
-				}
-			}
+			partialGroups = append(partialGroups, partialGroupMessage{
+				Label:      g.Label,
+				Required:   g.MinCount,
+				Matched:    matchedInGroup,
+				Successful: groupMatched,
+				Failed:     groupFailed,
+			})
 		}
 	}
 
@@ -124,10 +127,11 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 		out.Level = models.VerificationLevelUnverified
 	}
 
-	// Per §7.5: level 1 (partial) carries the failed-criterion reasons;
-	// level 0 ("nothing matched") and level 2 (full) carry no message.
+	// Per §7.5: level 1 (partial) carries an operator-facing Markdown
+	// explanation; level 0 ("nothing matched") and level 2 (full) carry no
+	// message.
 	if out.Level == models.VerificationLevelPartial {
-		out.Message = strings.Join(failReasons, "; ")
+		out.Message = buildPartialVerificationMessage(partialGroups, cctx)
 	}
 	return out, nil
 }

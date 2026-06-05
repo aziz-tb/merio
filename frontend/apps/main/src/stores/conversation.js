@@ -133,6 +133,12 @@ export const useConversationStore = defineStore('conversation', () => {
     errorMessage: ''
   })
 
+  const stats = reactive({
+    lists: {},
+    teams: {},
+    views: {}
+  })
+
   const conversation = reactive({
     data: null,
     loading: false,
@@ -210,6 +216,18 @@ export const useConversationStore = defineStore('conversation', () => {
         variant: 'destructive',
         description: handleHTTPError(error).message
       })
+    }
+  }
+
+  async function fetchConversationStats () {
+    try {
+      const response = await api.getConversationStats()
+      const nextStats = response.data?.data || {}
+      stats.lists = nextStats.lists || {}
+      stats.teams = nextStats.teams || {}
+      stats.views = nextStats.views || {}
+    } catch (error) {
+      console.error('Error fetching conversation stats:', handleHTTPError(error).message)
     }
   }
 
@@ -602,6 +620,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (!uuid) return
     try {
       await api.updateConversationStatus(uuid, { status: v })
+      fetchConversationStats()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -614,6 +633,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (!uuid) return
     try {
       await api.updateConversationStatus(uuid, { status: CONVERSATION_DEFAULT_STATUSES.SNOOZED, snoozed_until: snoozeDuration })
+      fetchConversationStats()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -637,6 +657,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (!uuid) return
     try {
       await api.updateAssignee(uuid, type, v)
+      fetchConversationStats()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -652,6 +673,7 @@ export const useConversationStore = defineStore('conversation', () => {
       if (conversation.data?.uuid === uuid) {
         conversation.data[`assigned_${type}_id`] = null
       }
+      fetchConversationStats()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
@@ -683,9 +705,15 @@ export const useConversationStore = defineStore('conversation', () => {
 
   // Throttled to cap list refreshes during bursts of WS events (leading + trailing).
   const throttledFetchFirstPage = useThrottleFn(fetchFirstPageConversations, 30000, true)
+  const throttledFetchConversationStats = useThrottleFn(fetchConversationStats, 30000, true)
 
   function refreshConversationList () {
     throttledFetchFirstPage()
+    refreshConversationStats()
+  }
+
+  function refreshConversationStats () {
+    throttledFetchConversationStats()
   }
 
   function updateConversationLastMessage (uuid, message) {
@@ -824,6 +852,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (existing) {
       deepMerge(existing, update)
     }
+    refreshConversationStats()
   }
 
   function mergeContactUpdate (update) {
@@ -972,6 +1001,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   return {
     macros,
+    stats,
     conversations,
     conversation,
     messages,
@@ -1014,6 +1044,8 @@ export const useConversationStore = defineStore('conversation', () => {
     fetchFirstPageConversations,
     fetchStatuses,
     fetchPriorities,
+    fetchConversationStats,
+    refreshConversationStats,
     setListSortField,
     setListStatus,
     removeMacroAction,

@@ -1,4 +1,4 @@
-# exec-runner/app/runner/scheduler.py
+# exec-runner/app/runner/scheduler.py
 """
 Sandbox scheduler lifecycle management.
 
@@ -61,6 +61,8 @@ async def init_sandbox(cfg: Config) -> None:
         default_memory_mb=cfg.default_memory_mb,
         default_timeout_seconds=cfg.default_timeout_seconds,
         enable_package_validation=cfg.enable_package_validation,
+        cpu_overcommit_ratio=cfg.cpu_overcommit_ratio,
+        memory_overcommit_ratio=cfg.memory_overcommit_ratio,
     )
 
     _scheduler = Scheduler(sandbox_cfg)
@@ -77,6 +79,8 @@ async def init_sandbox(cfg: Config) -> None:
         warm_pool_js=cfg.warm_pool_size_js,
         memory_mb=cfg.default_memory_mb,
         timeout_seconds=cfg.default_timeout_seconds,
+        cpu_overcommit_ratio=cfg.cpu_overcommit_ratio,
+        memory_overcommit_ratio=cfg.memory_overcommit_ratio,
     )
 
     if cfg.prewarm_on_startup:

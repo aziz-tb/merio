@@ -6,7 +6,9 @@ How to run `exec-runner` in production.
 
 - Linux host with KVM support (`/dev/kvm` exists), or macOS (HVF) for development
 - Python 3.12+
-- QEMU 8.0+ installed (`apt install qemu-system` on Debian/Ubuntu)
+- QEMU 9.0+ installed. QEMU 7.x/8.x can fail L1 memory snapshots with
+  `migrate command failed: Parameter 'uri' expects a valid migration protocol`.
+  The production Docker image installs QEMU from `bookworm-backports`.
 - Sufficient memory: ~4–6 GB for the warm pool plus headroom — see [Resource sizing](#resource-sizing)
 
 ## Recommended deployment shape
@@ -37,6 +39,21 @@ If the Docker migration needs rollback:
 docker compose -f docker-compose.prod.yml stop exec-runner
 sudo systemctl start exec-runner.service
 ```
+
+## Host kernel prerequisites
+
+Set host sysctls before running exec-runner under production load:
+
+```bash
+sudo tee /etc/sysctl.d/99-exec-sandbox.conf >/dev/null <<'EOF'
+vm.overcommit_memory=1
+vm.max_map_count=262144
+EOF
+sudo sysctl --system
+```
+
+These are host settings, not container settings. They keep snapshot-heavy VM
+workloads stable when the warm pool and concurrent executions are active.
 
 ## Linux production setup (systemd rollback)
 
@@ -162,9 +179,12 @@ is shown.
 ```dockerfile
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm
 
-# Install QEMU
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    qemu-system-x86 qemu-utils curl ca-certificates && \
+# Install QEMU 9+ from bookworm-backports
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list && \
+    apt-get update && \
+    apt-get install -y -t bookworm-backports --no-install-recommends \
+      qemu-system-x86 qemu-utils && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -189,7 +209,7 @@ Compose sets the runtime shape:
 ```yaml
 services:
   exec-runner:
-    build: ./exec-runner
+    image: ghcr.io/aziz-tb/merio-exec-runner:${IMAGE_TAG:-latest}
     devices:
       - /dev/kvm:/dev/kvm
     group_add:
@@ -197,8 +217,31 @@ services:
     environment:
       SERVICE_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
       EXEC_SANDBOX_OFFLINE: "1"
+      CPU_OVERCOMMIT_RATIO: ${CPU_OVERCOMMIT_RATIO:-2.0}
+      MEMORY_OVERCOMMIT_RATIO: ${MEMORY_OVERCOMMIT_RATIO:-5.0}
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 65536
+        hard: 65536
     expose:
       - "8090"
+```
+
+The image is published by GitHub Actions to
+`ghcr.io/aziz-tb/merio-exec-runner` on `v*` tags, matching the app and
+Temporal worker image tag convention (`latest`, `<tag>`, and per-arch tags).
+Production deploys should pull the image; they do not need the exec-runner
+source tree on the VPS.
+
+First-time migration from source-on-VPS to artifact-only deploy:
+
+```bash
+# Publish the first image by pushing a v* release tag.
+# Then, on the VPS:
+rm -rf /opt/merio/exec-runner/
+docker compose -f docker-compose.prod.yml pull exec-runner
+docker compose -f docker-compose.prod.yml up -d --force-recreate exec-runner
 ```
 
 The app and Temporal worker should use:
@@ -209,13 +252,27 @@ MERIO_EXEC__PLATFORM_BASE_URL=http://merio_app:9000
 MERIO_EXEC__SANDBOX_TOKEN=<same value as EXEC_RUNNER_TOKEN>
 ```
 
-Known container limitations for this migration:
+The compose service raises process and file-descriptor limits for the VM pool:
 
-- L1 snapshot save can fail inside Docker, so first execution may cold-boot.
-- cgroup v2 may not be exposed inside the container, reducing exec-sandbox's
-  internal resource enforcement.
-- Docker's default seccomp can block `unshare` and `io_uring`. QEMU/KVM
-  isolation still provides the main boundary for operator-authored tools.
+```yaml
+ulimits:
+  nproc: 65536
+  nofile:
+    soft: 65536
+    hard: 65536
+```
+
+### Operational warnings
+
+The following startup warnings are expected and safe in the Docker container:
+
+- `cgroup v2 unavailable, resource limits disabled`
+- `unshare unavailable (namespace isolation disabled)`
+- `io_uring blocked by seccomp/container policy`
+
+QEMU/KVM isolation remains the main boundary for operator-authored tools. L1
+background save errors should not recur with QEMU 9+; if they reappear, treat
+them as a real signal and check the QEMU version first.
 
 ### Kubernetes Pod (sidecar pattern)
 
@@ -306,8 +363,9 @@ For default config (10 Python + 5 JS warm pool, 256 MB per VM):
 | **Recommended host RAM** | **12–16 GB** |
 
 CPU: 4–8 cores. exec-sandbox's default overcommit (CPU 2x, MEM 5x) lets
-you run more concurrent VMs than physical cores — don't lower these unless
-load tests show pressure.
+you run more concurrent VMs than physical cores. Override
+`CPU_OVERCOMMIT_RATIO` and `MEMORY_OVERCOMMIT_RATIO` only when scaling
+concurrency on smaller hosts or after load tests show pressure.
 
 If running co-located with the Go binary, add ~1–2 GB for Go process,
 Postgres connection pool, Redis client.

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
+import { useConversationStore } from '@main/stores/conversation'
 import api from '@main/api'
 
 export const useSharedViewStore = defineStore('sharedViewStore', () => {
@@ -24,7 +25,10 @@ export const useSharedViewStore = defineStore('sharedViewStore', () => {
         }
     }
 
-    const refresh = () => loadSharedViews(true)
+    const refresh = async () => {
+        await loadSharedViews(true)
+        useConversationStore().fetchConversationStats()
+    }
 
     const reset = () => {
         sharedViewList.value = []

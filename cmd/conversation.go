@@ -17,6 +17,7 @@ import (
 	cmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	customerpkg "github.com/aziz-tb/merio/internal/customer"
 	"github.com/aziz-tb/merio/internal/customerdata"
+	"github.com/aziz-tb/merio/internal/dbutil"
 	"github.com/aziz-tb/merio/internal/detection"
 	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/aziz-tb/merio/internal/stringutil"
@@ -87,6 +88,93 @@ type createConversationRequest struct {
 	Attachments      []int          `json:"attachments"`
 	Initiator        string         `json:"initiator"` // "contact" | "agent"
 	CustomAttributes map[string]any `json:"custom_attributes"`
+}
+
+type conversationStatsResponse struct {
+	Lists map[string]int `json:"lists"`
+	Teams map[string]int `json:"teams"`
+	Views map[string]int `json:"views"`
+}
+
+func hasPermission(user umodels.User, perm string) bool {
+	return slices.Contains(user.Permissions, perm)
+}
+
+func conversationListTotal(conversations []cmodels.ConversationListItem) int {
+	if len(conversations) == 0 {
+		return 0
+	}
+	return conversations[0].Total
+}
+
+func withOpenConversationStatus(filtersJSON string) (string, error) {
+	var filters []dbutil.Filter
+	if filtersJSON = strings.TrimSpace(filtersJSON); filtersJSON != "" && filtersJSON != "null" {
+		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
+			return "", err
+		}
+	}
+
+	openFilters := make([]dbutil.Filter, 0, len(filters)+1)
+	for _, filter := range filters {
+		if filter.Model == "conversation_statuses" {
+			continue
+		}
+		if filter.Model == "conversations" && filter.Field == "status_id" {
+			continue
+		}
+		openFilters = append(openFilters, filter)
+	}
+	openFilters = append(openFilters, dbutil.Filter{
+		Model:    "conversation_statuses",
+		Field:    "name",
+		Operator: "equals",
+		Value:    cmodels.StatusOpen,
+	})
+
+	out, err := json.Marshal(openFilters)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+func conversationAccessListsForUser(user umodels.User) []string {
+	lists := []string{}
+	hasTeamAll := hasPermission(user, authzModels.PermConversationsReadTeamAll)
+	for _, perm := range user.Permissions {
+		if perm == authzModels.PermConversationsReadAll {
+			// No further lists required as user has access to all conversations.
+			return []string{cmodels.AllConversations}
+		}
+		if perm == authzModels.PermConversationsReadUnassigned {
+			lists = append(lists, cmodels.UnassignedConversations)
+		}
+		if perm == authzModels.PermConversationsReadAssigned {
+			lists = append(lists, cmodels.AssignedConversations)
+		}
+		// Skip TeamUnassignedConversations if user has TeamAllConversations (superset).
+		if perm == authzModels.PermConversationsReadTeamInbox && !hasTeamAll {
+			lists = append(lists, cmodels.TeamUnassignedConversations)
+		}
+		if perm == authzModels.PermConversationsReadTeamAll {
+			lists = append(lists, cmodels.TeamAllConversations)
+		}
+	}
+	return lists
+}
+
+func canAccessView(view vmodels.View, user umodels.User) bool {
+	switch view.Visibility {
+	case vmodels.VisibilityUser:
+		return view.UserID != nil && *view.UserID == user.ID
+	case vmodels.VisibilityAll:
+		return true
+	case vmodels.VisibilityTeam:
+		return view.TeamID != nil && slices.Contains(user.Teams.IDs(), *view.TeamID)
+	default:
+		return false
+	}
 }
 
 // handleGetAllConversations retrieves all conversations.
@@ -231,47 +319,12 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	hasAccess := false
-	switch view.Visibility {
-	case vmodels.VisibilityUser:
-		hasAccess = view.UserID != nil && *view.UserID == auser.ID
-	case vmodels.VisibilityAll:
-		hasAccess = true
-	case vmodels.VisibilityTeam:
-		if view.TeamID != nil {
-			hasAccess = slices.Contains(user.Teams.IDs(), *view.TeamID)
-		}
-	}
-
-	if !hasAccess {
+	if !canAccessView(view, user) {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("conversation.viewPermissionDenied"), nil, envelope.PermissionError)
 	}
 
 	// Prepare lists user has access to based on user permissions, internally this prepares the SQL query.
-	lists := []string{}
-	hasTeamAll := slices.Contains(user.Permissions, authzModels.PermConversationsReadTeamAll)
-	for _, perm := range user.Permissions {
-		if perm == authzModels.PermConversationsReadAll {
-			// No further lists required as user has access to all conversations.
-			lists = []string{cmodels.AllConversations}
-			break
-		}
-		if perm == authzModels.PermConversationsReadUnassigned {
-			lists = append(lists, cmodels.UnassignedConversations)
-		}
-		if perm == authzModels.PermConversationsReadAssigned {
-			lists = append(lists, cmodels.AssignedConversations)
-		}
-		// Skip TeamUnassignedConversations if user has TeamAllConversations (superset).
-		if perm == authzModels.PermConversationsReadTeamInbox && !hasTeamAll {
-			lists = append(lists, cmodels.TeamUnassignedConversations)
-		}
-		if perm == authzModels.PermConversationsReadTeamAll {
-			lists = append(lists, cmodels.TeamAllConversations)
-		}
-	}
-
-	// No lists found, user doesn't have access to any conversations.
+	lists := conversationAccessListsForUser(user)
 	if len(lists) == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
@@ -291,6 +344,118 @@ func handleGetViewConversations(r *fastglue.Request) error {
 		TotalPages: (total + pageSize - 1) / pageSize,
 		Page:       page,
 	})
+}
+
+// handleGetConversationStats returns Open conversation counts for sidebar buckets.
+func handleGetConversationStats(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		stats = conversationStatsResponse{
+			Lists: map[string]int{
+				cmodels.AssignedConversations:   0,
+				cmodels.MentionedConversations:  0,
+				cmodels.UnassignedConversations: 0,
+				cmodels.AllConversations:        0,
+			},
+			Teams: map[string]int{},
+			Views: map[string]int{},
+		}
+	)
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	openFilters, err := withOpenConversationStatus("")
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+
+	if hasPermission(user, authzModels.PermConversationsReadAssigned) {
+		conversations, err := app.conversation.GetAssignedConversationsList(user.ID, user.ID, "", "", openFilters, 1, 1)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		stats.Lists[cmodels.AssignedConversations] = conversationListTotal(conversations)
+	}
+
+	if hasPermission(user, authzModels.PermConversationsRead) {
+		conversations, err := app.conversation.GetMentionedConversationsList(user.ID, "", "", openFilters, 1, 1)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		stats.Lists[cmodels.MentionedConversations] = conversationListTotal(conversations)
+	}
+
+	if hasPermission(user, authzModels.PermConversationsReadUnassigned) {
+		conversations, err := app.conversation.GetUnassignedConversationsList(user.ID, "", "", openFilters, 1, 1)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		stats.Lists[cmodels.UnassignedConversations] = conversationListTotal(conversations)
+	}
+
+	if hasPermission(user, authzModels.PermConversationsReadAll) {
+		conversations, err := app.conversation.GetAllConversationsList(user.ID, "", "", openFilters, 1, 1)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		stats.Lists[cmodels.AllConversations] = conversationListTotal(conversations)
+	}
+
+	for _, teamID := range user.Teams.IDs() {
+		key := strconv.Itoa(teamID)
+		stats.Teams[key] = 0
+		if !hasPermission(user, authzModels.PermConversationsReadTeamInbox) {
+			continue
+		}
+
+		conversations, err := app.conversation.GetTeamUnassignedConversationsList(user.ID, teamID, "", "", openFilters, 1, 1)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		stats.Teams[key] = conversationListTotal(conversations)
+	}
+
+	canReadViews := hasPermission(user, authzModels.PermConversationsRead)
+	viewLists := conversationAccessListsForUser(user)
+	views := []vmodels.View{}
+
+	if hasPermission(user, authzModels.PermViewManage) {
+		userViews, err := app.view.GetUsersViews(user.ID)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		views = append(views, userViews...)
+	}
+
+	sharedViews, err := app.view.GetSharedViewsForUser(user.Teams.IDs())
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	views = append(views, sharedViews...)
+
+	for _, view := range views {
+		key := strconv.Itoa(view.ID)
+		stats.Views[key] = 0
+		if !canReadViews || len(viewLists) == 0 || !canAccessView(view, user) {
+			continue
+		}
+
+		filters, err := withOpenConversationStatus(string(view.Filters))
+		if err != nil {
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		}
+		conversations, err := app.conversation.GetViewConversationsList(user.ID, user.ID, user.Teams.IDs(), viewLists, "", "", filters, 1, 1)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		stats.Views[key] = conversationListTotal(conversations)
+	}
+
+	return r.SendEnvelope(stats)
 }
 
 // handleGetTeamUnassignedConversations returns conversations assigned to a team but not to any user.
