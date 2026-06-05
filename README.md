@@ -94,7 +94,9 @@ Production runs on a single VPS via Docker Compose and nginx.
 - nginx configs and setup runbook: [`deploy/nginx/`](./deploy/nginx/)
 - Deploy script: [`deploy/deploy.sh`](./deploy/deploy.sh), intended to be called by the CI/CD workflow over SSH
 
-Images are published to GHCR as `ghcr.io/aziz-tb/merio` and `ghcr.io/aziz-tb/merio-temporal-worker`.
+Images are published to GHCR as `ghcr.io/aziz-tb/merio`,
+`ghcr.io/aziz-tb/merio-temporal-worker`, and
+`ghcr.io/aziz-tb/merio-exec-runner`.
 
 ## Developers
 

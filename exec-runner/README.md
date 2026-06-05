@@ -33,12 +33,19 @@ The container needs `/dev/kvm` and the host `kvm` group GID:
 
 ```bash
 KVM_GID=$(getent group kvm | cut -d: -f3)
-docker compose -f docker-compose.prod.yml build exec-runner
+docker compose -f docker-compose.prod.yml pull exec-runner
 docker compose -f docker-compose.prod.yml up -d exec-runner
 ```
 
+The production image is published to
+`ghcr.io/aziz-tb/merio-exec-runner` on tagged releases. The VPS does not need
+the `exec-runner/` source tree.
+
 macOS Docker Desktop does not expose `/dev/kvm`; keep running the service on
 the host with `uv` for Mac development.
+
+Linux production images require QEMU 9+. QEMU 7.x/8.x can fail L1 memory
+snapshot saves; the production image installs QEMU from `bookworm-backports`.
 
 ## Endpoints
 
@@ -84,6 +91,8 @@ for the full plan and SDK reference.
 | `WARM_POOL_SIZE_JS` | 5 | | Pre-started JavaScript VMs |
 | `DEFAULT_MEMORY_MB` | 256 | | Per-VM memory |
 | `DEFAULT_TIMEOUT_SECONDS` | 60 | | Per-execution wall-clock cap |
+| `CPU_OVERCOMMIT_RATIO` | 2.0 | | exec-sandbox CPU overcommit ratio; defaults are fine for most setups |
+| `MEMORY_OVERCOMMIT_RATIO` | 5.0 | | exec-sandbox memory overcommit ratio; tune when scaling concurrency |
 | `MAX_CONCURRENT_EXECUTIONS` | 64 | | Service-level concurrency cap |
 | `EXECUTION_QUEUE_SIZE` | 128 | | Admission queue depth |
 | `LOG_LEVEL` | INFO | | DEBUG/INFO/WARNING/ERROR |
