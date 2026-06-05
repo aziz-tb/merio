@@ -93,16 +93,26 @@ func cPhoneMatchesERP(ctx models.CriterionContext) bool {
 	return false
 }
 
-// 4. contract_id_mentioned — extracted contractId equals the ERP contract id.
+// 4. contract_id_mentioned — the ERP contract ID appears as a token in
+// the message body or subject. Trusts the message itself, not upstream
+// extraction (which may include email-lookup matches).
 func cContractIDMentioned(ctx models.CriterionContext) bool {
-	cid := strings.TrimSpace(asString(ctx.ExtractedAttrs["contractId"]))
-	return cid != "" && strings.EqualFold(cid, conContractID(ctx.Contract))
+	erpID := strings.TrimSpace(conContractID(ctx.Contract))
+	if erpID == "" {
+		return false
+	}
+	return containsToken(ctx.Message.Body, erpID) || containsToken(ctx.Message.Subject, erpID)
 }
 
-// 5. customer_id_mentioned — extracted customerId equals the ERP customer id.
+// 5. customer_id_mentioned — the ERP customer ID appears as a token in
+// the message body or subject. Trusts the message itself, not upstream
+// extraction.
 func cCustomerIDMentioned(ctx models.CriterionContext) bool {
-	cid := strings.TrimSpace(asString(ctx.ExtractedAttrs["customerId"]))
-	return cid != "" && strings.EqualFold(cid, custCustomerID(ctx.Customer))
+	erpID := strings.TrimSpace(custCustomerID(ctx.Customer))
+	if erpID == "" {
+		return false
+	}
+	return containsToken(ctx.Message.Body, erpID) || containsToken(ctx.Message.Subject, erpID)
 }
 
 // 6. firstname_mentioned — the customer's or contract's firstname appears

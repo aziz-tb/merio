@@ -14,3 +14,4 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=20 app temporal-worker
 
 echo "Deploy complete."
+Ny1GrLR3T
