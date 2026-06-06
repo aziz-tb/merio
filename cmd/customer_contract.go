@@ -48,7 +48,7 @@ func handleGetCustomer(r *fastglue.Request) error {
 	if customerID == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "invalid customer id", nil, envelope.InputError)
 	}
-	out, err := loadCustomerWithContracts(r.RequestCtx, app, customerID)
+	out, err := loadCustomerWithContracts(r.RequestCtx, app, customerID, "")
 	if err != nil {
 		return sendCustomerContractError(r, app, err)
 	}
@@ -132,7 +132,11 @@ func handleGetConversationCustomer(r *fastglue.Request) error {
 	if !conv.CustomerID.Valid {
 		return r.SendEnvelope(nil)
 	}
-	out, err := loadCustomerWithContracts(r.RequestCtx, app, conv.CustomerID.String)
+	primaryContractID := ""
+	if conv.ContractID.Valid {
+		primaryContractID = conv.ContractID.String
+	}
+	out, err := loadCustomerWithContracts(r.RequestCtx, app, conv.CustomerID.String, primaryContractID)
 	if err != nil {
 		return sendCustomerContractError(r, app, err)
 	}
@@ -205,7 +209,7 @@ func handleAssignConversationCustomer(r *fastglue.Request) error {
 	if err := persistManualCustomerLink(r.RequestCtx, app, conv, contractRow, auser.ID, verificationLevel); err != nil {
 		return sendCustomerContractError(r, app, err)
 	}
-	out, err := loadCustomerWithContracts(r.RequestCtx, app, contractRow.CustomerID)
+	out, err := loadCustomerWithContracts(r.RequestCtx, app, contractRow.CustomerID, contractRow.ContractID)
 	if err != nil {
 		return sendCustomerContractError(r, app, err)
 	}
@@ -278,12 +282,12 @@ func requireAnyPermission(r *fastglue.Request, app *App, user umodels.User, perm
 	return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 }
 
-func loadCustomerWithContracts(ctx context.Context, app *App, customerID string) (json.RawMessage, error) {
+func loadCustomerWithContracts(ctx context.Context, app *App, customerID string, primaryContractID string) (json.RawMessage, error) {
 	cust, err := app.customer.GetFreshByCustomerID(ctx, customerID, customer.FreshOptions{})
 	if err != nil {
 		return nil, err
 	}
-	contracts, err := loadContractsForCustomer(ctx, app.lo, app.contract, cust)
+	contracts, err := loadContractsForCustomer(ctx, app.lo, app.contract, cust, primaryContractID)
 	if err != nil {
 		return nil, err
 	}
@@ -299,10 +303,17 @@ type warnLogger interface {
 	Warn(string, ...any)
 }
 
-func loadContractsForCustomer(ctx context.Context, lo warnLogger, contractStore contractHydrationStore, cust *customermodels.Customer) ([]contractmodels.Contract, error) {
-	expectedContractIDs := contractIDsFromRaw(cust.ContractIDs)
-	if len(expectedContractIDs) > 0 {
-		if err := contractStore.EnsureHydrated(ctx, expectedContractIDs, contract.FreshOptions{}); err != nil && lo != nil {
+func loadContractsForCustomer(ctx context.Context, lo warnLogger, contractStore contractHydrationStore, cust *customermodels.Customer, primaryContractIDs ...string) ([]contractmodels.Contract, error) {
+	hydrateIDs := contractIDsFromRaw(cust.ContractIDs)
+	primaryContractID := ""
+	if len(primaryContractIDs) > 0 {
+		primaryContractID = strings.TrimSpace(primaryContractIDs[0])
+	}
+	if primaryContractID != "" {
+		hydrateIDs = []string{primaryContractID}
+	}
+	if len(hydrateIDs) > 0 {
+		if err := contractStore.EnsureHydrated(ctx, hydrateIDs, contract.FreshOptions{}); err != nil && lo != nil {
 			lo.Warn("contract hydration cascade failed; returning partial data", "customer_id", cust.CustomerID, "error", err)
 		}
 	}
