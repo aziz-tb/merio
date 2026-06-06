@@ -284,27 +284,38 @@
         <div v-if="isPartial" class="rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-100">
           <div class="flex items-start gap-2">
             <AlertTriangle class="mt-0.5 size-4 shrink-0" />
-            <div class="min-w-0 flex-1 space-y-2">
+            <div class="min-w-0 flex-1 space-y-1">
               <MarkdownText
                 v-if="verificationMessage"
                 :source="verificationMessage"
                 wrap
-                class="max-w-none text-xs text-yellow-900 dark:text-yellow-100"
+                :class="[
+                  'max-w-none text-xs text-yellow-900 dark:text-yellow-100',
+                  verificationExpanded ? '' : 'line-clamp-2'
+                ]"
               />
               <p v-else>{{ t('conversation.customer.partialVerification') }}</p>
-              <Button
-                v-if="canManualVerify"
+              <button
+                v-if="verificationMessage"
                 type="button"
-                variant="outline"
-                size="sm"
-                class="h-7 border-yellow-300 bg-yellow-100 px-2 text-xs text-yellow-950 hover:bg-yellow-200 dark:border-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-100 dark:hover:bg-yellow-900/60"
-                :disabled="assigning"
-                @click="manualVerifyCustomer"
+                class="text-xs underline underline-offset-2 text-yellow-900/70 hover:text-yellow-900 dark:text-yellow-100/70 dark:hover:text-yellow-100"
+                @click="verificationExpanded = !verificationExpanded"
               >
-                {{ t('conversation.customer.manualVerify') }}
-              </Button>
+                {{ verificationExpanded ? t('conversation.customer.showLess') : t('conversation.customer.showMore') }}
+              </button>
             </div>
           </div>
+          <Button
+            v-if="canManualVerify"
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-7 border-yellow-300 bg-yellow-100/50 px-2 mx-2 mt-4 text-xs text-yellow-950 hover:bg-yellow-200/10 dark:border-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-100 dark:hover:bg-yellow-900/60"
+            :disabled="assigning"
+            @click="manualVerifyCustomer"
+          >
+            {{ t('conversation.customer.manualVerify') }}
+          </Button>
         </div>
 
         <div v-if="contracts.length > 0" class="space-y-2 ">
@@ -447,6 +458,7 @@ const conflictNotice = ref(null)
 
 // UI state
 const previewExpanded = ref(false)
+const verificationExpanded = ref(false)
 const previewLimit = 7
 
 // Refs / timers / cancellation tokens
@@ -547,21 +559,29 @@ onUnmounted(() => {
   cancelInFlightSearch()
 })
 
-const refresh = async () => {
+ const refresh = async (forceFetchLatestOp = false) => {
   if (!uuid.value) return
   loading.value = true
   try {
-    const [customerResp, latestResp] = await Promise.allSettled([
-      api.getConversationCustomer(uuid.value),
-      api.getLatestCustomerIdentification(uuid.value),
-    ])
+    // Always fetch customer; only fetch latest identification op when it
+    // actually drives UI (level=0 + linked_customer_id = reconnect scenario),
+    // or when forced after a workflow completion.
+    const shouldFetchLatestOp = forceFetchLatestOp ||
+      (verificationLevel.value === 0 && Boolean(contact.value?.linked_customer_id))
+
+    const fetches = [api.getConversationCustomer(uuid.value)]
+    if (shouldFetchLatestOp) {
+      fetches.push(api.getLatestCustomerIdentification(uuid.value))
+    }
+
+    const [customerResp, latestResp] = await Promise.allSettled(fetches)
 
     const failures = []
     if (customerResp.status === 'rejected') {
       failures.push('customer')
       console.warn('CustomerDetails refresh: customer fetch failed', customerResp.reason)
     }
-    if (latestResp.status === 'rejected') {
+    if (latestResp && latestResp.status === 'rejected') {
       failures.push('latest operation')
       console.warn('CustomerDetails refresh: latest operation fetch failed', latestResp.reason)
     }
@@ -582,8 +602,14 @@ const refresh = async () => {
         console.warn('CustomerDetails refresh: contract fallback fetch failed', error)
       }
     }
-    const ops = latestResp.status === 'fulfilled' ? latestResp.value.data?.data || [] : []
-    latestOperation.value = Array.isArray(ops) ? ops[0] || null : ops || null
+
+    if (latestResp) {
+      const ops = latestResp.status === 'fulfilled' ? latestResp.value.data?.data || [] : []
+      latestOperation.value = Array.isArray(ops) ? ops[0] || null : ops || null
+    } else {
+      latestOperation.value = null
+    }
+
     await loadLinkedCustomerForReconnect()
     if (latestOperation.value?.status === 'running') {
       startRunning()
@@ -803,7 +829,6 @@ const reconnectLinkedCustomer = () => {
 
 const manualVerifyCustomer = async () => {
   if (!uuid.value || assigning.value) return
-  if (!window.confirm(t('conversation.customer.confirmManualVerify'))) return
   assigning.value = true
   try {
     await api.verifyConversationCustomerManually(uuid.value)
@@ -885,7 +910,7 @@ const handleIdentificationCompleted = async (event) => {
   stopRunning()
   const previousID = stringValue(event?.previous_linked_customer_id)
   await conversationStore.fetchConversation(uuid.value)
-  await refresh()
+  await refresh(true)
   const currentID = customer.value?.customer_id || conversationStore.current?.customer_id || ''
   if (previousID && currentID && previousID !== currentID && !isConflictDismissed(previousID, currentID)) {
     conflictNotice.value = { previousId: previousID, currentId: currentID }
@@ -981,6 +1006,7 @@ const resetLocalState = () => {
   conflictDismissed.value = false
   conflictNotice.value = null
   previewExpanded.value = false
+  verificationExpanded.value = false
   clearRunningTimeout()
 }
 
