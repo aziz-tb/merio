@@ -140,20 +140,43 @@ func renderCriterionTemplate(tpl string, ctx models.CriterionContext) string {
 	replacements := map[string]string{
 		"{sender_email}":     messageValue(ctx.Message.SenderEmail),
 		"{mentioned_email}":  messageValue(strings.Join(ctx.Message.BodyEmails, ", ")),
-		"{erp_email}":        messageValue(strings.Join(erpEmails(ctx), ", ")),
-		"{erp_phone}":        messageValue(strings.Join(erpPhones(ctx), ", ")),
+		"{erp_email}":        messageValue(formatERPValuesForMessage(erpEmails(ctx), normEmail)),
+		"{erp_phone}":        messageValue(formatERPValuesForMessage(erpPhones(ctx), normPhone)),
 		"{contract_id}":      messageValue(firstNonEmpty(asString(ctx.ExtractedAttrs["contractId"]), conContractID(ctx.Contract))),
 		"{customer_id}":      messageValue(firstNonEmpty(asString(ctx.ExtractedAttrs["customerId"]), custCustomerID(ctx.Customer))),
 		"{firstname}":        messageValue(firstNonEmpty(conFirstname(ctx.Contract), custFirstname(ctx.Customer))),
 		"{lastname}":         messageValue(firstNonEmpty(conLastname(ctx.Contract), custLastname(ctx.Customer))),
-		"{delivery_address}": messageValue(strings.Join(deliveryAddrs(ctx), "; ")),
-		"{billing_address}":  messageValue(strings.Join(billingAddrs(ctx), "; ")),
+		"{delivery_address}": messageValue(formatERPValuesForMessage(deliveryAddrs(ctx), normAddr)),
+		"{billing_address}":  messageValue(formatERPValuesForMessage(billingAddrs(ctx), normAddr)),
 	}
 	out := tpl
 	for key, val := range replacements {
 		out = strings.ReplaceAll(out, key, val)
 	}
 	return out
+}
+
+// formatERPValuesForMessage deduplicates a list of ERP field values for
+// rendering in a message. Trim each value, normalize via `normalize` to
+// detect duplicates case/format-insensitively, and join distinct values with
+// " bzw. " (German for "or respectively") so messages stay readable when
+// contract and customer fields differ.
+func formatERPValuesForMessage(values []string, normalize func(string) string) string {
+	seen := make(map[string]bool, len(values))
+	unique := make([]string, 0, len(values))
+	for _, v := range values {
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			continue
+		}
+		key := normalize(trimmed)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		unique = append(unique, trimmed)
+	}
+	return strings.Join(unique, " bzw. ")
 }
 
 func messageValue(value string) string {
