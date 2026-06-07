@@ -9,7 +9,6 @@ DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "convers
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing', 'email_notification');
 -- Visitors are unauthenticated contacts.
 DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor');
-DROP TYPE IF EXISTS "ai_provider" CASCADE; CREATE TYPE "ai_provider" AS ENUM ('openai', 'anthropic');
 DROP TYPE IF EXISTS "automation_execution_mode" CASCADE; CREATE TYPE "automation_execution_mode" AS ENUM ('all', 'first_match');
 DROP TYPE IF EXISTS "macro_visibility" CASCADE; CREATE TYPE "macro_visibility" AS ENUM ('all', 'team', 'user');
 DROP TYPE IF EXISTS "view_visibility" CASCADE; CREATE TYPE "view_visibility" AS ENUM ('all', 'team', 'user');
@@ -185,7 +184,7 @@ CREATE TABLE secrets (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_accessed_at TIMESTAMPTZ,
     created_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT secrets_name_format CHECK (name ~ '^[a-z][a-z0-9_]{0,63}$')
+    CONSTRAINT secrets_name_format CHECK (name ~ '^[A-Za-z][A-Za-z0-9_]{0,63}$')
 );
 CREATE INDEX index_secrets_on_name ON secrets(name);
 
@@ -650,20 +649,6 @@ CREATE TABLE scheduled_sla_notifications (
 );
 CREATE INDEX index_scheduled_sla_notifications_on_send_at ON scheduled_sla_notifications(send_at);
 CREATE INDEX index_scheduled_sla_notifications_on_processed_at ON scheduled_sla_notifications(processed_at);
-
-DROP TABLE IF EXISTS ai_providers CASCADE;
-CREATE TABLE ai_providers (
-	id SERIAL PRIMARY KEY,
-	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-	name TEXT NOT NULL UNIQUE,
-	provider ai_provider NOT NULL,
-	config JSONB NOT NULL DEFAULT '{}',
-	is_default BOOLEAN NOT NULL DEFAULT FALSE,
-	CONSTRAINT constraint_ai_providers_on_name CHECK (length(name) <= 140)
-);
-CREATE UNIQUE INDEX index_unique_ai_providers_on_is_default_when_is_default_is_true ON ai_providers USING btree (is_default)
-WHERE (is_default = true);
 
 DROP TABLE IF EXISTS ai_prompts CASCADE;
 CREATE TABLE ai_prompts (
@@ -1519,17 +1504,6 @@ CREATE INDEX index_ai_usage_on_provider_model
 CREATE INDEX index_ai_usage_on_conversation_id_created_at
 	ON ai_usage (conversation_id, created_at DESC)
 	WHERE conversation_id IS NOT NULL;
-
-INSERT INTO ai_providers
-("name", provider, config, is_default)
-VALUES('openai', 'openai', '{"api_key": ""}'::jsonb, true);
-
--- Anthropic provider row for the F7 LLM abstraction. is_default=false
--- so the existing OpenAI rewrite manager keeps using the OpenAI row.
--- Admin sets the api_key via the AI providers settings UI.
-INSERT INTO ai_providers
-("name", provider, config, is_default)
-VALUES('anthropic', 'anthropic', '{"api_key": ""}'::jsonb, false);
 
 -- Default AI prompts
 INSERT INTO ai_prompts ("key", "content", title)

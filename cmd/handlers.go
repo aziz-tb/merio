@@ -283,7 +283,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// AI completions.
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
-	g.PUT("/api/v1/ai/provider", perm(handleUpdateAIProvider, "ai:manage"))
 
 	// AI agents (F9 — configuration data model).
 	g.GET("/api/v1/ai/agents", perm(handleListAIAgents, "ai_agents:manage"))
@@ -318,9 +317,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// edit form's tool picker.
 	g.GET("/api/v1/ai/internal-capabilities", perm(handleListAIInternalCapabilities, "ai_agents:manage"))
 
-	// AI presets — list of enabled reasoning presets from
-	// config/ai_presets.json. Same gate; consumed by the agent edit
-	// form's preset-overrides picker.
+	// AI presets — list of configured presets from config/ai_presets.json.
+	// Same gate; consumed by the agent edit form's preset-overrides picker,
+	// which filters by purpose and enabled state.
 	g.GET("/api/v1/ai/presets", perm(handleListAIPresets, "ai_agents:manage"))
 
 	// AI agent runner — manual run endpoint for testing pre-pipeline.
