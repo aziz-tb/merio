@@ -127,7 +127,7 @@ const lastInboxPath = useStorage('lastInboxPath', '')
                   name: 'admin-home'
                 }"
               >
-                <Gear class="!size-6" />
+                <Gear class="!size-5" />
               </router-link>
             </Button>
           </TooltipTrigger>
