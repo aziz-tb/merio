@@ -1289,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "A recherché dans la base de connaissances",
   "tools.get_customer_data.label": "A consulté les données du client",
-  "tools.get_conversation_history.label": "A vérifié les conversations précédentes"
+  "tools.get_conversation_history.label": "A vérifié les conversations précédentes",
+  "conversation.collapse": "Réduire",
+  "conversation.systemEventsOn": "{count} événements système le {date}",
+  "conversation.systemEventsBetween": "{count} événements système entre le {firstDate} et le {lastDate}"
 }

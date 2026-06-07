@@ -1289,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "پایگاه دانش را جستجو کرد",
   "tools.get_customer_data.label": "داده‌های مشتری را بررسی کرد",
-  "tools.get_conversation_history.label": "گفت‌وگوهای قبلی را بررسی کرد"
+  "tools.get_conversation_history.label": "گفت‌وگوهای قبلی را بررسی کرد",
+  "conversation.collapse": "بستن",
+  "conversation.systemEventsOn": "{count} رویداد سیستمی در {date}",
+  "conversation.systemEventsBetween": "{count} رویداد سیستمی بین {firstDate} و {lastDate}"
 }

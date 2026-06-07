@@ -1289,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "ナレッジベースを検索",
   "tools.get_customer_data.label": "顧客データを確認",
-  "tools.get_conversation_history.label": "過去の会話を確認"
+  "tools.get_conversation_history.label": "過去の会話を確認",
+  "conversation.collapse": "折りたたむ",
+  "conversation.systemEventsOn": "{date}のシステムイベント{count}件",
+  "conversation.systemEventsBetween": "{firstDate}から{lastDate}までのシステムイベント{count}件"
 }
