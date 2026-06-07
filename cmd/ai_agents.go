@@ -300,8 +300,12 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 				return envelope.NewError(envelope.InputError, "preset_overrides[\""+k+"\"] must be a non-empty preset slug", nil)
 			}
 			if !llm.IsKnownPurpose(k) {
+				known := make([]string, 0, len(llm.KnownPurposes))
+				for _, p := range llm.KnownPurposes {
+					known = append(known, string(p))
+				}
 				return envelope.NewError(envelope.InputError,
-					"preset_overrides key \""+k+"\" is not a known purpose; expected one of: classify, summarize, reason, synthesize, redact_pii, brief, extract_parameters",
+					"preset_overrides key \""+k+"\" is not a known purpose; expected one of: "+strings.Join(known, ", "),
 					nil)
 			}
 			if app.aiPresets != nil && !app.aiPresets.Has(v) {

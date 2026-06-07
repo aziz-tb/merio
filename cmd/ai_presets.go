@@ -6,24 +6,27 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// aiPresetView is the trimmed shape returned to the admin UI's preset
-// picker. The full Preset struct carries provider-key material and
-// fine-grained knobs (top_p, stop_sequences, caching flags) the agent
-// edit form has no business showing — those live in
-// config/ai_presets.json, edited out-of-band. The form picks a slug;
-// nothing else.
+// aiPresetView is the trimmed shape returned to the admin UI's preset picker.
+// API keys are resolved via secret.Resolver (env vars or the secrets table);
+// the full Preset struct also carries tuning knobs the agent edit form has no
+// business showing. The form needs enough metadata to filter by purpose,
+// provider, and enabled state without exposing raw tuning details.
 type aiPresetView struct {
-	Slug        string `json:"slug"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Model       string `json:"model"`
+	Slug        string   `json:"slug"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Model       string   `json:"model"`
+	Provider    string   `json:"provider"`
+	Enabled     bool     `json:"enabled"`
+	Purposes    []string `json:"purposes"`
+	Visibility  []string `json:"visibility"`
 }
 
-// handleListAIPresets returns the enabled presets from the in-memory
-// registry. Read-only, gated on ai_agents:manage (same gate as the
-// internal-capabilities list — see cmd/ai_internal_capabilities.go for
-// the consolidation note: keep separate handler files until this
-// pattern hits 5+ similar GETs, then merge into cmd/ai_registries.go).
+// handleListAIPresets returns presets from the in-memory registry. Read-only,
+// gated on ai_agents:manage (same gate as the internal-capabilities list — see
+// cmd/ai_internal_capabilities.go for the consolidation note: keep separate
+// handler files until this pattern hits 5+ similar GETs, then merge into
+// cmd/ai_registries.go).
 //
 // The registry is loaded once at boot from config/ai_presets.json;
 // edits require a restart, so the response is stable for the lifetime
@@ -41,14 +44,24 @@ func handleListAIPresets(r *fastglue.Request) error {
 	presets := app.aiPresets.List()
 	out := make([]aiPresetView, 0, len(presets))
 	for _, p := range presets {
-		if !p.Enabled {
-			continue
+		purposes := app.aiPresets.PurposesForPreset(p.Slug)
+		purposeNames := make([]string, 0, len(purposes))
+		for _, purpose := range purposes {
+			purposeNames = append(purposeNames, string(purpose))
+		}
+		visibility := p.Visibility
+		if visibility == nil {
+			visibility = []string{}
 		}
 		out = append(out, aiPresetView{
 			Slug:        p.Slug,
 			Name:        p.Name,
 			Description: p.Description,
 			Model:       p.Model,
+			Provider:    p.Provider,
+			Enabled:     p.Enabled,
+			Purposes:    purposeNames,
+			Visibility:  visibility,
 		})
 	}
 	return r.SendEnvelope(out)
