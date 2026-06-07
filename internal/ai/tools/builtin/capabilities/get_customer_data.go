@@ -5,142 +5,111 @@ import (
 	"fmt"
 
 	"github.com/aziz-tb/merio/internal/ai/tools/builtin"
-	verificationmodels "github.com/aziz-tb/merio/internal/verification/models"
+	"github.com/aziz-tb/merio/internal/contract"
+	"github.com/aziz-tb/merio/internal/customer"
+	customermodels "github.com/aziz-tb/merio/internal/customer/models"
+	"github.com/aziz-tb/merio/internal/customerdata"
 )
 
 func init() {
 	builtin.RegisterInternal(&getCustomerDataCapability{})
 }
 
-// getCustomerDataCapability returns the contact attached to a
-// conversation. PII fields (phone, custom attributes, country) are
-// redacted unless the caller's verification level is at least
-// piiVerificationLevel; the agent runtime sets that level from the
-// conversation's verification state in the inbound pipeline (F3+).
+// getCustomerDataCapability returns the full customer + contract record
+// linked to a conversation — the same payload the agent desk shows in the
+// sidebar and that GET /conversations/{uuid}/customer returns. The
+// conversation's stored customer_id / contract_id are the verified
+// identity, so the tool resolves everything from the conversation rather
+// than trusting free-form ids from the model.
 type getCustomerDataCapability struct{}
-
-const piiVerificationLevel = verificationmodels.VerificationLevelPartial
 
 func (g *getCustomerDataCapability) ID() string   { return "get_customer_data" }
 func (g *getCustomerDataCapability) Name() string { return "Get the conversation's customer" }
 
 func (g *getCustomerDataCapability) Description() string {
-	return "Fetch the contact (customer) attached to a conversation. " +
-		"Returns the contact's id, first and last name, email, account status, and timezone. " +
-		"PII fields (phone number, country, custom attributes) are returned only when the caller's verification level is 1 or higher.\n\n" +
-		"Use this to address the customer by name, check whether their account is enabled, " +
-		"or look up details needed to draft an accurate reply. " +
-		"By default resolves the contact for the conversation currently in scope; pass `conversation_id` to look up a different conversation explicitly."
+	return "Fetch the full customer and contract record linked to a conversation, including ERP details. " +
+		"Returns a customer object (name, contact details, address, segments) plus a `contracts` array; " +
+		"each contract carries an `agent_preview` list of human-readable label/value pairs (tariff, meter number, delivery state, consumption, …) alongside the raw ERP fields. " +
+		"Available fields vary by what the ERP returns.\n\n" +
+		"Use this to address the customer by name, understand their tariff/contract situation, or look up the details needed to draft an accurate reply. " +
+		"By default resolves the customer for the conversation currently in scope; pass `conversation_uuid` to look up a different conversation explicitly."
 }
 
 func (g *getCustomerDataCapability) InputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"conversation_id": map[string]any{
-				"type":        "integer",
-				"description": "Conversation id to resolve the contact from. Defaults to the conversation currently in scope.",
+			"conversation_uuid": map[string]any{
+				"type":        "string",
+				"description": "Conversation UUID to resolve the customer from. Defaults to the conversation currently in scope.",
 			},
 		},
 	}
 }
 
 func (g *getCustomerDataCapability) OutputSchema() map[string]any {
+	// The shape mirrors GET /conversations/{uuid}/customer: a flat customer
+	// object (Zone 1 + ERP-authored Zone 2 fields) with a nested
+	// `contracts` array. Fields are ERP-dependent, so we describe the
+	// envelope rather than enumerate every key.
 	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"contact_id":         map[string]any{"type": "integer"},
-			"first_name":         map[string]any{"type": "string"},
-			"last_name":          map[string]any{"type": "string"},
-			"email":              map[string]any{"type": "string"},
-			"type":               map[string]any{"type": "string"},
-			"enabled":            map[string]any{"type": "boolean"},
-			"phone_number":       map[string]any{"type": "string"},
-			"phone_country_code": map[string]any{"type": "string"},
-			"country":            map[string]any{"type": "string"},
-			"custom_attributes":  map[string]any{"type": "object"},
-			"pii_redacted":       map[string]any{"type": "boolean"},
-			"created_at":         map[string]any{"type": "string"},
-		},
+		"type":        "object",
+		"description": "Customer record with a nested `contracts` array. Each contract includes an `agent_preview` list of {label, value, tooltip} pairs plus raw ERP fields. Null when no customer is linked to the conversation.",
 	}
 }
 
 func (g *getCustomerDataCapability) Category() string { return "read" }
 
-// CustomerData is the typed envelope returned by this capability. PII
-// fields are populated only when the caller's verification level is high
-// enough; pii_redacted=true on the response when they were dropped.
-type CustomerData struct {
-	ContactID        int            `json:"contact_id"`
-	FirstName        string         `json:"first_name"`
-	LastName         string         `json:"last_name"`
-	Email            string         `json:"email,omitempty"`
-	Type             string         `json:"type"`
-	Enabled          bool           `json:"enabled"`
-	PhoneNumber      string         `json:"phone_number,omitempty"`
-	PhoneCountryCode string         `json:"phone_country_code,omitempty"`
-	Country          string         `json:"country,omitempty"`
-	CustomAttributes map[string]any `json:"custom_attributes,omitempty"`
-	PIIRedacted      bool           `json:"pii_redacted"`
-	CreatedAt        string         `json:"created_at,omitempty"`
-}
-
 func (g *getCustomerDataCapability) Execute(ctx context.Context, params map[string]any, rt *builtin.ToolRuntimeContext) (any, error) {
-	if rt == nil || rt.Conversation == nil || rt.User == nil {
-		return nil, fmt.Errorf("get_customer_data: runtime conversation/user managers are nil")
+	if rt == nil || rt.Conversation == nil || rt.Customer == nil || rt.Contract == nil {
+		return nil, fmt.Errorf("get_customer_data: runtime conversation/customer/contract managers are nil")
 	}
 
-	convID, ok := paramInt(params, "conversation_id")
-	if !ok || convID <= 0 {
-		convID = rt.ConversationID
+	// Resolve strictly by the provided uuid when given (id=0), otherwise
+	// fall back to the conversation currently in scope. get-conversation
+	// matches id OR uuid, so leaving both set could resolve the wrong row.
+	convUUID, _ := paramString(params, "conversation_uuid")
+	lookupID := rt.ConversationID
+	if convUUID != "" {
+		lookupID = 0
 	}
-	if convID <= 0 {
-		return nil, fmt.Errorf("get_customer_data: conversation_id is required (no conversation in scope and none provided)")
+	if lookupID <= 0 && convUUID == "" {
+		return nil, fmt.Errorf("get_customer_data: conversation_uuid is required (no conversation in scope and none provided)")
 	}
 
-	conv, err := rt.Conversation.GetConversation(convID, "", "")
+	conv, err := rt.Conversation.GetConversation(lookupID, convUUID, "")
 	if err != nil {
 		return nil, fmt.Errorf("get_customer_data: %w", err)
 	}
-	if conv.ContactID <= 0 {
-		return nil, fmt.Errorf("get_customer_data: conversation %d has no contact_id", convID)
+	if !conv.CustomerID.Valid || conv.CustomerID.String == "" {
+		// No customer linked — mirror the endpoint's empty response.
+		return nil, nil
+	}
+	primaryContractID := ""
+	if conv.ContractID.Valid {
+		primaryContractID = conv.ContractID.String
 	}
 
-	u, err := rt.User.GetContactOrVisitor(conv.ContactID, "")
+	raw, err := customerdata.LoadCustomerWithContracts(ctx, rt.Logf,
+		func(c context.Context, id string) (*customermodels.Customer, error) {
+			return rt.Customer.GetFreshByCustomerID(c, id, customer.FreshOptions{
+				ConversationID: conv.ID,
+				TraceID:        rt.TraceID,
+			})
+		},
+		func(c context.Context, ids []string) error {
+			return rt.Contract.EnsureHydrated(c, ids, contract.FreshOptions{
+				ConversationID: conv.ID,
+				TraceID:        rt.TraceID,
+			})
+		},
+		rt.Contract.ListByCustomerID,
+		conv.CustomerID.String, primaryContractID)
 	if err != nil {
 		return nil, fmt.Errorf("get_customer_data: %w", err)
 	}
 
-	out := CustomerData{
-		ContactID: u.ID,
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		Type:      u.Type,
-		Enabled:   u.Enabled,
-		CreatedAt: u.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
-	}
-	if u.Email.Valid {
-		out.Email = u.Email.String
-	}
-
-	if rt.VerificationLevel >= int(piiVerificationLevel) {
-		if u.PhoneNumber.Valid {
-			out.PhoneNumber = u.PhoneNumber.String
-		}
-		if u.PhoneNumberCountryCode.Valid {
-			out.PhoneCountryCode = u.PhoneNumberCountryCode.String
-		}
-		if u.Country.Valid {
-			out.Country = u.Country.String
-		}
-		if len(u.CustomAttributes) > 0 {
-			// CustomAttributes is json.RawMessage; the LLM gets a parsed
-			// map for free given the JSON encoder will round-trip.
-			out.CustomAttributes = decodeCustomAttributes(u.CustomAttributes)
-		}
-	} else {
-		out.PIIRedacted = true
-	}
-
-	return out, nil
+	// json.RawMessage round-trips through the dispatcher's json.Marshal
+	// verbatim, so the agent sees byte-identical JSON to the HTTP endpoint.
+	return raw, nil
 }

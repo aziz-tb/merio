@@ -19,7 +19,9 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
 	"github.com/aziz-tb/merio/internal/ai/tools/translator"
 	"github.com/aziz-tb/merio/internal/ai/usage/redact"
+	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/customer"
 	"github.com/aziz-tb/merio/internal/knowledge"
 	"github.com/aziz-tb/merio/internal/user"
 )
@@ -56,10 +58,6 @@ var (
 // for the type assertion.
 type UsageRecorder interface {
 	Record(ctx context.Context, row UsageRow) error
-}
-
-type CacheInvalidator interface {
-	InvalidateCache(id string) error
 }
 
 // UsageRow is the runner's projection of usage.Row — the subset of
@@ -116,8 +114,8 @@ type Opts struct {
 	Knowledge    *knowledge.Manager
 	Conversation *conversation.Manager
 	User         *user.Manager
-	Customer     CacheInvalidator
-	Contract     CacheInvalidator
+	Customer     *customer.Manager
+	Contract     *contract.Manager
 	Usage        UsageRecorder
 }
 
@@ -260,6 +258,8 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		Knowledge:           r.opts.Knowledge,
 		Conversation:        r.opts.Conversation,
 		User:                r.opts.User,
+		Customer:            r.opts.Customer,
+		Contract:            r.opts.Contract,
 	}
 
 	var (
