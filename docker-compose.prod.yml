@@ -16,6 +16,12 @@ services:
       MERIO_TEMPORAL__ENABLED: "true"
       MERIO_TEMPORAL__ADDRESS: temporal:7233
       MERIO_TEMPORAL__NAMESPACE: merio
+      # AI provider keys. Seeded from env as a fallback; stored secrets win.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AZURE_API_KEY: ${AZURE_API_KEY:-}
+      AZURE_FOUNDRY_ENDPOINT: ${AZURE_FOUNDRY_ENDPOINT:-}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
     networks:
       - merio
     depends_on:
@@ -189,6 +195,11 @@ services:
       MERIO_TEMPORAL__ENABLED: "true"
       MERIO_TEMPORAL__ADDRESS: temporal:7233
       MERIO_TEMPORAL__NAMESPACE: merio
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AZURE_API_KEY: ${AZURE_API_KEY:-}
+      AZURE_FOUNDRY_ENDPOINT: ${AZURE_FOUNDRY_ENDPOINT:-}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
     volumes:
       - ./config.toml:/worker/config.toml:ro
       - ./config:/worker/config:ro

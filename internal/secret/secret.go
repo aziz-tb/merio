@@ -31,7 +31,7 @@ var (
 	ErrInvalidName    = errors.New("invalid secret name")
 	ErrValueTooLarge  = errors.New("secret value exceeds 5 KB")
 
-	nameRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	nameRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,63}$`)
 )
 
 // AccessContext annotates secret access log lines with the execution that
@@ -95,8 +95,9 @@ func New(opts Opts) (*Manager, error) {
 }
 
 // ValidName reports whether a secret name satisfies the platform naming
-// contract: lowercase alphanumeric + underscore, max 64 chars, starts with a
-// letter.
+// contract: alphanumeric + underscore, max 64 chars, starts with a letter.
+// Uppercase names are allowed so env-style operator secrets such as
+// OPENAI_API_KEY can be stored verbatim.
 func ValidName(name string) bool {
 	return nameRe.MatchString(strings.TrimSpace(name))
 }

@@ -98,6 +98,18 @@ Images are published to GHCR as `ghcr.io/aziz-tb/merio`,
 `ghcr.io/aziz-tb/merio-temporal-worker`, and
 `ghcr.io/aziz-tb/merio-exec-runner`.
 
+### AI provider configuration
+
+LLM and embedding provider keys are resolved from the Secrets Manager first,
+then from environment variables. Secret names must match the env var names
+verbatim. Runtime lookups are cached for 5 minutes, so key or endpoint changes
+can take up to 5 minutes to apply without a restart.
+
+- `ANTHROPIC_API_KEY` for Anthropic direct.
+- `OPENAI_API_KEY` for OpenAI direct.
+- `AZURE_API_KEY` and `AZURE_FOUNDRY_ENDPOINT` for Azure Foundry.
+- `VOYAGE_API_KEY` and optional `VOYAGE_ENDPOINT` for Voyage embeddings.
+
 ## Developers
 
 - If you are interested in contributing, **please read [CONTRIBUTING.md](./CONTRIBUTING.md) first**.
