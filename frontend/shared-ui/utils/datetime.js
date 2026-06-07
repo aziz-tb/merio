@@ -30,8 +30,9 @@ export const formatDuration = (seconds, showSeconds = true) => {
   return `${hours}h ${mins}m ${showSeconds ? `${secs}s` : ''}`
 }
 
-export const formatMessageTimestamp = (time) => {
-  return format(time, 'd MMM, hh:mm a')
+export function formatMessageTimestamp(input) {
+  if (!input) return ''
+  return format(new Date(input), 'd MMM, HH:mm')
 }
 
 export const formatFullTimestamp = (time) => {

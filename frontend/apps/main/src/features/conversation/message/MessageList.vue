@@ -1,3 +1,4 @@
+<!-- MessageList.vue -->
 <template>
   <div class="flex flex-col relative h-full">
     <div ref="threadEl" class="flex-1 overflow-y-auto" @scroll="handleScroll">
@@ -22,24 +23,57 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" tag="div">
-          <div
-            v-for="(message, index) in conversationStore.conversationMessages"
-            :key="message.uuid"
-            :data-message-uuid="message.uuid"
-            :class="[
-              message.type === 'activity' ? 'my-2' : '',
-              showRowBorder(index) ? 'border-t border-border' : ''
-            ]"
-          >
-            <div v-if="!message.private && message.type !== 'activity'">
-              <MessageBubble :message="message" :direction="message.type" />
+        <TransitionGroup
+          v-else
+          enter-active-class="animate-slide-in"
+          tag="div"
+          class="divide-y divide-border/40"
+        >
+          <div v-for="group in groupedMessages" :key="group.id">
+            <!-- Activity group: collapsed summary OR expanded list -->
+            <div
+              v-if="group.kind === 'activities'"
+              class="py-2.5 px-4 text-center"
+            >
+              <button
+                v-if="shouldCollapseActivities(group) && !isActivityGroupExpanded(group.id)"
+                type="button"
+                @click="toggleActivityGroup(group.id)"
+                class="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 hover:bg-muted px-2.5 py-1 rounded-full transition-colors"
+              >
+                <ClockRotateLeft :size="12" />
+                {{ activityGroupSummary(group) }}
+                <ChevronDown :size="12" />
+              </button>
+              <div v-else>
+                <ActivityMessageBubble
+                  v-for="activityMessage in group.items"
+                  :key="activityMessage.uuid"
+                  :message="activityMessage"
+                />
+                <button
+                  v-if="shouldCollapseActivities(group)"
+                  type="button"
+                  @click="toggleActivityGroup(group.id)"
+                  class="my-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronUp :size="11" />
+                  {{ $t('conversation.collapse') }}
+                </button>
+              </div>
             </div>
-            <div v-else-if="isPrivateNote(message)">
-              <MessageBubble :message="message" direction="outgoing" />
-            </div>
-            <div v-else-if="message.type === 'activity'">
-              <ActivityMessageBubble :message="message" />
+
+            <!-- Regular message -->
+            <div
+              v-else
+              :data-message-uuid="group.item.uuid"
+            >
+              <div v-if="!group.item.private && group.item.type !== 'activity'">
+                <MessageBubble :message="group.item" :direction="group.item.type" />
+              </div>
+              <div v-else-if="isPrivateNote(group.item)">
+                <MessageBubble :message="group.item" direction="outgoing" />
+              </div>
             </div>
           </div>
         </TransitionGroup>
@@ -61,21 +95,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowsRotate as RefreshCw, ChevronDown } from '@qall/icons'
+import {
+  ArrowsRotate as RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  ClockRotateLeft
+} from '@qall/icons'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
+import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
+import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
+const { t } = useI18n()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
@@ -84,6 +126,72 @@ const emitter = useEmitter()
 const isAtBottom = ref(true)
 const unReadMessages = ref(0)
 const currentConversationUUID = ref('')
+
+// Activities collapse below this threshold are shown expanded inline; clusters
+// of 3+ events collapse into a single chip with count and date range.
+const ACTIVITY_COLLAPSE_THRESHOLD = 2
+const expandedActivityGroups = ref(new Set())
+
+// Group consecutive activity messages into one "activities" block. Regular
+// messages stay as individual groups. The result is what the template
+// iterates so hairlines (via divide-y on the parent) sit between groups,
+// not between individual activity rows.
+const groupedMessages = computed(() => {
+  const messages = conversationStore.conversationMessages
+  const groups = []
+  let currentActivityGroup = null
+
+  for (const message of messages) {
+    if (message.type === 'activity') {
+      if (!currentActivityGroup) {
+        // Stable id from the first activity in the run so expansion state and
+        // transition keys survive older-message prepends ("Load more").
+        currentActivityGroup = { kind: 'activities', id: 'act-' + message.uuid, items: [] }
+        groups.push(currentActivityGroup)
+      }
+      currentActivityGroup.items.push(message)
+    } else {
+      currentActivityGroup = null
+      groups.push({ kind: 'message', id: message.uuid, item: message })
+    }
+  }
+
+  return groups
+})
+
+function isActivityGroupExpanded(groupId) {
+  return expandedActivityGroups.value.has(groupId)
+}
+
+function toggleActivityGroup(groupId) {
+  const set = expandedActivityGroups.value
+  if (set.has(groupId)) set.delete(groupId)
+  else set.add(groupId)
+  // Re-assign to trigger reactivity since Set mutations aren't observed
+  expandedActivityGroups.value = new Set(set)
+}
+
+function shouldCollapseActivities(group) {
+  return group.items.length >= ACTIVITY_COLLAPSE_THRESHOLD
+}
+
+function activityGroupSummary(group) {
+  const first = group.items[0]
+  const last = group.items[group.items.length - 1]
+  const firstDate = formatMessageTimestamp(first.updated_at).split(',')[0]
+  const lastDate = formatMessageTimestamp(last.updated_at).split(',')[0]
+  if (firstDate === lastDate) {
+    return t('conversation.systemEventsOn', {
+      count: group.items.length,
+      date: firstDate
+    })
+  }
+  return t('conversation.systemEventsBetween', {
+    count: group.items.length,
+    firstDate,
+    lastDate
+  })
+}
 
 const checkIfAtBottom = () => {
   const thread = threadEl.value
@@ -182,6 +290,8 @@ watch(
     ) {
       currentConversationUUID.value = conversationStore.current.uuid
       unReadMessages.value = 0
+      // Reset activity group expansion state for fresh conversation
+      expandedActivityGroups.value = new Set()
 
       // Check if this is a mentioned conversation
       const scrollToUUID = route.query.scrollTo
@@ -218,21 +328,6 @@ watch(
 
 const isPrivateNote = (message) => {
   return message.type === 'outgoing' && message.private
-}
-
-// Show a top border on a row only when the row is a regular message AND there
-// is at least one earlier regular message. Activity rows ("System set priority …")
-// never get a border, and there's no border above the first regular message —
-// so single-message threads stay borderless and stacks of activities don't
-// pick up dividers either.
-const showRowBorder = (idx) => {
-  const messages = conversationStore.conversationMessages
-  const cur = messages[idx]
-  if (!cur || cur.type === 'activity') return false
-  for (let i = idx - 1; i >= 0; i--) {
-    if (messages[i] && messages[i].type !== 'activity') return true
-  }
-  return false
 }
 </script>
 

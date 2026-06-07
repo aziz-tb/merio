@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 export function formatDateTime(value) {
   const d = toDate(value)
   if (!d) return ''
-  return format(d, 'PP, HH:mm')
+  return format(d, 'd MMM, HH:mm')
 }
 
 /**

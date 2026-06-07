@@ -1,3 +1,4 @@
+<!-- MessageEnvelope.vue -->
 <template>
   <div class="mb-1 text-xs space-y-1">
     <div class="space-y-0.5">
