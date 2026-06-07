@@ -28,22 +28,32 @@
 
           <!-- Content container -->
           <div class="flex-1 min-w-0 space-y-1">
-            <!-- Contact name + time -->
-            <div class="flex items-baseline justify-between gap-2">
-              <h3 class="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold text-foreground">
-                <span class="truncate">{{ displayName }}</span>
-                <Tooltip v-if="isLinked">
-                  <TooltipTrigger as-child>
-                    <LinkSimple class="size-3 shrink-0 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>{{ t('conversation.customer.linkedTooltip') }}</TooltipContent>
-                </Tooltip>
-              </h3>
+
+
+            <!-- Contact name + linked indicator -->
+            <div class="flex min-w-0 items-center gap-1.5 items-baseline justify-between ">
+              <div class="flex items-center gap-1.5 min-w-0">
+              <h3 class="truncate text-sm font-semibold text-foreground">{{ displayName }}</h3>
+              <Tooltip v-if="isLinked">
+                <TooltipTrigger as-child>
+                  <LinkSimple class="size-3 shrink-0 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>{{ t('conversation.customer.linkedTooltip') }}</TooltipContent>
+              </Tooltip>
+            </div>
               <span
                 class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 tabular-nums"
                 v-if="conversation.last_message_at"
               >
                 {{ relativeLastMessageTime }}
+              </span>
+            </div>
+
+
+            <!-- Subject + time -->
+            <div class="flex gap-2">
+              <span class="min-w-0 flex-1 truncate text-sm text-foreground">
+                {{ subject }}
               </span>
             </div>
 
@@ -120,7 +130,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Envelope as Mail, Message as MessageSquare, Reply, EnvelopeOpen as MailOpen, FilePen, Link, LinkSimple } from '@qall/icons'
+import { Envelope as Mail, Message as MessageSquare, Reply, EnvelopeOpen as MailOpen, FilePen, LinkSimple } from '@qall/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
@@ -209,4 +219,5 @@ const draftPreview = computed(() => {
 
 const displayName = computed(() => getConversationDisplayName(props.conversation))
 const isLinked = computed(() => hasLinkedCustomer(props.conversation))
+const subject = computed(() => props.conversation.subject?.trim() || t('globals.messages.noSubject'))
 </script>
