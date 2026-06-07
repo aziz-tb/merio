@@ -1,18 +1,17 @@
-// Package catalog loads config/anthropic_models.json into an in-memory
-// Catalog used by the preset registry to validate that every preset's
-// model field references a known model.
+// Package catalog loads model catalog JSON files into an in-memory Catalog
+// used by the preset registry to validate that every preset's provider/model
+// pair references a known model.
 //
 // The catalog is data, not config in the koanf sense: edits require a
 // version-control PR + restart, and a typo in a model id should crash
-// startup rather than silently fall back. v1 ships with one provider
-// (Anthropic); when Bedrock or Azure land, this package gains a second
-// catalog file or a multi-provider catalog shape.
+// startup rather than silently fall back.
 package catalog
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 )
 
 // Tier classifies models into rough cost/quality bands for ops UI hints.
@@ -25,18 +24,27 @@ const (
 	TierOpus   Tier = "opus"
 )
 
-// Model is one entry in config/anthropic_models.json. Field tags mirror
-// the JSON key names exactly so the file remains the human-edit surface.
+// Model is one entry in a model catalog JSON file. Field tags mirror the JSON
+// key names exactly so the files remain the human-edit surface.
 type Model struct {
-	ID                      string  `json:"id"`
-	DisplayName             string  `json:"display_name"`
-	ContextWindow           int     `json:"context_window"`
-	MaxOutputTokens         int     `json:"max_output_tokens"`
-	SupportsCaching         bool    `json:"supports_caching"`
-	SupportsExtendedCaching bool    `json:"supports_extended_caching"`
-	SupportsThinking        bool    `json:"supports_thinking"`
-	Tier                    Tier    `json:"tier"`
-	Pricing                 Pricing `json:"pricing"`
+	ID                      string `json:"id"`
+	Provider                string `json:"provider"`
+	DisplayName             string `json:"display_name"`
+	ContextWindow           int    `json:"context_window"`
+	MaxOutputTokens         int    `json:"max_output_tokens"`
+	SupportsCaching         bool   `json:"supports_caching"`
+	SupportsExtendedCaching bool   `json:"supports_extended_caching"`
+	// SupportsThinking means the model can emit provider-visible thinking
+	// content blocks that should be preserved and round-tripped. Today this is
+	// Claude-specific and is independent of OpenAI reasoning-token controls.
+	SupportsThinking bool `json:"supports_thinking"`
+	// IsReasoningModel means the provider translator must use reasoning-model
+	// request semantics: max_completion_tokens instead of max_tokens and no
+	// temperature knob unless the provider explicitly allows it. OpenAI o-series
+	// and GPT reasoning modes use this; it does not imply visible thinking blocks.
+	IsReasoningModel bool    `json:"is_reasoning_model"`
+	Tier             Tier    `json:"tier"`
+	Pricing          Pricing `json:"pricing"`
 }
 
 // Pricing carries the model's per-million-token rates. Currency is USD
@@ -54,7 +62,7 @@ type Pricing struct {
 	EffectiveFrom                  string  `json:"effective_from"`
 }
 
-// Catalog is the loaded set of models, keyed by ID for O(1) lookup. It's
+// Catalog is the loaded set of models, keyed by provider:id for O(1) lookup. It's
 // immutable after Load — any edits to the source file require an app
 // restart to take effect (v1 limitation).
 type Catalog struct {
@@ -69,14 +77,54 @@ type catalogFile struct {
 	Models  []Model `json:"models"`
 }
 
-// Load reads the catalog file at path. Returns a populated Catalog or a
-// descriptive error on parse / shape failure. Callers that pass an empty
-// path get an empty Catalog (Has returns false for everything) — useful
-// in tests that don't exercise model validation.
+// Load reads one catalog file at path. It stays as a compatibility wrapper for
+// tests and single-catalog deployments; production uses LoadMulti.
 func Load(path string) (*Catalog, error) {
 	if path == "" {
 		return &Catalog{models: map[string]Model{}, all: []Model{}}, nil
 	}
+	return LoadMulti(map[string]string{"anthropic": path})
+}
+
+// LoadMulti reads and merges provider-specific catalog files. The paths map is
+// keyed by provider name ("anthropic", "openai", "azure"); every model in a
+// file must carry the same provider value. Duplicate provider/model pairs are
+// rejected.
+func LoadMulti(paths map[string]string) (*Catalog, error) {
+	if len(paths) == 0 {
+		return &Catalog{models: map[string]Model{}, all: []Model{}}, nil
+	}
+
+	providers := make([]string, 0, len(paths))
+	for provider := range paths {
+		providers = append(providers, provider)
+	}
+	sort.Strings(providers)
+
+	models := make(map[string]Model)
+	all := make([]Model, 0)
+	for _, provider := range providers {
+		path := paths[provider]
+		if path == "" {
+			continue
+		}
+		fileModels, err := loadFile(path, provider)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range fileModels {
+			k := key(m.Provider, m.ID)
+			if _, dup := models[k]; dup {
+				return nil, fmt.Errorf("catalog: duplicate model %q for provider %q", m.ID, m.Provider)
+			}
+			models[k] = m
+			all = append(all, m)
+		}
+	}
+	return &Catalog{models: models, all: all}, nil
+}
+
+func loadFile(path string, provider string) ([]Model, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("catalog: reading %s: %w", path, err)
@@ -89,13 +137,15 @@ func Load(path string) (*Catalog, error) {
 		return nil, fmt.Errorf("catalog: %s contains no models", path)
 	}
 
-	models := make(map[string]Model, len(f.Models))
 	for i, m := range f.Models {
 		if m.ID == "" {
 			return nil, fmt.Errorf("catalog: %s models[%d].id is empty", path, i)
 		}
-		if _, dup := models[m.ID]; dup {
-			return nil, fmt.Errorf("catalog: %s contains duplicate model id %q", path, m.ID)
+		if m.Provider == "" {
+			return nil, fmt.Errorf("catalog: %s model %q provider is empty", path, m.ID)
+		}
+		if provider != "" && m.Provider != provider {
+			return nil, fmt.Errorf("catalog: %s model %q provider=%q does not match file provider %q", path, m.ID, m.Provider, provider)
 		}
 		// Pricing must be present + non-zero for every model. ai_usage
 		// cost columns depend on it; a missing entry would silently log
@@ -109,26 +159,16 @@ func Load(path string) (*Catalog, error) {
 		if m.Pricing.Currency == "" {
 			return nil, fmt.Errorf("catalog: %s model %q pricing.currency is empty", path, m.ID)
 		}
-		models[m.ID] = m
 	}
-	return &Catalog{models: models, all: f.Models}, nil
+	return f.Models, nil
 }
 
-// Has reports whether the catalog contains a model with the given id.
-func (c *Catalog) Has(modelID string) bool {
-	if c == nil {
-		return false
-	}
-	_, ok := c.models[modelID]
-	return ok
-}
-
-// Get returns the catalog entry for modelID, or zero + false.
-func (c *Catalog) Get(modelID string) (Model, bool) {
+// Get returns the catalog entry for provider/modelID, or zero + false.
+func (c *Catalog) Get(provider, modelID string) (Model, bool) {
 	if c == nil {
 		return Model{}, false
 	}
-	m, ok := c.models[modelID]
+	m, ok := c.models[key(provider, modelID)]
 	return m, ok
 }
 
@@ -144,14 +184,18 @@ func (c *Catalog) All() []Model {
 	return out
 }
 
-// IDs returns the model IDs in the catalog (file order).
+// IDs returns provider-qualified model IDs in file order.
 func (c *Catalog) IDs() []string {
 	if c == nil {
 		return nil
 	}
 	out := make([]string, 0, len(c.all))
 	for _, m := range c.all {
-		out = append(out, m.ID)
+		out = append(out, key(m.Provider, m.ID))
 	}
 	return out
+}
+
+func key(provider, modelID string) string {
+	return provider + ":" + modelID
 }

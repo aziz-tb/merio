@@ -15,7 +15,6 @@ import (
 	_ "time/tzdata"
 
 	activitylog "github.com/aziz-tb/merio/internal/activity_log"
-	aiLegacy "github.com/aziz-tb/merio/internal/ai/legacy"
 	auth_ "github.com/aziz-tb/merio/internal/auth"
 	"github.com/aziz-tb/merio/internal/authz"
 	businesshours "github.com/aziz-tb/merio/internal/business_hours"
@@ -39,6 +38,7 @@ import (
 	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
 	aioperations "github.com/aziz-tb/merio/internal/ai/operations"
 	"github.com/aziz-tb/merio/internal/ai/reranker"
+	airewrite "github.com/aziz-tb/merio/internal/ai/rewrite"
 	"github.com/aziz-tb/merio/internal/ai/runner"
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
 	aibuiltin "github.com/aziz-tb/merio/internal/ai/tools/builtin"
@@ -138,7 +138,7 @@ type App struct {
 	sla              *sla.Manager
 	csat             *csat.Manager
 	view             *view.Manager
-	ai               *aiLegacy.Manager
+	rewrite          *airewrite.Manager
 	aiAgents         *aiagents.Manager
 	aiTools          *aitools.Manager
 	aiToolDispatcher *aitools.Dispatcher
@@ -155,13 +155,13 @@ type App struct {
 	// context FKs to this id. Zero if seeding failed — boot is
 	// expected to fail before that path.
 	systemInboxID int
-	// AI runtime: model catalog (loaded from config/anthropic_models.json)
+	// AI runtime: model catalog (loaded from provider-specific catalog files)
 	// and preset registry (loaded from config/ai_presets.json). Both are
 	// read-only after startup; reload requires app restart in v1.
 	aiCatalog *aicatalog.Catalog
 	aiPresets *aipreset.Registry
-	// LLM provider — nil when no Anthropic API key is configured.
-	// Run endpoint returns 503 in that case.
+	// LLM provider — nil when no provider API key is configured. Run
+	// endpoint returns 503 in that case.
 	aiProvider llm.LLMProvider
 	// Agent runner — nil when aiProvider is nil. The handler checks.
 	agentRunner *runner.Runner
@@ -315,6 +315,7 @@ func main() {
 		i18n                        = initI18n(fs)
 		secretsKEK                  = initSecretsKEK()
 		secretMgr                   = initSecret(db, i18n, secretsKEK)
+		secretResolver              = secret.NewResolver(secretMgr)
 		execRunnerMgr               = initExecRunner(db, execTokenMgr, systemUserID, secretMgr)
 		csat                        = initCSAT(db, i18n)
 		oidc                        = initOIDC(db, settings, i18n)
@@ -340,11 +341,11 @@ func main() {
 		// fast on bad config — see initAIModelCatalog / initAIPresetRegistry.
 		aiCatalogInst     = initAIModelCatalog()
 		aiPresetsInst     = initAIPresetRegistry(aiCatalogInst)
-		aiProviderInst    = initAnthropicProvider(db, aiPresetsInst, aiCatalogInst)
+		aiProviderInst    = initLLMProvider(secretResolver, aiPresetsInst, aiCatalogInst)
 		aiUsageInst       = initAIUsage(db, aiCatalogInst)
 		aiOperationsInst  = initAIOperations(db)
 		systemInboxIDInst = initSystemInboxID(db)
-		detectionMgrInst  = initDetectionManager(aiProviderInst, aiUsageInst, systemInboxIDInst)
+		detectionMgrInst  = initDetectionManager(aiProviderInst, aiPresetsInst, aiUsageInst, systemInboxIDInst)
 		temporalClient    = initTemporal()
 		functionMgr       = initFunction(db, execRunnerMgr, i18n)
 		customerMgr       = initCustomer(db, i18n, settings, functionMgr)
@@ -356,8 +357,8 @@ func main() {
 		// nil-safe — if Voyage key is absent or Redis is down, kb_search
 		// surfaces a clear error at first invocation rather than
 		// crashing the boot.
-		embedProviderInst   = initEmbeddingProvider(aiPresetsInst)
-		rerankProviderInst  = initRerankProvider(aiPresetsInst)
+		embedProviderInst   = initEmbeddingProvider(secretResolver)
+		rerankProviderInst  = initRerankProvider(secretResolver)
 		embeddingsStoreInst = initEmbeddingsStore(db)
 		queryEmbedCacheInst = initQueryEmbeddingCache(rdb)
 		searcherInst        = initSearcher(embeddingsStoreInst, embedProviderInst, rerankProviderInst, queryEmbedCacheInst)
@@ -431,7 +432,7 @@ func main() {
 		knowledge:       initKnowledge(db, i18n),
 		execToken:       execTokenMgr,
 		execRunner:      execRunnerMgr,
-		ai:              initAI(db, i18n),
+		rewrite:         initRewrite(db, i18n),
 		aiAgents:        initAIAgents(db, i18n),
 		aiTools:         initAITools(db, i18n),
 		function:        functionMgr,

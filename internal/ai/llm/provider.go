@@ -3,9 +3,9 @@ package llm
 import "context"
 
 // LLMProvider is the provider-agnostic interface that everything calling
-// an LLM goes through. v1 has two implementations: the Anthropic provider
-// (production) and FakeLLMProvider (tests). Future Bedrock/Azure
-// implementations slot in with no caller-side changes.
+// an LLM goes through. v1 production providers are Anthropic, OpenAI, and
+// Azure; FakeLLMProvider covers tests. Future provider implementations slot
+// in with no caller-side changes.
 //
 // The interface is deliberately small: Complete is the only method
 // callers reach for in v1. StreamComplete is reserved for L5 auto-send
@@ -27,7 +27,8 @@ type LLMProvider interface {
 	// in v1).
 	StreamComplete(ctx context.Context, req CompletionRequest, onChunk func(string)) (CompletionResponse, error)
 
-	// Name returns a stable provider identifier ("anthropic", "fake").
+	// Name returns a stable provider identifier ("anthropic", "openai",
+	// "azure", "fake").
 	// Used in log fields, metric labels, and ai_usage.provider.
 	Name() string
 }

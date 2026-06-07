@@ -1,8 +1,8 @@
 // Package llm defines the provider-agnostic shape of LLM interactions used
 // across the AI runtime: request/response types, content blocks, tool
 // definitions, and the LLMProvider interface. Provider implementations
-// (Anthropic, fakes) live in subpackages and translate this shape to and
-// from their wire format.
+// (Anthropic, OpenAI, Azure, fakes) live in subpackages and translate this
+// shape to and from their wire format.
 package llm
 
 // Purpose enumerates the ways the platform invokes an LLM. Each purpose
@@ -18,15 +18,8 @@ package llm
 type Purpose string
 
 const (
-	// PurposeClassify — short structured-output decisions (spam, language,
+	// PurposeClassification — short structured-output decisions (spam, language,
 	// tag classification). Latency-sensitive, deterministic-leaning.
-	PurposeClassify Purpose = "classify"
-
-	// PurposeClassification — feature-outcome classification (tag
-	// classification on inbound messages, synchronous detection AI
-	// evaluation). Kept distinct from PurposeClassify so cost/usage can be
-	// tracked independently. (Renamed from PurposeTagClassification in
-	// Batch 9 — the generic name fits non-tag detection consumers.)
 	PurposeClassification Purpose = "classification"
 
 	// PurposeSummarize — condensing inbound content into briefings, ticket
@@ -52,6 +45,10 @@ const (
 	// arguments for tool calls (parameter extraction).
 	PurposeExtractParameters Purpose = "extract_parameters"
 
+	// PurposeRewrite — reply-box rewrite actions such as make-polite,
+	// make-shorter, and similar user-triggered composer transformations.
+	PurposeRewrite Purpose = "rewrite"
+
 	// PurposeEmbed — vector embedding generation (Voyage). Does NOT fit
 	// the LLM preset model: embedding has no temperature, no
 	// max_tokens, no chat shape. The preset registry's validation
@@ -65,7 +62,6 @@ const (
 // startup, and the agent handler uses it to validate preset_overrides
 // keys at agent save time.
 var KnownPurposes = []Purpose{
-	PurposeClassify,
 	PurposeClassification,
 	PurposeSummarize,
 	PurposeReason,
@@ -73,6 +69,7 @@ var KnownPurposes = []Purpose{
 	PurposeRedactPII,
 	PurposeBrief,
 	PurposeExtractParameters,
+	PurposeRewrite,
 	PurposeEmbed,
 }
 

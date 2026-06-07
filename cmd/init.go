@@ -18,14 +18,16 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/embeddings"
 	voyageembed "github.com/aziz-tb/merio/internal/ai/embeddings/voyage"
 	aiexecutions "github.com/aziz-tb/merio/internal/ai/executions"
-	aiLegacy "github.com/aziz-tb/merio/internal/ai/legacy"
 	"github.com/aziz-tb/merio/internal/ai/llm"
 	"github.com/aziz-tb/merio/internal/ai/llm/anthropic"
+	azurellm "github.com/aziz-tb/merio/internal/ai/llm/azure"
 	aicatalog "github.com/aziz-tb/merio/internal/ai/llm/catalog"
+	openaillm "github.com/aziz-tb/merio/internal/ai/llm/openai"
 	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
 	aioperations "github.com/aziz-tb/merio/internal/ai/operations"
 	"github.com/aziz-tb/merio/internal/ai/reranker"
 	voyagerank "github.com/aziz-tb/merio/internal/ai/reranker/voyage"
+	airewrite "github.com/aziz-tb/merio/internal/ai/rewrite"
 	"github.com/aziz-tb/merio/internal/ai/runner"
 	runnerevents "github.com/aziz-tb/merio/internal/ai/runner/events"
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
@@ -897,27 +899,45 @@ func initSystemInboxID(db *sqlx.DB) int {
 	return id
 }
 
-// initAIModelCatalog loads config/anthropic_models.json into an in-memory
-// catalog used to validate preset model references at startup. Path is
-// configurable via `ai.models_catalog_path` (defaults to
-// config/anthropic_models.json relative to the working directory).
+// initAIModelCatalog loads provider model catalogs into an in-memory catalog
+// used to validate preset model references at startup. The legacy
+// `ai.models_catalog_path` override still loads a single Anthropic-shaped file;
+// by default we load config/anthropic_models.json, config/openai_models.json,
+// and config/azure_models.json.
 //
 // Missing or malformed catalog is fatal: a typo in a model id should
 // crash startup, not silently fall back to a default.
 func initAIModelCatalog() *aicatalog.Catalog {
 	path := ko.String("ai.models_catalog_path")
-	if path == "" {
-		path = "config/anthropic_models.json"
+	var (
+		cat *aicatalog.Catalog
+		err error
+		src string
+	)
+	if path != "" {
+		if abs, err := filepath.Abs(path); err == nil {
+			path = abs
+		}
+		cat, err = aicatalog.Load(path)
+		src = path
+	} else {
+		paths := map[string]string{
+			"anthropic": "config/anthropic_models.json",
+			"openai":    "config/openai_models.json",
+			"azure":     "config/azure_models.json",
+		}
+		for provider, p := range paths {
+			if abs, err := filepath.Abs(p); err == nil {
+				paths[provider] = abs
+			}
+		}
+		cat, err = aicatalog.LoadMulti(paths)
+		src = "config/anthropic_models.json, config/openai_models.json, config/azure_models.json"
 	}
-	abs, err := filepath.Abs(path)
-	if err == nil {
-		path = abs
-	}
-	cat, err := aicatalog.Load(path)
 	if err != nil {
 		log.Fatalf("error loading AI model catalog: %v", err)
 	}
-	colorlog.Green("AI model catalog: %d models loaded from %s", len(cat.IDs()), path)
+	colorlog.Green("AI model catalog: %d models loaded from %s", len(cat.IDs()), src)
 	return cat
 }
 
@@ -944,47 +964,86 @@ func initAIPresetRegistry(cat *aicatalog.Catalog) *aipreset.Registry {
 	return reg
 }
 
-// initAnthropicProvider builds the production llm.LLMProvider against
-// Anthropic. Resolution order for the API key:
-//
-//  1. config/ai_presets.json → provider_keys.anthropic (platform key,
-//     set by engineering at deploy time)
-//  2. ai_providers row WHERE provider='anthropic' (encrypted, fallback
-//     path for when a per-tenant secrets UI lands)
-//
-// Returns nil + warns when neither is set. The agent runner is nil in
-// that case; the run endpoint returns 503 at run time.
-func initAnthropicProvider(db *sqlx.DB, registry *aipreset.Registry, cat *aicatalog.Catalog) llm.LLMProvider {
-	apiKey := registry.ProviderKey("anthropic")
-	source := "config/ai_presets.json"
+// initLLMProvider builds the router-backed production llm.LLMProvider.
+func initLLMProvider(resolver *secret.Resolver, registry *aipreset.Registry, cat *aicatalog.Catalog) llm.LLMProvider {
+	providers := make(map[string]llm.LLMProvider)
+	ctx := context.Background()
+
+	apiKey := resolver.Resolve(ctx, "ANTHROPIC_API_KEY")
 	if apiKey == "" {
-		// Fall back to the DB-stored key.
-		encKey := ko.MustString("app.encryption_key")
-		k, err := anthropic.LookupAPIKey(db, encKey)
+		colorlog.Red("ANTHROPIC_API_KEY not set in secrets/env — Anthropic presets are unavailable")
+	} else {
+		lo := initLogger("anthropic")
+		p, err := anthropic.New(anthropic.Opts{
+			APIKey:   apiKey,
+			Catalog:  cat,
+			Registry: registry,
+			Lo:       lo,
+		})
 		if err != nil {
-			log.Fatalf("error reading Anthropic api key from ai_providers: %v", err)
+			log.Fatalf("error initializing Anthropic provider: %v", err)
 		}
-		if k != "" {
-			apiKey = k
-			source = "ai_providers row"
-		}
+		providers["anthropic"] = p
+		colorlog.Green("Anthropic provider: ready (key from secrets/env)")
 	}
-	if apiKey == "" {
-		colorlog.Red("Anthropic API key not set — set provider_keys.anthropic in config/ai_presets.json (or the ai_providers row) to enable the agent runner")
+
+	openAIKey := resolver.Resolve(ctx, "OPENAI_API_KEY")
+	if openAIKey == "" {
+		colorlog.Red("OPENAI_API_KEY not set in secrets/env — OpenAI presets are unavailable")
+	} else {
+		p, err := openaillm.New(openaillm.Opts{
+			APIKey:   openAIKey,
+			Resolver: resolver,
+			Catalog:  cat,
+			Registry: registry,
+			Lo:       initLogger("openai"),
+		})
+		if err != nil {
+			log.Fatalf("error initializing OpenAI provider: %v", err)
+		}
+		providers["openai"] = p
+		colorlog.Green("OpenAI provider: ready (key from secrets/env)")
+	}
+
+	azureKey := resolver.Resolve(ctx, "AZURE_API_KEY")
+	azureEndpoint := resolver.Resolve(ctx, "AZURE_FOUNDRY_ENDPOINT")
+	if azureKey == "" || azureEndpoint == "" {
+		colorlog.Red("AZURE_API_KEY or AZURE_FOUNDRY_ENDPOINT not set in secrets/env — Azure presets are unavailable")
+	} else {
+		p, err := azurellm.New(azurellm.Opts{
+			APIKey:   azureKey,
+			Endpoint: azureEndpoint,
+			Resolver: resolver,
+			Catalog:  cat,
+			Registry: registry,
+			Lo:       initLogger("azure"),
+		})
+		if err != nil {
+			log.Fatalf("error initializing Azure provider: %v", err)
+		}
+		providers["azure"] = p
+		colorlog.Green("Azure provider: ready (key and endpoint from secrets/env)")
+	}
+
+	if len(providers) == 0 {
+		colorlog.Red("No LLM providers configured — set ANTHROPIC_API_KEY, OPENAI_API_KEY, or Azure provider secrets/env vars")
 		return nil
 	}
-	lo := initLogger("anthropic")
-	p, err := anthropic.New(anthropic.Opts{
-		APIKey:   apiKey,
-		Catalog:  cat,
-		Registry: registry,
-		Lo:       lo,
+	r, err := llm.NewRouter(llm.RouterOpts{
+		Providers: providers,
+		ProviderForPreset: func(slug string) (string, bool) {
+			pre, ok := registry.Get(slug)
+			if !ok {
+				return "", false
+			}
+			return pre.Provider, true
+		},
 	})
 	if err != nil {
-		log.Fatalf("error initializing Anthropic provider: %v", err)
+		log.Fatalf("error initializing LLM router: %v", err)
 	}
-	colorlog.Green("Anthropic provider: ready (key from %s)", source)
-	return p
+	colorlog.Green("LLM router: ready (%d provider(s))", len(providers))
+	return r
 }
 
 // initAgentRunner wires up the agent runner. Returns nil when the
@@ -1081,13 +1140,14 @@ func (a *runnerUsageAdapter) Record(ctx context.Context, in runner.UsageRow) err
 	})
 }
 
-func initDetectionManager(provider llm.LLMProvider, usageMgr *aiusage.Manager, systemInboxID int) *detection.Manager {
+func initDetectionManager(provider llm.LLMProvider, presets *aipreset.Registry, usageMgr *aiusage.Manager, systemInboxID int) *detection.Manager {
 	lo := initLogger("detection")
 	return detection.New(detection.Opts{
-		Lo:            lo,
-		LLMProvider:   provider,
-		UsageMgr:      usageMgr,
-		SystemInboxID: systemInboxID,
+		Lo:             lo,
+		LLMProvider:    provider,
+		PresetRegistry: presets,
+		UsageMgr:       usageMgr,
+		SystemInboxID:  systemInboxID,
 	})
 }
 
@@ -1449,17 +1509,16 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 	return manager
 }
 
-// initAI inits AI manager.
-func initAI(db *sqlx.DB, i18n *i18n.I18n) *aiLegacy.Manager {
-	lo := initLogger("ai")
-	m, err := aiLegacy.New(aiLegacy.Opts{
-		DB:            db,
-		Lo:            lo,
-		I18n:          i18n,
-		EncryptionKey: ko.MustString("app.encryption_key"),
+// initRewrite inits the reply-box rewrite prompt manager.
+func initRewrite(db *sqlx.DB, i18n *i18n.I18n) *airewrite.Manager {
+	lo := initLogger("rewrite")
+	m, err := airewrite.New(airewrite.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
 	})
 	if err != nil {
-		log.Fatalf("error initializing AI manager: %v", err)
+		log.Fatalf("error initializing rewrite manager: %v", err)
 	}
 	return m
 }
@@ -1611,19 +1670,21 @@ func getLogLevel(lvl string) logf.Level {
 }
 
 // initEmbeddingProvider builds the Voyage embeddings.Provider. Returns
-// nil when no Voyage API key is configured — the main app stays up,
-// but kb_search returns "RAG subsystem not initialized" until the key
-// is set. Wire the key in config/ai_presets.json provider_keys.voyage.
-func initEmbeddingProvider(reg *aipreset.Registry) embeddings.Provider {
-	apiKey := reg.ProviderKey("voyage")
+// nil when no Voyage API key is configured — the main app stays up, but
+// kb_search returns "RAG subsystem not initialized" until the key is set.
+func initEmbeddingProvider(resolver *secret.Resolver) embeddings.Provider {
+	apiKey := resolver.Resolve(context.Background(), "VOYAGE_API_KEY")
 	if apiKey == "" {
-		colorlog.Red("Voyage API key not set (provider_keys.voyage in config/ai_presets.json) — kb_search hybrid search disabled")
+		colorlog.Red("VOYAGE_API_KEY not set in secrets/env — kb_search hybrid search disabled")
 		return nil
 	}
+	endpoint := resolver.Resolve(context.Background(), "VOYAGE_ENDPOINT")
 	lo := initLogger("voyage-embeddings")
 	p, err := voyageembed.New(voyageembed.Opts{
-		APIKey: apiKey,
-		Lo:     lo,
+		APIKey:   apiKey,
+		Endpoint: endpoint,
+		Resolver: resolver,
+		Lo:       lo,
 	})
 	if err != nil {
 		log.Fatalf("error initializing Voyage embeddings provider: %v", err)
@@ -1635,8 +1696,8 @@ func initEmbeddingProvider(reg *aipreset.Registry) embeddings.Provider {
 // initRerankProvider builds the Voyage reranker.Provider. Shares the
 // same API key as the embedding provider. Returns nil when the key is
 // absent (kb_search degrades to RRF-order fallback).
-func initRerankProvider(reg *aipreset.Registry) reranker.Provider {
-	apiKey := reg.ProviderKey("voyage")
+func initRerankProvider(resolver *secret.Resolver) reranker.Provider {
+	apiKey := resolver.Resolve(context.Background(), "VOYAGE_API_KEY")
 	if apiKey == "" {
 		return nil
 	}

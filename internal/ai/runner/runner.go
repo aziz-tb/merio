@@ -838,7 +838,7 @@ func (r *Runner) recordUsage(
 		TraceID:             req.TraceID,
 		CallSequenceInTrace: callSeq,
 		InboxID:             req.InboxID,
-		Provider:            "anthropic", // v1 is Anthropic-only; widens when the multi-provider abstraction ships
+		Provider:            coalesceString(resp.Provider, resp.Observability.Provider, pres.Provider),
 		Model:               coalesceString(resp.Model, pres.Model),
 		PresetSlug:          coalesceString(resp.PresetUsed, pres.Slug),
 		Purpose:             string(llm.PurposeReason),
@@ -897,17 +897,21 @@ func hasCompletionResponsePayload(resp llm.CompletionResponse) bool {
 		resp.Usage.InputTokens != 0 ||
 		resp.Usage.OutputTokens != 0 ||
 		resp.Usage.CachedTokens != 0 ||
+		resp.Provider != "" ||
 		resp.PresetUsed != "" ||
 		resp.Model != "" ||
+		resp.Observability.Provider != "" ||
 		resp.Observability.ProviderRequestID != "" ||
 		len(resp.Observability.ProviderMetadata) > 0
 }
 
-func coalesceString(primary, fallback string) string {
-	if primary != "" {
-		return primary
+func coalesceString(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
 	}
-	return fallback
+	return ""
 }
 
 // outcomeForError maps a provider error to one of the ai_usage outcome
