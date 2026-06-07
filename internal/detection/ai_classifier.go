@@ -2,6 +2,8 @@ package detection
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,6 +18,13 @@ func (m *Manager) evaluateAI(ctx context.Context, ai *AIClassifier, ec Evaluatio
 	}
 	if ai == nil || strings.TrimSpace(ai.Prompt) == "" {
 		return EvaluationResult{Matched: false, Reasoning: "empty AI prompt"}, nil
+	}
+	if m.presetRegistry == nil {
+		return EvaluationResult{}, errors.New("detection: preset registry is not configured")
+	}
+	pre, err := m.presetRegistry.Resolve(llm.PurposeClassification, nil)
+	if err != nil {
+		return EvaluationResult{}, fmt.Errorf("detection: resolve classification preset: %w", err)
 	}
 
 	toolDef := llm.ToolDef{
@@ -35,7 +44,7 @@ func (m *Manager) evaluateAI(ctx context.Context, ai *AIClassifier, ec Evaluatio
 	startedAt := time.Now()
 	resp, err := m.llmProvider.Complete(ctx, llm.CompletionRequest{
 		Purpose:    llm.PurposeClassification,
-		PresetSlug: m.presetSlug,
+		PresetSlug: pre.Slug,
 		Messages: []llm.Message{{
 			Role: llm.RoleUser,
 			Content: []llm.ContentBlock{{
@@ -119,6 +128,15 @@ func buildTicketSummary(ec EvaluationContext) string {
 	return b.String()
 }
 
+func coalesceString(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // recordUsage writes one ai_usage row for a successful AI-detection LLM
 // call. Best-effort: a nil usage manager, zero system inbox, or write
 // error is logged and swallowed — auditing must never break detection.
@@ -133,7 +151,11 @@ func (m *Manager) recordUsage(ctx context.Context, ec EvaluationContext, resp ll
 
 	presetSlug := resp.PresetUsed
 	if presetSlug == "" {
-		presetSlug = m.presetSlug
+		if m.presetRegistry != nil {
+			if pre, err := m.presetRegistry.Resolve(llm.PurposeClassification, nil); err == nil {
+				presetSlug = pre.Slug
+			}
+		}
 	}
 
 	row := usage.Row{
@@ -141,7 +163,7 @@ func (m *Manager) recordUsage(ctx context.Context, ec EvaluationContext, resp ll
 		TraceID:             traceID,
 		CallSequenceInTrace: 1,
 		InboxID:             m.systemInboxID,
-		Provider:            "anthropic",
+		Provider:            coalesceString(resp.Provider, resp.Observability.Provider, "anthropic"),
 		Model:               resp.Model,
 		PresetSlug:          presetSlug,
 		Purpose:             string(llm.PurposeClassification),

@@ -447,9 +447,7 @@
   "agent.generateApiKey": "API की निर्माण करा",
   "agent.new": "नवीन एजंट",
   "agent.selectAvailabilityStatus": "उपलब्धता स्थिती निवडा",
-  "ai.apiKey.description": "{provider} API की सेट केलेली नाही किंवा अवैध आहे. AI वैशिष्ट्ये वापरण्यासाठी वैध API की प्रविष्ट करा.",
   "ai.apiKeyNotSet": "{provider} API की सेट केलेली नाही. कृपया तुमच्या प्रशासकांना ते सेट करण्यास सांगा",
-  "ai.enterOpenAIAPIKey": "OpenAI API की प्रविष्ट करा",
   "auth.backToLogin": "लॉगिनवर परत जा",
   "auth.checkEmailForReset": "कृपया रीसेट लिंकसाठी तुमचा ईमेल तपासा.",
   "auth.confirmPassword": "पासवर्ड पुष्टी करा",
@@ -1131,7 +1129,7 @@
   "admin.ai.tool.noSdkBadge": "no SDK",
   "admin.ai.tool.packagesJsDisabled": "JavaScript packages not supported in v1",
   "admin.ai.preset.placeholder": "Select a preset",
-  "admin.ai.preset.defaultLabelPrefix": "Default — uses platform default",
+  "admin.ai.preset.defaultLabelPrefix": "Platform default",
   "admin.ai.agent.toolsPicker.internalHeading": "Internal capabilities",
   "admin.ai.agent.toolsPicker.internalHelp": "Read-only platform tools (get_customer_data, get_conversation_history, …). Always available regardless of verification; visibility is filtered per-call.",
   "admin.ai.agent.toolsPicker.internalEmpty": "No internal capabilities registered.",
@@ -1291,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "ज्ञानसंग्रहात शोध घेतला",
   "tools.get_customer_data.label": "ग्राहकाची माहिती पाहिली",
-  "tools.get_conversation_history.label": "मागील संभाषणे तपासली"
+  "tools.get_conversation_history.label": "मागील संभाषणे तपासली",
+  "conversation.collapse": "संकुचित करा",
+  "conversation.systemEventsOn": "{date} रोजी {count} सिस्टम इव्हेंट",
+  "conversation.systemEventsBetween": "{firstDate} आणि {lastDate} दरम्यान {count} सिस्टम इव्हेंट"
 }

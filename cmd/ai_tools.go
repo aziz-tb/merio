@@ -252,6 +252,8 @@ func handleInvokeAITool(r *fastglue.Request) error {
 			Knowledge:         app.knowledge,
 			Conversation:      app.conversation,
 			User:              app.user,
+			Customer:          app.customer,
+			Contract:          app.contract,
 		}
 	}
 

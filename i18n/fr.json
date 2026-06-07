@@ -447,9 +447,7 @@
   "agent.generateApiKey": "Générer une clé API",
   "agent.new": "Nouvel agent",
   "agent.selectAvailabilityStatus": "Sélectionner le statut de disponibilité",
-  "ai.apiKey.description": "{provider} La clé API n'est pas définie ou n'est pas valide. Veuillez saisir une clé API valide pour utiliser les fonctionnalités de l'IA.",
   "ai.apiKeyNotSet": "{provider} La clé API n'est pas définie, veuillez demander à votre administrateur de la définir",
-  "ai.enterOpenAIAPIKey": "Saisir la clé API OpenAI",
   "auth.backToLogin": "Retour à la page de connexion",
   "auth.checkEmailForReset": "Vérifie tes e-mails pour trouver le lien de réinitialisation de ton mot de passe.",
   "auth.confirmPassword": "Confirmez le mot de passe",
@@ -1131,7 +1129,7 @@
   "admin.ai.tool.noSdkBadge": "no SDK",
   "admin.ai.tool.packagesJsDisabled": "JavaScript packages not supported in v1",
   "admin.ai.preset.placeholder": "Select a preset",
-  "admin.ai.preset.defaultLabelPrefix": "Default — uses platform default",
+  "admin.ai.preset.defaultLabelPrefix": "Platform default",
   "admin.ai.agent.toolsPicker.internalHeading": "Internal capabilities",
   "admin.ai.agent.toolsPicker.internalHelp": "Read-only platform tools (get_customer_data, get_conversation_history, …). Always available regardless of verification; visibility is filtered per-call.",
   "admin.ai.agent.toolsPicker.internalEmpty": "No internal capabilities registered.",
@@ -1291,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "A recherché dans la base de connaissances",
   "tools.get_customer_data.label": "A consulté les données du client",
-  "tools.get_conversation_history.label": "A vérifié les conversations précédentes"
+  "tools.get_conversation_history.label": "A vérifié les conversations précédentes",
+  "conversation.collapse": "Réduire",
+  "conversation.systemEventsOn": "{count} événements système le {date}",
+  "conversation.systemEventsBetween": "{count} événements système entre le {firstDate} et le {lastDate}"
 }

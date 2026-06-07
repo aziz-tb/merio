@@ -14,7 +14,9 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/embeddings"
 	"github.com/zerodha/logf"
 
+	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/customer"
 	"github.com/aziz-tb/merio/internal/knowledge"
 	"github.com/aziz-tb/merio/internal/user"
 )
@@ -111,6 +113,8 @@ type ToolRuntimeContext struct {
 	Knowledge    *knowledge.Manager
 	Conversation *conversation.Manager
 	User         *user.Manager
+	Customer     *customer.Manager
+	Contract     *contract.Manager
 
 	// Future hooks (don't build until needed):
 	//   DB           *sqlx.DB                 — raw query escape hatch

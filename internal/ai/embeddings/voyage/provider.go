@@ -6,9 +6,8 @@
 //
 // API reference: https://docs.voyageai.com/docs/embeddings
 //
-// Authentication: bearer token via Authorization header. Key resolved at
-// startup via the preset registry's provider_keys.voyage (preferred) or
-// the VOYAGE_API_KEY env var (fallback).
+// Authentication: bearer token via Authorization header. Key and endpoint are
+// resolved through secret.Resolver when configured, falling back to static Opts.
 package voyage
 
 import (
@@ -25,6 +24,8 @@ import (
 	"github.com/sony/gobreaker"
 	"github.com/zerodha/logf"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/aziz-tb/merio/internal/secret"
 )
 
 const (
@@ -53,15 +54,16 @@ const (
 
 	// Retry policy: 3 total attempts (initial + 2 retries), 1s and 3s
 	// backoff. Aligned with the Anthropic provider's policy.
-	retryAttempts  = 3
-	retryBackoff1  = 1 * time.Second
-	retryBackoff2  = 3 * time.Second
+	retryAttempts = 3
+	retryBackoff1 = 1 * time.Second
+	retryBackoff2 = 3 * time.Second
 )
 
 // Provider implements embeddings.Provider against Voyage's REST API.
 type Provider struct {
 	apiKey       string
 	endpoint     string
+	resolver     *secret.Resolver
 	model        string
 	dimensions   int
 	maxBatch     int
@@ -78,6 +80,7 @@ type Provider struct {
 type Opts struct {
 	APIKey       string
 	Endpoint     string
+	Resolver     *secret.Resolver
 	Model        string
 	Dimensions   int
 	Concurrency  int
@@ -91,7 +94,7 @@ type Opts struct {
 // are missing — boot-time loud failure is preferred to silent
 // half-config.
 func New(opt Opts) (*Provider, error) {
-	if opt.APIKey == "" {
+	if opt.APIKey == "" && opt.Resolver == nil {
 		return nil, errors.New("voyage: APIKey is required")
 	}
 	if opt.Lo == nil {
@@ -133,6 +136,7 @@ func New(opt Opts) (*Provider, error) {
 	return &Provider{
 		apiKey:       opt.APIKey,
 		endpoint:     opt.Endpoint,
+		resolver:     opt.Resolver,
 		model:        opt.Model,
 		dimensions:   opt.Dimensions,
 		maxBatch:     opt.MaxBatch,
@@ -222,12 +226,12 @@ func (p *Provider) callWithRetry(ctx context.Context, batch []string) ([][]float
 }
 
 type embedRequest struct {
-	Input          []string `json:"input"`
-	Model          string   `json:"model"`
-	InputType      string   `json:"input_type,omitempty"`
-	Truncation     bool     `json:"truncation,omitempty"`
-	OutputDimension int     `json:"output_dimension,omitempty"`
-	OutputDtype    string   `json:"output_dtype,omitempty"`
+	Input           []string `json:"input"`
+	Model           string   `json:"model"`
+	InputType       string   `json:"input_type,omitempty"`
+	Truncation      bool     `json:"truncation,omitempty"`
+	OutputDimension int      `json:"output_dimension,omitempty"`
+	OutputDtype     string   `json:"output_dtype,omitempty"`
 }
 
 type embedResponse struct {
@@ -256,23 +260,36 @@ func (e *apiError) Error() string {
 // response parsing + status-based error classification.
 func (p *Provider) callOnce(ctx context.Context, batch []string) ([][]float32, error) {
 	body := embedRequest{
-		Input:          batch,
-		Model:          p.model,
-		InputType:      "document",
-		Truncation:     true,
+		Input:           batch,
+		Model:           p.model,
+		InputType:       "document",
+		Truncation:      true,
 		OutputDimension: p.dimensions,
-		OutputDtype:    "float",
+		OutputDtype:     "float",
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("voyage: marshal: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint, bytes.NewReader(raw))
+	apiKey := p.apiKey
+	endpoint := p.endpoint
+	if p.resolver != nil {
+		if resolved := p.resolver.Resolve(ctx, "VOYAGE_API_KEY"); resolved != "" {
+			apiKey = resolved
+		}
+		if resolved := p.resolver.Resolve(ctx, "VOYAGE_ENDPOINT"); resolved != "" {
+			endpoint = resolved
+		}
+	}
+	if apiKey == "" {
+		return nil, errors.New("voyage: API key is empty")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("voyage: new request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := p.httpClient.Do(req)

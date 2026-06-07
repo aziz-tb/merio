@@ -72,7 +72,7 @@ func sendSecretError(r *fastglue.Request, app *App, err error) error {
 func secretErrorResponse(app *App, err error) (int, string, string) {
 	switch {
 	case errors.Is(err, secret.ErrInvalidName):
-		return fasthttp.StatusBadRequest, "secret name must match ^[a-z][a-z0-9_]{0,63}$", envelope.InputError
+		return fasthttp.StatusBadRequest, "secret name must match ^[A-Za-z][A-Za-z0-9_]{0,63}$", envelope.InputError
 	case errors.Is(err, secret.ErrValueTooLarge):
 		return fasthttp.StatusBadRequest, "secret value exceeds 5 KB", envelope.InputError
 	case errors.Is(err, secret.ErrSecretExists):

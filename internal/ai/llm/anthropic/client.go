@@ -152,7 +152,7 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 	if err != nil {
 		return llm.CompletionResponse{}, err
 	}
-	if modelMeta, ok := p.catalog.Get(pre.Model); ok {
+	if modelMeta, ok := p.catalog.Get(pre.Provider, pre.Model); ok {
 		if req.ThinkingEnabled {
 			if thinking, ok := thinkingConfigForModel(modelMeta); ok {
 				params.Thinking = thinking

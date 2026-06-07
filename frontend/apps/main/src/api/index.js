@@ -284,8 +284,8 @@ const listAIAgentRuns = (id, params) =>
 // agent edit form's tool picker (added in chunk 9).
 const getAIInternalCapabilities = () => http.get('/api/v1/ai/internal-capabilities')
 
-// List enabled reasoning presets (config/ai_presets.json). Consumed by
-// the agent edit form's preset-overrides picker.
+// List AI presets (config/ai_presets.json). Consumed by the agent edit
+// form's preset-overrides picker, which filters by purpose and enabled state.
 const getAIPresets = () => http.get('/api/v1/ai/presets')
 
 // Composer tab — list the latest composer-source run per enabled agent
@@ -650,11 +650,6 @@ const aiCompletion = (data) => http.post('/api/v1/ai/completion', data, {
     'Content-Type': 'application/json'
   }
 })
-const updateAIProvider = (data) => http.put('/api/v1/ai/provider', data, {
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
   headers: {
@@ -812,7 +807,6 @@ export default {
   updateAutomationRule,
   updateAutomationRuleWeights,
   updateAutomationRulesExecutionMode,
-  updateAIProvider,
   createAutomationRule,
   toggleAutomationRule,
   deleteAutomationRule,

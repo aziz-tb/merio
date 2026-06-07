@@ -29,7 +29,7 @@
           </Label>
         </div>
         <div class="max-w-md">
-          <PresetSelect :model-value="reasonPreset" @update:modelValue="onPresetChange" />
+          <PresetSelect purpose="reason" :model-value="reasonPreset" @update:modelValue="onPresetChange" />
         </div>
         <p class="text-xs text-muted-foreground">
           {{ t('admin.ai.agent.presetOverridesHelp') }}

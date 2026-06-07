@@ -10,21 +10,14 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm/catalog"
 )
 
-// Registry is the in-memory set of presets, purpose→preset mapping,
-// and platform-level provider API keys, loaded from
-// config/ai_presets.json. After Load it's read-only (concurrent
-// Resolve / Has / ProviderKey calls are safe without locks).
-//
-// Why provider keys live here: the Anthropic API key is a platform
-// concern, not a tenant-configurable thing — same store as the rest of
-// the AI runtime knobs that engineering owns. Operators set it in
-// config/ai_presets.json once at deployment; per-tenant key management
-// is deferred until there's a real second-provider story.
+// Registry is the in-memory set of presets and purpose→preset mappings loaded
+// from config/ai_presets.json. After Load it's read-only (concurrent Resolve /
+// Has calls are safe without locks). Provider API keys are resolved by
+// secret.Resolver, not by the preset registry.
 type Registry struct {
 	presets         map[string]Preset // slug → preset
 	purposeMappings map[llm.Purpose]string
-	providerKeys    map[string]string // provider name → API key
-	order           []string          // slugs in file order, for deterministic listing
+	order           []string // slugs in file order, for deterministic listing
 }
 
 // presetsFile mirrors config/ai_presets.json's top-level shape.
@@ -32,10 +25,12 @@ type presetsFile struct {
 	Comment         string            `json:"_comment,omitempty"`
 	Presets         []Preset          `json:"presets"`
 	PurposeMappings map[string]string `json:"purpose_mappings"`
-	// ProviderKeys is an optional map of provider name → API key.
-	// Anthropic's key lives here in v1. Empty / missing → the runner
-	// returns 503 at run time with a "configure the key" message.
-	ProviderKeys map[string]string `json:"provider_keys,omitempty"`
+}
+
+var allowedProviders = map[string]struct{}{
+	"anthropic": {},
+	"openai":    {},
+	"azure":     {},
 }
 
 // Load reads config/ai_presets.json at path and validates it against the
@@ -44,10 +39,12 @@ type presetsFile struct {
 //
 //   - presets is non-empty
 //   - every preset has a non-empty unique slug
-//   - every preset's provider is "anthropic" (v1)
+//   - every preset's provider is one of anthropic, openai, azure
 //   - every preset's model exists in the catalog
 //   - temperature in [0, 2]; max_tokens > 0 and ≤ catalog max_output_tokens
+//   - caching_enabled only true when the model supports prompt caching
 //   - caching_extended_ttl only true when the model supports it (catalog flag)
+//   - every visibility entry is a known llm.Purpose
 //   - purpose_mappings covers exactly llm.KnownPurposes
 //   - every mapped slug exists in presets
 //   - every mapped slug references an enabled preset
@@ -82,19 +79,22 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 		if p.Name == "" {
 			return nil, fmt.Errorf("preset: %s presets[%q] has empty name", source, p.Slug)
 		}
-		if p.Provider != "anthropic" {
-			return nil, fmt.Errorf("preset: %s presets[%q] provider %q unsupported (v1: anthropic only)", source, p.Slug, p.Provider)
+		if _, ok := allowedProviders[p.Provider]; !ok {
+			return nil, fmt.Errorf("preset: %s presets[%q] provider %q unsupported (allowed: anthropic, openai, azure)", source, p.Slug, p.Provider)
 		}
 		if p.Model == "" {
 			return nil, fmt.Errorf("preset: %s presets[%q] has empty model", source, p.Slug)
 		}
 		if cat != nil {
-			m, ok := cat.Get(p.Model)
+			m, ok := cat.Get(p.Provider, p.Model)
 			if !ok {
-				return nil, fmt.Errorf("preset: %s presets[%q] model %q not in catalog (known: %v)", source, p.Slug, p.Model, cat.IDs())
+				return nil, fmt.Errorf("preset: %s presets[%q] provider/model %q/%q not in catalog (known: %v)", source, p.Slug, p.Provider, p.Model, cat.IDs())
 			}
 			if p.MaxTokens > 0 && p.MaxTokens > m.MaxOutputTokens {
 				return nil, fmt.Errorf("preset: %s presets[%q] max_tokens=%d exceeds model %q max_output_tokens=%d", source, p.Slug, p.MaxTokens, p.Model, m.MaxOutputTokens)
+			}
+			if p.CachingEnabled && !m.SupportsCaching {
+				return nil, fmt.Errorf("preset: %s presets[%q] caching_enabled=true but model %q does not support prompt caching", source, p.Slug, p.Model)
 			}
 			if p.CachingExtendedTTL && !m.SupportsExtendedCaching {
 				return nil, fmt.Errorf("preset: %s presets[%q] caching_extended_ttl=true but model %q does not support extended caching", source, p.Slug, p.Model)
@@ -105,6 +105,11 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 		}
 		if p.MaxTokens <= 0 {
 			return nil, fmt.Errorf("preset: %s presets[%q] max_tokens must be > 0 (got %d)", source, p.Slug, p.MaxTokens)
+		}
+		for _, v := range p.Visibility {
+			if !llm.IsKnownPurpose(v) {
+				return nil, fmt.Errorf("preset: %s presets[%q] visibility %q is not a known purpose (known: %v)", source, p.Slug, v, knownPurposeStrings())
+			}
 		}
 		presets[p.Slug] = p
 		order = append(order, p.Slug)
@@ -145,43 +150,11 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 		mappings[llm.Purpose(keyRaw)] = slug
 	}
 
-	// Provider keys — pass through, normalize to lowercase keys so
-	// "Anthropic" and "anthropic" both work in the config file.
-	keys := make(map[string]string, len(f.ProviderKeys))
-	for k, v := range f.ProviderKeys {
-		keys[normalizeProviderName(k)] = v
-	}
-
 	return &Registry{
 		presets:         presets,
 		purposeMappings: mappings,
-		providerKeys:    keys,
 		order:           order,
 	}, nil
-}
-
-// normalizeProviderName lowercases the provider name so lookups are
-// case-insensitive (mirrors the SDK convention).
-func normalizeProviderName(name string) string {
-	out := make([]byte, len(name))
-	for i := 0; i < len(name); i++ {
-		c := name[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		out[i] = c
-	}
-	return string(out)
-}
-
-// ProviderKey returns the API key for the named provider, or "" when
-// unconfigured. Used by initAnthropicProvider at boot time; the runner
-// returns 503 when this is empty.
-func (r *Registry) ProviderKey(provider string) string {
-	if r == nil {
-		return ""
-	}
-	return r.providerKeys[normalizeProviderName(provider)]
 }
 
 // Resolve returns the preset to use for the given purpose, applying the
@@ -254,6 +227,22 @@ func (r *Registry) List() []Preset {
 	return out
 }
 
+// PurposesForPreset returns the configured purpose names that currently map to
+// slug. A preset can serve multiple purposes, so callers should treat the
+// result as metadata rather than a single category.
+func (r *Registry) PurposesForPreset(slug string) []llm.Purpose {
+	if r == nil {
+		return nil
+	}
+	out := make([]llm.Purpose, 0)
+	for _, purpose := range llm.KnownPurposes {
+		if r.purposeMappings[purpose] == slug {
+			out = append(out, purpose)
+		}
+	}
+	return out
+}
+
 // Slugs returns all preset slugs in file order. Helper for error messages
 // that want to surface the valid options.
 func (r *Registry) Slugs() []string {
@@ -263,16 +252,6 @@ func (r *Registry) Slugs() []string {
 	out := make([]string, len(r.order))
 	copy(out, r.order)
 	return out
-}
-
-// PurposeMapping returns the configured slug for purpose, ignoring any
-// agent override. Useful for diagnostics and admin pages.
-func (r *Registry) PurposeMapping(purpose llm.Purpose) (string, bool) {
-	if r == nil {
-		return "", false
-	}
-	slug, ok := r.purposeMappings[purpose]
-	return slug, ok
 }
 
 func knownPurposeStrings() []string {

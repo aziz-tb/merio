@@ -120,7 +120,7 @@
         </Collapsible>
 
         <!-- Information -->
-        <Collapsible defaultOpen class="group/section border-t border-border pt-3">
+        <Collapsible class="group/section border-t border-border pt-3">
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">
             <span class="flex items-center gap-2">
               <Ticket class="size-4" /> 
@@ -136,7 +136,6 @@
         <!-- Contact attributes -->
         <Collapsible
           v-if="customAttributeStore.contactAttributeOptions.length > 0"
-          defaultOpen
           class="group/section border-t border-border pt-3"
         >
           <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-semibold py-1 transition-colors hover:text-primary">

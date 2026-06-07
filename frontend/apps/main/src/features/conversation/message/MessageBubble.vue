@@ -1,5 +1,6 @@
+<!-- MessageBubble.vue -->
 <template>
-  <!-- Inline message row (no bubble bg). Borders come from `divide-y` on the parent list, so single messages have no border and stacks have hairlines only between adjacent rows. -->
+  <!-- Inline message row (no bubble bg). Hairlines come from `divide-y` on the parent list, so they appear consistently between every group. -->
   <div
     class="group flex flex-row gap-3 pl-2 px-4 py-4 w-full"
     :class="{ 'bg-private': isPrivateMessage }"
@@ -15,10 +16,17 @@
 
     <!-- Content -->
     <div class="flex-1 min-w-0">
-      <!-- Header: name (+ meta line) on the left, timestamp on the right -->
+      <!-- Header: name (with optional inline lock icon for private notes) and timestamp -->
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <p class="font-semibold text-sm truncate">{{ getFullName }}</p>
+          <p class="font-semibold text-sm truncate flex items-center gap-1.5">
+            <Lock
+              v-if="isPrivateMessage"
+              :size="11"
+              class="text-amber-700 dark:text-amber-500 flex-shrink-0"
+            />
+            <span class="truncate">{{ getFullName }}</span>
+          </p>
           <MessageEnvelope
             v-if="showEnvelope"
             :message="message"
@@ -27,7 +35,9 @@
           />
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <p class="text-xs text-muted-foreground tabular-nums cursor-default">{{ formatMessageTimestamp(message.created_at) }}</p>
+          <p class="text-xs text-muted-foreground tabular-nums cursor-default">
+            {{ formatMessageTimestamp(message.created_at) }}
+          </p>
         </div>
       </div>
 
@@ -86,9 +96,8 @@
         <Spinner v-if="isOutgoing && message.status === 'pending'" size="sm" />
       </div>
 
-      <!-- Status Icons (outgoing only) -->
+      <!-- Status Icons (outgoing only; lock icon moved to header so it sits inline with sender name) -->
       <div v-if="isOutgoing" class="flex items-center gap-2 mt-2">
-        <Lock :size="10" v-if="isPrivateMessage" class="text-muted-foreground" />
         <Check :size="14" v-if="showCheckCheck" class="text-green-500" />
         <Tooltip v-if="message.meta?.continuity_emailed">
           <TooltipTrigger>
@@ -107,7 +116,6 @@
       </div>
     </div>
   </div>
-
 </template>
 
 <script setup>
@@ -115,7 +123,14 @@ import { computed, ref } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Envelope as Mail, ArrowRotateLeft as RotateCcw, Check, Ellipsis as MoreHorizontal, User } from '@qall/icons'
+import {
+  Lock,
+  Envelope as Mail,
+  ArrowRotateLeft as RotateCcw,
+  Check,
+  Ellipsis as MoreHorizontal,
+  User
+} from '@qall/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
@@ -174,7 +189,9 @@ const isPrivateMessage = computed(() => props.message.private)
 const showCheckCheck = computed(
   () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
 )
-const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
+const showRetry = computed(
+  () => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID
+)
 
 const retryMessage = (msg) => {
   api.retryMessage(convStore.current.uuid, msg.uuid)
@@ -209,5 +226,4 @@ const showEnvelope = computed(() => {
     props.message.meta?.subject
   )
 })
-
 </script>

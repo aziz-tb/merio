@@ -33,6 +33,7 @@ require (
 	github.com/knadh/stuffbin v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mr-karan/balance v0.0.0-20250317053523-d32c6ade6cf1
+	github.com/openai/openai-go v1.12.0
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/redis/go-redis/v9 v9.5.5
 	github.com/rhnvrm/simples3 v0.10.1

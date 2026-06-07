@@ -1,0 +1,62 @@
+{
+  "_comment": "Catalog of Azure Foundry-routed models deployed for this operator. Pricing is per-million text tokens USD. Reasoning tokens are billed as output tokens.",
+  "models": [
+    {
+      "id": "claude-haiku-4-5",
+      "provider": "azure",
+      "display_name": "Claude Haiku 4.5 (Azure Foundry)",
+      "context_window": 200000,
+      "max_output_tokens": 8192,
+      "supports_caching": true,
+      "supports_thinking": true,
+      "is_reasoning_model": false,
+      "supports_extended_caching": true,
+      "tier": "haiku",
+      "pricing": {
+        "input_per_million_tokens_usd": 1.00,
+        "output_per_million_tokens_usd": 5.00,
+        "cached_input_per_million_tokens_usd": 0.10,
+        "currency": "USD",
+        "effective_from": "2025-10-01"
+      }
+    },
+    {
+      "id": "o4-mini",
+      "provider": "azure",
+      "display_name": "o4-mini (Azure Foundry)",
+      "context_window": 200000,
+      "max_output_tokens": 100000,
+      "supports_caching": true,
+      "supports_thinking": true,
+      "is_reasoning_model": true,
+      "supports_extended_caching": false,
+      "tier": "mini",
+      "pricing": {
+        "input_per_million_tokens_usd": 1.10,
+        "output_per_million_tokens_usd": 4.40,
+        "cached_input_per_million_tokens_usd": 0.275,
+        "currency": "USD",
+        "effective_from": "2025-04-16"
+      }
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "provider": "azure",
+      "display_name": "Claude Sonnet 4.5 (Azure Foundry)",
+      "context_window": 1000000,
+      "max_output_tokens": 64000,
+      "supports_caching": true,
+      "supports_extended_caching": true,
+      "supports_thinking": true,
+      "is_reasoning_model": false,
+      "tier": "balanced",
+      "pricing": {
+        "input_per_million_tokens_usd": 3.00,
+        "output_per_million_tokens_usd": 15.00,
+        "cached_input_per_million_tokens_usd": 3.75,
+        "currency": "USD",
+        "effective_from": "2025-04-16"
+      }
+    }
+  ]
+}

@@ -14,17 +14,23 @@ package preset
 // StopSequences means "no stop sequences" — same behavior either way, so
 // a slice (nil-vs-empty) is fine.
 type Preset struct {
-	Slug                 string   `json:"slug"`
-	Name                 string   `json:"name"`
-	Description          string   `json:"description,omitempty"`
-	Provider             string   `json:"provider"` // "anthropic" only in v1
-	Model                string   `json:"model"`    // must exist in catalog
-	Temperature          float64  `json:"temperature"`
-	MaxTokens            int      `json:"max_tokens"`
-	TopP                 *float64 `json:"top_p,omitempty"`
-	TopK                 *int     `json:"top_k,omitempty"`
-	StopSequences        []string `json:"stop_sequences,omitempty"`
-	CachingEnabled       bool     `json:"caching_enabled"`
-	CachingExtendedTTL   bool     `json:"caching_extended_ttl"`
-	Enabled              bool     `json:"enabled"`
+	Slug               string   `json:"slug"`
+	Name               string   `json:"name"`
+	Description        string   `json:"description,omitempty"`
+	Provider           string   `json:"provider"` // provider id: anthropic, openai, azure
+	Model              string   `json:"model"`    // must exist in catalog
+	Temperature        float64  `json:"temperature"`
+	MaxTokens          int      `json:"max_tokens"`
+	TopP               *float64 `json:"top_p,omitempty"`
+	TopK               *int     `json:"top_k,omitempty"`
+	StopSequences      []string `json:"stop_sequences,omitempty"`
+	CachingEnabled     bool     `json:"caching_enabled"`
+	CachingExtendedTTL bool     `json:"caching_extended_ttl"`
+	Enabled            bool     `json:"enabled"`
+	// Visibility lists the UI preset-select use cases this preset shows up
+	// in (each value is a known llm.Purpose). It is decoupled from
+	// purpose_mappings: it controls which presets a user may *pick* in a
+	// given select, not which preset is the platform *default* for a
+	// purpose. Empty/omitted means the preset appears in no select.
+	Visibility []string `json:"visibility,omitempty"`
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 
 	"github.com/aziz-tb/merio/internal/ai/llm"
+	anthropicshared "github.com/aziz-tb/merio/internal/ai/llm/anthropic/shared"
 	"github.com/aziz-tb/merio/internal/ai/llm/catalog"
 	"github.com/aziz-tb/merio/internal/ai/llm/preset"
 )
@@ -149,7 +150,7 @@ func thinkingConfigForModel(model catalog.Model) (sdk.ThinkingConfigParamUnion, 
 	}
 	return sdk.ThinkingConfigParamUnion{
 		OfAdaptive: &sdk.ThinkingConfigAdaptiveParam{
-			Type: "adaptive",
+			Type: anthropicshared.ThinkingTypeAdaptive,
 		},
 	}, true
 }
@@ -255,7 +256,9 @@ func sdkToCompletionResponse(msg *sdk.Message, p preset.Preset, markers int, att
 		},
 		PresetUsed: p.Slug,
 		Model:      p.Model,
+		Provider:   "anthropic",
 		Observability: llm.ResponseObservability{
+			Provider:          "anthropic",
 			ProviderRequestID: msg.ID,
 			RetryCount:        attempts,
 			ProviderMetadata:  metadata,
@@ -264,50 +267,37 @@ func sdkToCompletionResponse(msg *sdk.Message, p preset.Preset, markers int, att
 	return out
 }
 
-// sdkContentToBlocks translates the SDK's response content (a union of
-// text / tool_use / thinking / etc.) to our ContentBlock list. Unknown
-// block types are surfaced as best-effort placeholder text so callers
-// see a stable shape rather than silently dropping content.
+// sdkContentToBlocks adapts the SDK's response content union to the standard
+// Anthropic Messages JSON block shape, then delegates the shared platform
+// ContentBlock conversion.
 func sdkContentToBlocks(content []sdk.ContentBlockUnion) []llm.ContentBlock {
-	out := make([]llm.ContentBlock, 0, len(content))
+	blocks := make([]anthropicshared.ResponseBlock, 0, len(content))
 	for _, c := range content {
 		switch c.Type {
 		case "text":
 			t := c.AsText()
-			out = append(out, llm.ContentBlock{Type: llm.ContentBlockTypeText, Text: t.Text})
+			blocks = append(blocks, anthropicshared.ResponseBlock{Type: "text", Text: t.Text})
 		case "thinking":
 			tb := c.AsThinking()
-			out = append(out, llm.ContentBlock{
-				Type:      llm.ContentBlockTypeThinking,
-				Text:      tb.Thinking,
+			blocks = append(blocks, anthropicshared.ResponseBlock{
+				Type:      "thinking",
+				Thinking:  tb.Thinking,
 				Signature: tb.Signature,
 			})
 		case "redacted_thinking":
 			tb := c.AsRedactedThinking()
-			out = append(out, llm.ContentBlock{
-				Type: llm.ContentBlockTypeRedactedThinking,
-				Data: tb.Data,
-			})
+			blocks = append(blocks, anthropicshared.ResponseBlock{Type: "redacted_thinking", Data: tb.Data})
 		case "tool_use":
 			tu := c.AsToolUse()
-			input := map[string]any{}
-			if len(tu.Input) > 0 {
-				_ = json.Unmarshal(tu.Input, &input)
-			}
-			out = append(out, llm.ContentBlock{
-				Type:      llm.ContentBlockTypeToolUse,
-				ToolUseID: tu.ID,
-				ToolName:  tu.Name,
-				ToolInput: input,
+			blocks = append(blocks, anthropicshared.ResponseBlock{
+				Type:  "tool_use",
+				ID:    tu.ID,
+				Name:  tu.Name,
+				Input: tu.Input,
 			})
 		default:
-			// Unknown / not-yet-modeled block type. Surface as text so the
-			// agent runner sees something rather than dropping silently.
-			out = append(out, llm.ContentBlock{
-				Type: llm.ContentBlockTypeText,
-				Text: fmt.Sprintf("[anthropic: %s block elided]", c.Type),
-			})
+			blocks = append(blocks, anthropicshared.ResponseBlock{Type: c.Type})
 		}
 	}
-	return out
+	return anthropicshared.ResponseBlocksToContentBlocks(blocks, "anthropic")
 }

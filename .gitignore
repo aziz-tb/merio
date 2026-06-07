@@ -24,3 +24,13 @@ exec-runner/tests/
 exec-runner/.pytest_cache
 exec-runner/.venv
 **_test.go
+!internal/secret/resolver_test.go
+!internal/ai/llm/catalog/catalog_test.go
+!internal/ai/llm/azure/provider_test.go
+!internal/ai/llm/azure/live_smoke_test.go
+!internal/ai/llm/openai/retry_test.go
+!internal/ai/llm/openaitranslate/translate_test.go
+!internal/ai/llm/preset/registry_test.go
+!internal/ai/llm/router_test.go
+/graphify-out
+/ai_dump.txt

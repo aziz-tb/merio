@@ -283,15 +283,15 @@ func requireAnyPermission(r *fastglue.Request, app *App, user umodels.User, perm
 }
 
 func loadCustomerWithContracts(ctx context.Context, app *App, customerID string, primaryContractID string) (json.RawMessage, error) {
-	cust, err := app.customer.GetFreshByCustomerID(ctx, customerID, customer.FreshOptions{})
-	if err != nil {
-		return nil, err
-	}
-	contracts, err := loadContractsForCustomer(ctx, app.lo, app.contract, cust, primaryContractID)
-	if err != nil {
-		return nil, err
-	}
-	return customerToAPIResponse(*cust, contracts), nil
+	return customerdata.LoadCustomerWithContracts(ctx, app.lo,
+		func(c context.Context, id string) (*customermodels.Customer, error) {
+			return app.customer.GetFreshByCustomerID(c, id, customer.FreshOptions{})
+		},
+		func(c context.Context, ids []string) error {
+			return app.contract.EnsureHydrated(c, ids, contract.FreshOptions{})
+		},
+		app.contract.ListByCustomerID,
+		customerID, primaryContractID)
 }
 
 type contractHydrationStore interface {
@@ -304,20 +304,16 @@ type warnLogger interface {
 }
 
 func loadContractsForCustomer(ctx context.Context, lo warnLogger, contractStore contractHydrationStore, cust *customermodels.Customer, primaryContractIDs ...string) ([]contractmodels.Contract, error) {
-	hydrateIDs := contractIDsFromRaw(cust.ContractIDs)
 	primaryContractID := ""
 	if len(primaryContractIDs) > 0 {
-		primaryContractID = strings.TrimSpace(primaryContractIDs[0])
+		primaryContractID = primaryContractIDs[0]
 	}
-	if primaryContractID != "" {
-		hydrateIDs = []string{primaryContractID}
-	}
-	if len(hydrateIDs) > 0 {
-		if err := contractStore.EnsureHydrated(ctx, hydrateIDs, contract.FreshOptions{}); err != nil && lo != nil {
-			lo.Warn("contract hydration cascade failed; returning partial data", "customer_id", cust.CustomerID, "error", err)
-		}
-	}
-	return contractStore.ListByCustomerID(cust.CustomerID)
+	return customerdata.LoadContractsForCustomer(ctx, lo,
+		func(c context.Context, ids []string) error {
+			return contractStore.EnsureHydrated(c, ids, contract.FreshOptions{})
+		},
+		contractStore.ListByCustomerID,
+		cust, primaryContractID)
 }
 
 type customerIDHydrator interface {
@@ -404,50 +400,6 @@ func ciFirstString(m map[string]any, keys ...string) string {
 		}
 	}
 	return ""
-}
-
-func contractIDsFromRaw(raw json.RawMessage) []string {
-	if len(raw) == 0 {
-		return nil
-	}
-	var items []any
-	if err := json.Unmarshal(raw, &items); err != nil {
-		return nil
-	}
-	out := make([]string, 0, len(items))
-	seen := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		id := ciValueString(item)
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	return out
-}
-
-func ciValueString(v any) string {
-	switch x := v.(type) {
-	case string:
-		return strings.TrimSpace(x)
-	case json.Number:
-		return strings.TrimSpace(x.String())
-	case float64:
-		if x == float64(int64(x)) {
-			return strconv.FormatInt(int64(x), 10)
-		}
-		return strconv.FormatFloat(x, 'f', -1, 64)
-	case int:
-		return strconv.Itoa(x)
-	case int64:
-		return strconv.FormatInt(x, 10)
-	default:
-		return ""
-	}
 }
 
 func customerToAPIResponse(c customermodels.Customer, contracts []contractmodels.Contract) json.RawMessage {

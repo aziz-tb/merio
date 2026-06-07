@@ -24,10 +24,14 @@ func (a *Activities) LLMExtractActivity(ctx context.Context, in cimodels.LLMExtr
 		return out, nil
 	}
 	out.Ran = true
+	pre, err := a.PresetRegistry.Resolve(llm.PurposeExtractParameters, nil)
+	if err != nil {
+		return out, fmt.Errorf("resolve extract-parameters preset: %w", err)
+	}
 
 	req := llm.CompletionRequest{
 		Purpose:    llm.PurposeExtractParameters,
-		PresetSlug: "fast-haiku",
+		PresetSlug: pre.Slug,
 		TraceID:    in.TraceID,
 		Messages: []llm.Message{{
 			Role: llm.RoleUser,

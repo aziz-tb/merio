@@ -5,6 +5,7 @@ import (
 
 	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
 	"github.com/aziz-tb/merio/internal/ai/llm"
+	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
 	aioperations "github.com/aziz-tb/merio/internal/ai/operations"
 	"github.com/aziz-tb/merio/internal/ai/usage"
 	"github.com/aziz-tb/merio/internal/contract"
@@ -22,6 +23,7 @@ type Activities struct {
 	DB              *sqlx.DB
 	Lo              *logf.Logger
 	LLMProvider     llm.LLMProvider
+	PresetRegistry  *aipreset.Registry
 	UsageMgr        *usage.Manager
 	AIOperationsMgr *aioperations.Manager
 	TagMgr          *tag.Manager
@@ -45,6 +47,9 @@ func New(a *Activities) (*Activities, error) {
 	}
 	if a.LLMProvider == nil {
 		return nil, fmt.Errorf("tagclassification: LLMProvider required")
+	}
+	if a.PresetRegistry == nil {
+		return nil, fmt.Errorf("tagclassification: PresetRegistry required")
 	}
 	if a.UsageMgr == nil {
 		return nil, fmt.Errorf("tagclassification: UsageMgr required")
@@ -75,6 +80,7 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 		DB:              deps.DB,
 		Lo:              deps.Logger("tag-classification"),
 		LLMProvider:     deps.LLMProvider,
+		PresetRegistry:  deps.AIPresets,
 		UsageMgr:        deps.Usage,
 		AIOperationsMgr: deps.AIOperations,
 		TagMgr:          deps.Tags,

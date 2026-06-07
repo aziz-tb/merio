@@ -4,14 +4,8 @@ import (
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/zerodha/logf"
-)
 
-// thinkingTopPMin and thinkingTopPMax bound the only top_p range
-// Anthropic accepts when extended thinking is enabled. Values outside
-// [0.95, 1.0] are rejected with an invalid_request_error.
-const (
-	thinkingTopPMin = 0.95
-	thinkingTopPMax = 1.0
+	anthropicshared "github.com/aziz-tb/merio/internal/ai/llm/anthropic/shared"
 )
 
 // sanitizeForThinking strips sampling knobs from a MessageNewParams
@@ -70,7 +64,7 @@ func sanitizeForThinking(params sdk.MessageNewParams, lo *logf.Logger, model str
 
 	// top_p: must be omitted or in [0.95, 1.0].
 	if !param.IsOmitted(params.TopP) {
-		if v := params.TopP.Value; v < thinkingTopPMin || v > thinkingTopPMax {
+		if v := params.TopP.Value; !anthropicshared.TopPAllowedForThinking(v) {
 			lo.Info("anthropic.thinking.suppress_top_p",
 				"model", model,
 				"configured", v,

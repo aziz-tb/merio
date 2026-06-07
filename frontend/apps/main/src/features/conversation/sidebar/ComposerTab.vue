@@ -75,9 +75,18 @@
             </Badge>
           </button>
 
-          <Tooltip
-            v-if="!rowsByAgent[agent.id] || rowsByAgent[agent.id].outcome?.outcome !== 'sent'"
+          <!-- Busy: spinner -->
+          <Button
+            v-if="isAgentBusy(agent.id)"
+            size="icon"
+            variant="secondary"
+            disabled
           >
+            <Loader2 class="h-4 w-4 animate-spin" />
+          </Button>
+
+          <!-- First run: start the agent -->
+          <Tooltip v-else-if="!rowsByAgent[agent.id]">
             <TooltipTrigger as-child>
               <Button
                 size="icon"
@@ -85,16 +94,34 @@
                 :disabled="isRunActionDisabled(agent.id)"
                 @click="runAgent(agent)"
               >
-                <Loader2 v-if="isAgentBusy(agent.id)" class="h-4 w-4 animate-spin" />
-                <RotateCcw v-else-if="rowsByAgent[agent.id]" class="h-4 w-4" />
-                <Play v-else class="h-4 w-4" />
+                <Play class="h-4 w-4" />
+                <span class="sr-only">{{ $t('composer.runAgent') }}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ $t('composer.runAgent') }}</TooltipContent>
+          </Tooltip>
+
+          <!-- Completed run with a trace: toggle trace vs draft view.
+               Stays available after the reply is sent (read-only inspection);
+               re-running now lives only on the in-panel Regenerate action. -->
+          <Tooltip v-else-if="hasTrace(agent.id)">
+            <TooltipTrigger as-child>
+              <Button
+                size="icon"
+                variant="ghost"
+                @click="toggleTraceView(agent.id)"
+              >
+                <History
+                  class="h-4 w-4"
+                  :class="isTraceView(agent.id) ? 'text-foreground' : 'text-muted-foreground'"
+                />
                 <span class="sr-only">
-                  {{ rowsByAgent[agent.id] ? $t('composer.regenerate') : $t('composer.runAgent') }}
+                  {{ isTraceView(agent.id) ? $t('composer.hideActivity') : $t('composer.showActivity') }}
                 </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              {{ rowsByAgent[agent.id] ? $t('composer.regenerate') : $t('composer.runAgent') }}
+              {{ isTraceView(agent.id) ? $t('composer.hideActivity') : $t('composer.showActivity') }}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -110,6 +137,8 @@
             :stream-status="streamStatusFor(agent.id)"
             :stream-error="streamErrorFor(agent.id)"
             :is-streaming="isAgentStreaming(agent.id)"
+            :activity-view="isTraceView(agent.id)"
+            :hide-activity-toggle="true"
           >
             <template
               v-if="shouldShowActions(agent.id)"
@@ -160,7 +189,7 @@
                   <TooltipTrigger as-child>
                     <Button
                       size="icon"
-                      variant="ghost"
+                      variant="secondary"
                       :disabled="isRunActionDisabled(agent.id)"
                       @click="runAgent(agent)"
                     >
@@ -183,7 +212,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, shallowRef, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader as Loader2, Pencil, Play, ArrowsRotate as RefreshCw, ArrowRotateLeft as RotateCcw, PaperPlane as Send } from '@qall/icons'
+import { ClockRotateLeft as History, Loader as Loader2, Pencil, Play, ArrowsRotate as RefreshCw, ArrowRotateLeft as RotateCcw, PaperPlane as Send } from '@qall/icons'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -198,6 +227,7 @@ import { useWorkflowCompletion } from '@/composables/useWorkflowCompletion'
 import { useConversationStore } from '@/stores/conversation'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { MACRO_CONTEXT } from '@/constants/conversation'
 import SelectCombobox from '@/components/combobox/SelectCombobox.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@/api'
@@ -248,6 +278,23 @@ const toggleExpanded = (id) => {
   if (next.has(id)) next.delete(id)
   else next.add(id)
   expandedAgentIds.value = next
+}
+
+// Per-agent toggle for the card-header trace view: when on, the panel shows
+// the run's tool+thinking trace in place of the draft.
+const traceViewAgentIds = ref(new Set())
+const isTraceView = (id) => traceViewAgentIds.value.has(id)
+const hasTrace = (id) => Boolean(rowsByAgent.value[id]?.agent_execution?.trace?.length)
+const toggleTraceView = (id) => {
+  if (!expandedAgentIds.value.has(id)) {
+    const expanded = new Set(expandedAgentIds.value)
+    expanded.add(id)
+    expandedAgentIds.value = expanded
+  }
+  const next = new Set(traceViewAgentIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  traceViewAgentIds.value = next
 }
 
 const normalize = (execution) => normalizeExecution(execution)
@@ -659,10 +706,13 @@ const sendReply = async (agent, row) => {
 const editReply = (row) => {
   const draft = row?.agent_execution?.draft || ''
   const html = plainTextToHTML(draft)
-  conversationStore.setMacro('reply', {
-    id: `composer:${row.agent_execution.id}:${Date.now()}`,
-    message_content: html,
-  })
+  conversationStore.setMacro(
+    {
+      id: `composer:${row.agent_execution.id}:${Date.now()}`,
+      message_content: html,
+    },
+    MACRO_CONTEXT.REPLY
+  )
   emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
     description: t('composer.editToast'),
   })
@@ -713,6 +763,7 @@ watch(
       matchingAgents.value = []
       adHocAgentId.value = null
       adHocAgentIds.value = new Set()
+      traceViewAgentIds.value = new Set()
       validating.value = false
       refresh()
     }

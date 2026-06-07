@@ -447,9 +447,7 @@
   "agent.generateApiKey": "Genera chiave API",
   "agent.new": "Nuovo agente",
   "agent.selectAvailabilityStatus": "Seleziona stato di disponibilità",
-  "ai.apiKey.description": "La chiave API {provider} non è impostata o non valida. Inserisci una chiave API valida per usare le funzioni AI.",
   "ai.apiKeyNotSet": "Chiave API {provider} non impostata. Chiedi all'amministratore di configurarla",
-  "ai.enterOpenAIAPIKey": "Inserisci OpenAI API Key",
   "auth.backToLogin": "Torna al login",
   "auth.checkEmailForReset": "Controlla la tua email per trovare il link per il reset della password.",
   "auth.confirmPassword": "Conferma password",
@@ -1131,7 +1129,7 @@
   "admin.ai.tool.noSdkBadge": "no SDK",
   "admin.ai.tool.packagesJsDisabled": "JavaScript packages not supported in v1",
   "admin.ai.preset.placeholder": "Select a preset",
-  "admin.ai.preset.defaultLabelPrefix": "Default — uses platform default",
+  "admin.ai.preset.defaultLabelPrefix": "Platform default",
   "admin.ai.agent.toolsPicker.internalHeading": "Internal capabilities",
   "admin.ai.agent.toolsPicker.internalHelp": "Read-only platform tools (get_customer_data, get_conversation_history, …). Always available regardless of verification; visibility is filtered per-call.",
   "admin.ai.agent.toolsPicker.internalEmpty": "No internal capabilities registered.",
@@ -1291,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "Ha cercato nella knowledge base",
   "tools.get_customer_data.label": "Ha consultato i dati del cliente",
-  "tools.get_conversation_history.label": "Ha controllato le conversazioni precedenti"
+  "tools.get_conversation_history.label": "Ha controllato le conversazioni precedenti",
+  "conversation.collapse": "Comprimi",
+  "conversation.systemEventsOn": "{count} eventi di sistema il {date}",
+  "conversation.systemEventsBetween": "{count} eventi di sistema tra il {firstDate} e il {lastDate}"
 }

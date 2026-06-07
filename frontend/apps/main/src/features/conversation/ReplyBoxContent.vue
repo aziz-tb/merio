@@ -680,8 +680,16 @@ const handleEmojiSelect = (emoji) => {
   nextTick(() => (insertContent.value = emoji))
 }
 
-const handleAiPromptSelected = (key) => {
-  emit('aiPromptSelected', key)
+const handleAiPromptSelected = (payload) => {
+  if (typeof payload === 'string') {
+    emit('aiPromptSelected', {
+      key: payload,
+      content: textContent.value,
+      html: htmlContent.value
+    })
+    return
+  }
+  emit('aiPromptSelected', payload)
 }
 
 // Watch and update macro view based on message type this filters our macros.

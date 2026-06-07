@@ -1,6 +1,7 @@
+<!-- ActivityMessageBubble.vue -->
 <template>
   <div class="text-center">
-    <div class="text-muted-foreground text-sm">
+    <div class="text-muted-foreground text-sm my-2">
       {{ message.content }}
       <Tooltip>
         <TooltipTrigger>

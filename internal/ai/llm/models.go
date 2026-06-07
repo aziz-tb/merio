@@ -221,6 +221,7 @@ type CompletionResponse struct {
 	Content       []ContentBlock        `json:"content"`
 	Usage         Usage                 `json:"usage"`
 	CacheMetrics  CacheMetrics          `json:"cache_metrics"`
+	Provider      string                `json:"provider"`
 	PresetUsed    string                `json:"preset_used"`
 	Model         string                `json:"model"`
 	Observability ResponseObservability `json:"observability"`
@@ -247,6 +248,7 @@ type CompletionResponse struct {
 //     verbatim to ai_usage.provider_metadata (no redaction — these
 //     are operational metrics, not user content).
 type ResponseObservability struct {
+	Provider          string          `json:"provider,omitempty"`
 	ProviderRequestID string          `json:"provider_request_id,omitempty"`
 	RetryCount        int             `json:"retry_count,omitempty"`
 	ProviderMetadata  json.RawMessage `json:"provider_metadata,omitempty"`

@@ -8,25 +8,24 @@ import (
 	"fmt"
 
 	"github.com/aziz-tb/merio/internal/ai/llm"
+	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
 	"github.com/aziz-tb/merio/internal/ai/usage"
 	"github.com/zerodha/logf"
 )
 
-const defaultClassificationPreset = "fast-haiku"
-
 // Manager is the public entry point for detection evaluation.
 type Manager struct {
-	lo            *logf.Logger
-	llmProvider   llm.LLMProvider
-	presetSlug    string
-	usageMgr      *usage.Manager
-	systemInboxID int
+	lo             *logf.Logger
+	llmProvider    llm.LLMProvider
+	presetRegistry *aipreset.Registry
+	usageMgr       *usage.Manager
+	systemInboxID  int
 }
 
 type Opts struct {
-	Lo          *logf.Logger
-	LLMProvider llm.LLMProvider
-	PresetSlug  string
+	Lo             *logf.Logger
+	LLMProvider    llm.LLMProvider
+	PresetRegistry *aipreset.Registry
 	// UsageMgr + SystemInboxID enable ai_usage recording for AI-mode
 	// detection (Batch 9 audit-gap fix). Both optional: a nil UsageMgr
 	// or zero inbox id skips the write (the evaluation still runs).
@@ -35,16 +34,12 @@ type Opts struct {
 }
 
 func New(opts Opts) *Manager {
-	presetSlug := opts.PresetSlug
-	if presetSlug == "" {
-		presetSlug = defaultClassificationPreset
-	}
 	return &Manager{
-		lo:            opts.Lo,
-		llmProvider:   opts.LLMProvider,
-		presetSlug:    presetSlug,
-		usageMgr:      opts.UsageMgr,
-		systemInboxID: opts.SystemInboxID,
+		lo:             opts.Lo,
+		llmProvider:    opts.LLMProvider,
+		presetRegistry: opts.PresetRegistry,
+		usageMgr:       opts.UsageMgr,
+		systemInboxID:  opts.SystemInboxID,
 	}
 }
 

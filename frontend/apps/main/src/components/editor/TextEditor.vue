@@ -202,7 +202,13 @@ const emit = defineEmits([
   'suppressOutsideCollapse'
 ])
 
-const emitPrompt = (key) => emit('aiPromptSelected', key)
+const emitPrompt = (key) => {
+  emit('aiPromptSelected', {
+    key,
+    content: editor.value?.getText() ?? textContent.value ?? '',
+    html: editor.value?.getHTML() ?? htmlContent.value ?? ''
+  })
+}
 const emitComposerOverlayChange = (name, open) => {
   emit('composerOverlayChange', name, open)
 }

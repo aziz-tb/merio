@@ -8,6 +8,7 @@ import (
 
 	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
 	"github.com/aziz-tb/merio/internal/ai/llm"
+	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
 	"github.com/aziz-tb/merio/internal/ai/usage"
 	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/customer"
@@ -38,6 +39,7 @@ type Activities struct {
 	Settings        settingStore
 	Function        functionRunner
 	LLMProvider     llm.LLMProvider
+	PresetRegistry  *aipreset.Registry
 	UsageMgr        *usage.Manager
 	CustomerMgr     *customer.Manager
 	ContractMgr     *contract.Manager
@@ -77,6 +79,9 @@ func New(a *Activities) (*Activities, error) {
 	if a.LLMProvider == nil {
 		return nil, errors.New("customeridentification: LLMProvider required")
 	}
+	if a.PresetRegistry == nil {
+		return nil, errors.New("customeridentification: PresetRegistry required")
+	}
 	if a.UsageMgr == nil {
 		return nil, errors.New("customeridentification: UsageMgr required")
 	}
@@ -110,6 +115,7 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 		Settings:        deps.Settings,
 		Function:        deps.Functions,
 		LLMProvider:     deps.LLMProvider,
+		PresetRegistry:  deps.AIPresets,
 		UsageMgr:        deps.Usage,
 		CustomerMgr:     deps.Customers,
 		ContractMgr:     deps.Contracts,

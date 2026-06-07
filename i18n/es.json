@@ -447,9 +447,7 @@
   "agent.generateApiKey": "Generar clave API",
   "agent.new": "Nuevo agente",
   "agent.selectAvailabilityStatus": "Seleccionar estado de disponibilidad",
-  "ai.apiKey.description": "La clave API de {provider} no está configurada o no es válida. Por favor introduce una clave API válida para usar funciones de IA.",
   "ai.apiKeyNotSet": "La clave API de {provider} no está configurada. Por favor pide a tu administrador que la configure",
-  "ai.enterOpenAIAPIKey": "Introduce la clave API de OpenAI",
   "auth.backToLogin": "Volver al inicio de sesión",
   "auth.checkEmailForReset": "Revisa tu correo electrónico para obtener el enlace de restablecimiento de contraseña.",
   "auth.confirmPassword": "Confirmar contraseña",
@@ -1131,7 +1129,7 @@
   "admin.ai.tool.noSdkBadge": "no SDK",
   "admin.ai.tool.packagesJsDisabled": "JavaScript packages not supported in v1",
   "admin.ai.preset.placeholder": "Select a preset",
-  "admin.ai.preset.defaultLabelPrefix": "Default — uses platform default",
+  "admin.ai.preset.defaultLabelPrefix": "Platform default",
   "admin.ai.agent.toolsPicker.internalHeading": "Internal capabilities",
   "admin.ai.agent.toolsPicker.internalHelp": "Read-only platform tools (get_customer_data, get_conversation_history, …). Always available regardless of verification; visibility is filtered per-call.",
   "admin.ai.agent.toolsPicker.internalEmpty": "No internal capabilities registered.",
@@ -1291,5 +1289,8 @@
   "conversation.customer.refreshFailed": "Failed to refresh customer details. Please try again.",
   "tools.kb_search.label": "Buscó en la base de conocimiento",
   "tools.get_customer_data.label": "Consultó los datos del cliente",
-  "tools.get_conversation_history.label": "Revisó conversaciones anteriores"
+  "tools.get_conversation_history.label": "Revisó conversaciones anteriores",
+  "conversation.collapse": "Contraer",
+  "conversation.systemEventsOn": "{count} eventos del sistema el {date}",
+  "conversation.systemEventsBetween": "{count} eventos del sistema entre el {firstDate} y el {lastDate}"
 }
