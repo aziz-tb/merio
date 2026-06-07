@@ -34,10 +34,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/inboxes') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 -p-2 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
+              class="shrink-0 rounded-md size-9 -p-2 text-foreground hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[state=open]:bg-white data-[state=open]:rounded-lg data-[state=open]:border data-[state=open]:border-muted-background dark:data-[state=open]:bg-background data-[state=open]:text-primary [&[data-active=true]_svg]:opacity-100"
             >
               <router-link :to="lastInboxPath || { name: 'inboxes' }">
-                <Inboxes class="!size-6" />
+                <Inboxes class="!size-5" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -51,10 +51,11 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/contacts') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
+              class="shrink-0 rounded-md size-9 text-foreground hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[state=open]:bg-white data-[state=open]:rounded-lg data-[state=open]:border data-[state=open]:border-muted-background dark:data-[state=open]:bg-zinc-900 data-[state=open]:text-primary [&[data-active=true]_svg]:opacity-100"
             >
+             <!-- -->
               <router-link :to="{ name: 'contacts' }">
-                <AddressBook class="!size-6" />
+                <AddressBook class="!size-5" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -68,10 +69,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/knowledge') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
+              class="shrink-0 rounded-md size-9 text-foreground hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[state=open]:bg-white data-[state=open]:rounded-lg data-[state=open]:border data-[state=open]:border-muted-background dark:data-[state=open]:bg-zinc-900 data-[state=open]:text-primary [&[data-active=true]_svg]:opacity-100"
             >
               <router-link :to="{ name: 'knowledge-list' }">
-                <BookOpenCover class="!size-6" />
+                <BookOpenCover class="!size-5" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -85,10 +86,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/ai') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
+              class="shrink-0 rounded-md size-9 text-foreground hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[state=open]:bg-white data-[state=open]:rounded-lg data-[state=open]:border data-[state=open]:border-muted-background dark:data-[state=open]:bg-zinc-900 data-[state=open]:text-primary [&[data-active=true]_svg]:opacity-100"
             >
               <router-link :to="{ name: 'ai-agent-list' }">
-                <MicrochipAi class="!size-6" />
+                <MicrochipAi class="!size-5" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -102,10 +103,10 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/reports') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
+              class="shrink-0 rounded-md size-9 text-foreground hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[state=open]:bg-white data-[state=open]:rounded-lg data-[state=open]:border data-[state=open]:border-muted-background dark:data-[state=open]:bg-zinc-900 data-[state=open]:text-primary [&[data-active=true]_svg]:opacity-100"
             >
               <router-link :to="{ name: 'reports' }">
-                <ChartSimple class="!size-6" />
+                <ChartSimple class="!size-5" />
               </router-link>
             </Button>
           </TooltipTrigger>
@@ -119,7 +120,7 @@ const lastInboxPath = useStorage('lastInboxPath', '')
               variant="ghost"
               size="icon"
               :data-state="route.path.startsWith('/admin') ? 'open' : undefined"
-              class="shrink-0 rounded-md size-9 data-[state=open]:bg-white data-[state=open]:dark:text-primary-foreground data-[state=open]:shadow-sm hover:text-foreground"
+              class="shrink-0 rounded-md size-9 text-foreground hover:text-primary hover:bg-background dark:hover:bg-zinc-900 data-[state=open]:bg-white data-[state=open]:rounded-lg data-[state=open]:border data-[state=open]:border-muted-background dark:data-[state=open]:bg-zinc-900 data-[state=open]:text-primary [&[data-active=true]_svg]:opacity-100"
             >
               <router-link
                 :to="{
