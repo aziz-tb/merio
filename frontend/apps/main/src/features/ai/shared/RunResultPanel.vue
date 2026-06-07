@@ -197,38 +197,40 @@
     </div>
 
     <template v-else-if="result">
-      <div
-        v-if="hasDraft"
-        class="rounded-md bg-background p-3 text-sm leading-relaxed whitespace-pre-wrap"
-      >
-        {{ result.draft }}
-      </div>
+      <template v-if="!activityView">
+        <div
+          v-if="hasDraft"
+          class="rounded-md bg-background p-3 text-sm leading-relaxed whitespace-pre-wrap"
+        >
+          {{ result.draft }}
+        </div>
 
-      <Alert v-else-if="result.status === 'incomplete'" class="border-input bg-muted/20">
-        <CircleAlert class="h-4 w-4" />
-        <AlertTitle>{{ $t('composer.couldntFinishReply') }}</AlertTitle>
-        <AlertDescription v-if="result.partial_reason">
+        <Alert v-else-if="result.status === 'incomplete'" class="border-input bg-muted/20">
+          <CircleAlert class="h-4 w-4" />
+          <AlertTitle>{{ $t('composer.couldntFinishReply') }}</AlertTitle>
+          <AlertDescription v-if="result.partial_reason">
+            {{ result.partial_reason }}
+          </AlertDescription>
+        </Alert>
+
+        <Alert v-else-if="result.status === 'failed'" variant="destructive">
+          <AlertCircle class="h-4 w-4" />
+          <AlertTitle>{{ result.partial_reason || $t('globals.messages.somethingWentWrong') }}</AlertTitle>
+        </Alert>
+
+        <p v-else-if="result.partial_reason" class="text-sm italic text-muted-foreground">
           {{ result.partial_reason }}
-        </AlertDescription>
-      </Alert>
-
-      <Alert v-else-if="result.status === 'failed'" variant="destructive">
-        <AlertCircle class="h-4 w-4" />
-        <AlertTitle>{{ result.partial_reason || $t('globals.messages.somethingWentWrong') }}</AlertTitle>
-      </Alert>
-
-      <p v-else-if="result.partial_reason" class="text-sm italic text-muted-foreground">
-        {{ result.partial_reason }}
-      </p>
+        </p>
+      </template>
 
       <div
-        v-if="$slots.actions || activityItems.length"
+        v-if="(!activityView && $slots.actions) || (activityItems.length && !hideActivityToggle)"
         class="flex flex-wrap items-center justify-between gap-2"
       >
-        <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2">
+        <div v-if="!activityView && $slots.actions" class="flex flex-wrap items-center gap-2">
           <slot name="actions" />
         </div>
-        <Tooltip v-if="activityItems.length">
+        <Tooltip v-if="activityItems.length && !hideActivityToggle">
           <TooltipTrigger as-child>
             <Button
               type="button"
@@ -248,7 +250,7 @@
         </Tooltip>
       </div>
 
-      <div v-if="showActivity && activityItems.length" class="space-y-2 border-t border-input pt-3">
+      <div v-if="(showActivity || activityView) && activityItems.length" class="space-y-2 border-t border-input pt-3">
         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {{ $t('composer.activity') }}
         </p>
@@ -429,6 +431,13 @@ const props = defineProps({
   streamError: { type: String, default: '' },
   isStreaming: { type: Boolean, default: false },
   verbose: { type: Boolean, default: false },
+  // When true, the completed state renders the activity trace in place of
+  // the draft (parent-controlled view). Defaults preserve the standalone
+  // behavior used by the test/preview/history panels.
+  activityView: { type: Boolean, default: false },
+  // When true, suppress the panel's own activity toggle button (the parent
+  // drives the trace view from elsewhere, e.g. the composer card header).
+  hideActivityToggle: { type: Boolean, default: false },
 })
 
 const { t } = useI18n()
