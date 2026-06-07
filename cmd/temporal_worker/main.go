@@ -48,7 +48,9 @@ import (
 	aiexecutions "github.com/aziz-tb/merio/internal/ai/executions"
 	aillm "github.com/aziz-tb/merio/internal/ai/llm"
 	anthropicllm "github.com/aziz-tb/merio/internal/ai/llm/anthropic"
+	azurellm "github.com/aziz-tb/merio/internal/ai/llm/azure"
 	aicatalog "github.com/aziz-tb/merio/internal/ai/llm/catalog"
+	openaillm "github.com/aziz-tb/merio/internal/ai/llm/openai"
 	aipreset "github.com/aziz-tb/merio/internal/ai/llm/preset"
 	aioperations "github.com/aziz-tb/merio/internal/ai/operations"
 	"github.com/aziz-tb/merio/internal/ai/reranker"
@@ -72,6 +74,7 @@ import (
 	"github.com/aziz-tb/merio/internal/knowledge"
 	"github.com/aziz-tb/merio/internal/migrations"
 	"github.com/aziz-tb/merio/internal/realtime"
+	"github.com/aziz-tb/merio/internal/secret"
 	"github.com/aziz-tb/merio/internal/setting"
 	"github.com/aziz-tb/merio/internal/sla"
 	"github.com/aziz-tb/merio/internal/tag"
@@ -422,6 +425,7 @@ func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activi
 	needsExec := needsAIRuns || needsPipeline
 	needsConversationGraph := needsAIRuns || needsPipeline
 	needsEmbeddingSearch := needsEmbeddings || needsAIRuns
+	var secretResolver *secret.Resolver
 
 	deps.SystemInboxID = resolveSystemInboxID(deps.DB)
 	deps.SystemUserID = resolveSystemUserID(deps.DB)
@@ -444,11 +448,12 @@ func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activi
 		if err != nil {
 			log.Fatalf("temporal-worker: ai_usage manager: %v", err)
 		}
+		secretResolver = buildSecretResolver(deps.DB, logger("secret-manager"))
 	}
 	if needsLLM {
-		deps.LLMProvider = buildAnthropicProvider(ko, deps.DB, deps.AIPresets, deps.AIModelCatalog)
+		deps.LLMProvider = buildLLMProvider(secretResolver, deps.AIPresets, deps.AIModelCatalog, ko)
 		if deps.LLMProvider == nil {
-			log.Fatalf("temporal-worker: Anthropic provider not configured — selected queues require it")
+			log.Fatalf("temporal-worker: no LLM provider configured — selected queues require it")
 		}
 	}
 	if needsExec {
@@ -488,11 +493,11 @@ func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activi
 		if err != nil {
 			log.Fatalf("temporal-worker: knowledge manager: %v", err)
 		}
-		deps.EmbeddingProvider = buildEmbeddingProvider(deps.AIPresets, ko)
+		deps.EmbeddingProvider = buildEmbeddingProvider(secretResolver, ko)
 		if needsEmbeddings && deps.EmbeddingProvider == nil {
-			log.Fatalf("temporal-worker: Voyage API key not set (provider_keys.voyage) — required for the embeddings queue")
+			log.Fatalf("temporal-worker: VOYAGE_API_KEY not set in secrets/env — required for the embeddings queue")
 		}
-		deps.RerankProvider = buildRerankProvider(deps.AIPresets, ko)
+		deps.RerankProvider = buildRerankProvider(secretResolver, ko)
 		deps.EmbeddingStore, err = embeddings.NewStore(embeddings.StoreOpts{
 			DB: deps.DB,
 			Lo: logger("embeddings-store"),
@@ -668,10 +673,11 @@ func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activi
 			log.Fatalf("temporal-worker: resolve system user: %v", err)
 		}
 		deps.Detection = detection.New(detection.Opts{
-			Lo:            logger("detection"),
-			LLMProvider:   deps.LLMProvider,
-			UsageMgr:      deps.Usage,
-			SystemInboxID: deps.SystemInboxID,
+			Lo:             logger("detection"),
+			LLMProvider:    deps.LLMProvider,
+			PresetRegistry: deps.AIPresets,
+			UsageMgr:       deps.Usage,
+			SystemInboxID:  deps.SystemInboxID,
 		})
 		deps.Verification = verification.New(verification.Opts{Lo: logger("verification")})
 	}
@@ -761,13 +767,23 @@ func openRedis(ko *koanf.Koanf) *redis.Client {
 
 func loadAIModelCatalog(ko *koanf.Koanf) (*aicatalog.Catalog, error) {
 	path := ko.String("ai.models_catalog_path")
-	if path == "" {
-		path = "config/anthropic_models.json"
+	if path != "" {
+		if abs, err := filepath.Abs(path); err == nil {
+			path = abs
+		}
+		return aicatalog.Load(path)
 	}
-	if abs, err := filepath.Abs(path); err == nil {
-		path = abs
+	paths := map[string]string{
+		"anthropic": "config/anthropic_models.json",
+		"openai":    "config/openai_models.json",
+		"azure":     "config/azure_models.json",
 	}
-	return aicatalog.Load(path)
+	for provider, p := range paths {
+		if abs, err := filepath.Abs(p); err == nil {
+			paths[provider] = abs
+		}
+	}
+	return aicatalog.LoadMulti(paths)
 }
 
 func loadAIPresetRegistry(ko *koanf.Koanf, cat *aicatalog.Catalog) (*aipreset.Registry, error) {
@@ -781,38 +797,102 @@ func loadAIPresetRegistry(ko *koanf.Koanf, cat *aicatalog.Catalog) (*aipreset.Re
 	return aipreset.Load(path, cat)
 }
 
-func buildAnthropicProvider(ko *koanf.Koanf, db *sqlx.DB, reg *aipreset.Registry, cat *aicatalog.Catalog) aillm.LLMProvider {
-	apiKey := reg.ProviderKey("anthropic")
-	if apiKey == "" {
-		encKey := ko.MustString("app.encryption_key")
-		k, err := anthropicllm.LookupAPIKey(db, encKey)
-		if err != nil {
-			log.Fatalf("temporal-worker: read anthropic api key: %v", err)
-		}
-		apiKey = k
-	}
-	if apiKey == "" {
-		return nil
-	}
-	p, err := anthropicllm.New(anthropicllm.Opts{
-		APIKey:   apiKey,
-		Catalog:  cat,
-		Registry: reg,
-		Lo:       initLogger(ko, "anthropic"),
-	})
+func buildSecretResolver(db *sqlx.DB, lo *logf.Logger) *secret.Resolver {
+	kek, err := secret.LoadKEK()
 	if err != nil {
-		log.Fatalf("temporal-worker: anthropic provider: %v", err)
+		log.Fatalf("temporal-worker: load secrets KEK from %s: %v", secret.KEKEnvVar, err)
 	}
-	return p
+	mgr, err := secret.New(secret.Opts{DB: db, Lo: lo, KEK: kek})
+	if err != nil {
+		log.Fatalf("temporal-worker: secret manager: %v", err)
+	}
+	return secret.NewResolver(mgr)
 }
 
-func buildEmbeddingProvider(reg *aipreset.Registry, ko *koanf.Koanf) embeddings.Provider {
-	apiKey := reg.ProviderKey("voyage")
+func buildLLMProvider(resolver *secret.Resolver, reg *aipreset.Registry, cat *aicatalog.Catalog, ko *koanf.Koanf) aillm.LLMProvider {
+	providers := make(map[string]aillm.LLMProvider)
+	ctx := context.Background()
+
+	apiKey := resolver.Resolve(ctx, "ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		log.Printf("temporal-worker: ANTHROPIC_API_KEY not set in secrets/env — Anthropic presets are unavailable")
+	} else {
+		p, err := anthropicllm.New(anthropicllm.Opts{
+			APIKey:   apiKey,
+			Catalog:  cat,
+			Registry: reg,
+			Lo:       initLogger(ko, "anthropic"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: anthropic provider: %v", err)
+		}
+		providers["anthropic"] = p
+	}
+
+	openAIKey := resolver.Resolve(ctx, "OPENAI_API_KEY")
+	if openAIKey == "" {
+		log.Printf("temporal-worker: OPENAI_API_KEY not set in secrets/env — OpenAI presets are unavailable")
+	} else {
+		p, err := openaillm.New(openaillm.Opts{
+			APIKey:   openAIKey,
+			Resolver: resolver,
+			Catalog:  cat,
+			Registry: reg,
+			Lo:       initLogger(ko, "openai"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: openai provider: %v", err)
+		}
+		providers["openai"] = p
+	}
+
+	azureKey := resolver.Resolve(ctx, "AZURE_API_KEY")
+	azureEndpoint := resolver.Resolve(ctx, "AZURE_FOUNDRY_ENDPOINT")
+	if azureKey == "" || azureEndpoint == "" {
+		log.Printf("temporal-worker: AZURE_API_KEY or AZURE_FOUNDRY_ENDPOINT not set in secrets/env — Azure presets are unavailable")
+	} else {
+		p, err := azurellm.New(azurellm.Opts{
+			APIKey:   azureKey,
+			Endpoint: azureEndpoint,
+			Resolver: resolver,
+			Catalog:  cat,
+			Registry: reg,
+			Lo:       initLogger(ko, "azure"),
+		})
+		if err != nil {
+			log.Fatalf("temporal-worker: azure provider: %v", err)
+		}
+		providers["azure"] = p
+	}
+
+	if len(providers) == 0 {
+		return nil
+	}
+	r, err := aillm.NewRouter(aillm.RouterOpts{
+		Providers: providers,
+		ProviderForPreset: func(slug string) (string, bool) {
+			pre, ok := reg.Get(slug)
+			if !ok {
+				return "", false
+			}
+			return pre.Provider, true
+		},
+	})
+	if err != nil {
+		log.Fatalf("temporal-worker: LLM router: %v", err)
+	}
+	return r
+}
+
+func buildEmbeddingProvider(resolver *secret.Resolver, ko *koanf.Koanf) embeddings.Provider {
+	apiKey := resolver.Resolve(context.Background(), "VOYAGE_API_KEY")
 	if apiKey == "" {
 		return nil
 	}
 	p, err := voyageembed.New(voyageembed.Opts{
 		APIKey:       apiKey,
+		Endpoint:     resolver.Resolve(context.Background(), "VOYAGE_ENDPOINT"),
+		Resolver:     resolver,
 		Concurrency:  ko.Int("embeddings.concurrency"),
 		TotalTimeout: ko.Duration("embeddings.total_timeout"),
 		Lo:           initLogger(ko, "voyage-embeddings"),
@@ -823,8 +903,8 @@ func buildEmbeddingProvider(reg *aipreset.Registry, ko *koanf.Koanf) embeddings.
 	return p
 }
 
-func buildRerankProvider(reg *aipreset.Registry, ko *koanf.Koanf) reranker.Provider {
-	apiKey := reg.ProviderKey("voyage")
+func buildRerankProvider(resolver *secret.Resolver, ko *koanf.Koanf) reranker.Provider {
+	apiKey := resolver.Resolve(context.Background(), "VOYAGE_API_KEY")
 	if apiKey == "" {
 		return nil
 	}

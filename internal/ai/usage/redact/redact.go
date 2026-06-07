@@ -6,8 +6,7 @@
 //
 //  1. **Pattern-based redaction** over every string value in the
 //     payload, regardless of nesting. Catches emails, German IBANs,
-//     phone numbers, contract numbers, customer IDs, Zählernummer,
-//     and any extra patterns the deployment configures.
+//     phone numbers, contract numbers, customer IDs, and Zählernummer.
 //
 //  2. **Field-aware redaction** for known structured shapes — the
 //     `get_customer_data` tool result holds first_name / last_name /
@@ -127,32 +126,13 @@ func loadPatterns() {
 			},
 			// German contract identifiers — generic ALL-CAPS prefix +
 			// dash + 4+ digits. Catches CNT-12345, VERT-789, KD-100001,
-			// etc. Configurable extension via AddCustomPattern.
+			// etc.
 			{
 				re:       regexp.MustCompile(`\b(?:CNT|VERT|KD|VK|VTR|ZN)-\d{4,}\b`),
 				sentinel: SentinelContract,
 			},
 		}
 	})
-}
-
-// customPatterns lets ops register additional regexes (German energy
-// distributors have idiosyncratic ID shapes — Zählernummer schemes
-// vary by Netzbetreiber, customer references vary by billing system).
-// Appended once at startup; not safe to mutate concurrently after the
-// first redaction.
-var customPatterns []compiledPattern
-
-// AddCustomPattern registers an additional regex → sentinel mapping.
-// Call ONLY at startup, before any Record() / Redact() runs. The
-// patterns array is precompiled and read-only after first use.
-func AddCustomPattern(pattern, sentinel string) error {
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return err
-	}
-	customPatterns = append(customPatterns, compiledPattern{re: re, sentinel: sentinel})
-	return nil
 }
 
 // Bytes is the top-level entrypoint. Takes a raw JSON payload, walks
@@ -278,15 +258,11 @@ func shouldInsertFieldUnderscore(runes []rune, i int) bool {
 	return false
 }
 
-// applyPatterns runs every precompiled regex (built-in + custom) over
-// the string in order. Each match is replaced wholesale by the
-// pattern's sentinel; subsequent patterns see the already-redacted
-// string so we never double-redact.
+// applyPatterns runs every precompiled regex over the string in order.
+// Each match is replaced wholesale by the pattern's sentinel; subsequent
+// patterns see the already-redacted string so we never double-redact.
 func applyPatterns(s string) string {
 	for _, p := range patterns {
-		s = p.re.ReplaceAllString(s, p.sentinel)
-	}
-	for _, p := range customPatterns {
 		s = p.re.ReplaceAllString(s, p.sentinel)
 	}
 	return s

@@ -290,15 +290,21 @@ func (a *Activities) applyTagSideEffects(conv cmodels.Conversation, appliedTagID
 
 func (a *Activities) recordAIUsage(ctx context.Context, convID int, traceID string, r Result, latencyMs int) {
 	conversationID := int64(convID)
+	presetSlug := r.PresetUsed
+	if presetSlug == "" && a.PresetRegistry != nil {
+		if pre, err := a.PresetRegistry.Resolve(llm.PurposeClassification, nil); err == nil {
+			presetSlug = pre.Slug
+		}
+	}
 	row := usage.Row{
 		CreatedAt:           time.Now().UTC(),
 		TraceID:             traceID,
 		CallSequenceInTrace: 1,
 		InboxID:             a.SystemInboxID,
 		ConversationID:      &conversationID,
-		Provider:            "anthropic",
+		Provider:            coalesce(r.Provider, "anthropic"),
 		Model:               r.Model,
-		PresetSlug:          coalesce(r.PresetUsed, "fast-haiku"),
+		PresetSlug:          presetSlug,
 		Purpose:             string(llm.PurposeClassification),
 		StopReason:          r.StopReason,
 		InputTokens:         r.InputTokens,
@@ -326,9 +332,11 @@ func intSet(ids []int) map[int]bool {
 	return out
 }
 
-func coalesce(s, fallback string) string {
-	if s != "" {
-		return s
+func coalesce(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
 	}
-	return fallback
+	return ""
 }

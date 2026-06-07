@@ -24,7 +24,6 @@ package usage
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -51,12 +50,6 @@ const (
 	OutcomeInvalidRequest = "invalid_request"
 	OutcomeOther          = "other"
 )
-
-// ErrDuplicate signals an idempotent retry: the row was already
-// recorded for (trace_id, call_sequence_in_trace, created_at). The
-// Manager swallows this and logs at INFO; callers don't need to
-// branch on it but the type is exposed for tests.
-var ErrDuplicate = errors.New("usage: duplicate (trace_id, call_sequence, created_at)")
 
 // Manager is the canonical write surface for ai_usage.
 type Manager struct {
@@ -146,7 +139,7 @@ type Row struct {
 
 // Record writes one ai_usage row. Synchronous. Idempotent — a retry
 // with the same (trace_id, call_sequence, created_at) returns nil with
-// ErrDuplicate logged at INFO.
+// the duplicate logged at INFO.
 //
 // Cost calculation:
 //   - Resolves the model in the catalog
@@ -182,7 +175,7 @@ func (m *Manager) Record(ctx context.Context, row Row) error {
 	}
 
 	// Cost calc. Catalog lookup is in-memory; cheap.
-	inputCost, outputCost, cachedCost, ok := ComputeCost(m.catalog, row.Model,
+	inputCost, outputCost, cachedCost, ok := ComputeCost(m.catalog, row.Provider, row.Model,
 		row.InputTokens, row.OutputTokens, row.CachedInputTokens)
 	if !ok {
 		m.lo.Warn("usage: model not in catalog; cost columns will be zero",
@@ -268,11 +261,11 @@ func (m *Manager) Record(ctx context.Context, row Row) error {
 // decide whether to log or fail.
 //
 // Convention: rates are per-million tokens. (tokens / 1e6) * rate.
-func ComputeCost(cat *catalog.Catalog, modelID string, inputTokens, outputTokens, cachedInputTokens int) (input, output, cached float64, ok bool) {
+func ComputeCost(cat *catalog.Catalog, provider, modelID string, inputTokens, outputTokens, cachedInputTokens int) (input, output, cached float64, ok bool) {
 	if cat == nil {
 		return 0, 0, 0, false
 	}
-	m, found := cat.Get(modelID)
+	m, found := cat.Get(provider, modelID)
 	if !found {
 		return 0, 0, 0, false
 	}
@@ -306,7 +299,3 @@ func nilOrString(p *string) interface{} {
 	}
 	return *p
 }
-
-// Guard against unused-import warning when no rows query lands here —
-// keep sql import wired for future Get / Count methods.
-var _ = sql.ErrNoRows

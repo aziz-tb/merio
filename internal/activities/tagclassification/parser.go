@@ -34,6 +34,7 @@ func parseClassifyTagsResponse(resp llm.CompletionResponse) (Result, error) {
 	return Result{
 		Reasoning:         reasoning,
 		Scores:            scores,
+		Provider:          coalesce(resp.Provider, resp.Observability.Provider, "anthropic"),
 		Model:             resp.Model,
 		PresetUsed:        resp.PresetUsed,
 		StopReason:        string(resp.StopReason),

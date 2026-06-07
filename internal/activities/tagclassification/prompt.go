@@ -17,6 +17,7 @@ const maxContextChars = 12000
 type Result struct {
 	Reasoning         string
 	Scores            map[string]float64
+	Provider          string
 	Model             string
 	PresetUsed        string
 	StopReason        string
@@ -35,10 +36,14 @@ func (a *Activities) runBatchedAI(ctx context.Context, conv cmodels.Conversation
 		return Result{}, fmt.Errorf("load conversation messages: %w", err)
 	}
 	messagesText := formatMessagesForPrompt(messages)
+	pre, err := a.PresetRegistry.Resolve(llm.PurposeClassification, nil)
+	if err != nil {
+		return Result{}, fmt.Errorf("resolve classification preset: %w", err)
+	}
 
 	req := llm.CompletionRequest{
 		Purpose:    llm.PurposeClassification,
-		PresetSlug: "fast-haiku",
+		PresetSlug: pre.Slug,
 		TraceID:    traceID,
 		Messages: []llm.Message{{
 			Role: llm.RoleUser,
