@@ -71,12 +71,15 @@ _TIMEOUT_SECONDS = 30
 
 def _auth_value() -> str:
     """
-    Builds the `Authorization` header value. Merio's parser expects
-    `Token <key>:<secret>` — we send the same token in both halves; the
-    server-side resolver only reads the key (the secret half is ignored
-    for sx_-prefixed tokens).
+    Builds the `Authorization` header value. fastglue's ParseAuthHeader
+    matches the scheme prefix case-sensitively against lowercase "token"
+    (see `authToken` in fastglue) — a capitalized "Token" fails the prefix
+    check, so the server falls through to session auth and returns 401.
+    The scheme MUST be lowercase. We send the same token in both halves;
+    the resolver only reads the key (the secret half is ignored for
+    sx_-prefixed tokens).
     """
-    return f"Token {_TOKEN}:{_TOKEN}"
+    return f"token {_TOKEN}:{_TOKEN}"
 
 
 def _read_headers(system: bool) -> dict[str, str]:
