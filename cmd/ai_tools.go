@@ -163,8 +163,12 @@ func handleDeleteAITool(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, fetchErr)
 	}
 	svc := aitools.NewService(app.db, app.aiTools, app.function)
-	if delErr := svc.DeleteToolWithFunction(r.RequestCtx, id, existing.Slug); delErr != nil {
+	agentsCleaned, delErr := svc.DeleteToolWithFunction(r.RequestCtx, id, existing.Slug)
+	if delErr != nil {
 		return sendErrorEnvelope(r, delErr)
+	}
+	if agentsCleaned > 0 {
+		app.lo.Info("removed deleted tool from agents", "tool_id", id, "slug", existing.Slug, "agents_cleaned", agentsCleaned)
 	}
 	return r.SendEnvelope(true)
 }

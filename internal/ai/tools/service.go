@@ -67,21 +67,45 @@ func (s *Service) UpdateToolWithFunction(ctx context.Context, toolID int, functi
 	return out, nil
 }
 
-// DeleteToolWithFunction deletes the ai_tools row and linked functions row
-// in one transaction. ai_tools must be deleted first because the FK from
-// ai_tools.function_id to functions.id is ON DELETE RESTRICT.
-func (s *Service) DeleteToolWithFunction(ctx context.Context, toolID int, functionName string) error {
+// removeAgentToolRef strips a deleted custom tool from every agent's tools
+// JSONB. Agent tool refs ({"id":N,"kind":"custom"}) have no FK, so deleting
+// an ai_tools row would otherwise leave dangling refs that make those agents
+// fail validation on their next update. $1 is the tool id (used as both int,
+// to match the stored JSON number, and text, to compare the extracted value).
+const removeAgentToolRef = `
+UPDATE ai_agents
+SET tools = COALESCE((
+    SELECT jsonb_agg(e)
+    FROM jsonb_array_elements(tools) e
+    WHERE NOT (e->>'kind' = 'custom' AND e->>'id' = $1::text)
+), '[]'::jsonb)
+WHERE tools @> jsonb_build_array(jsonb_build_object('id', $1::int, 'kind', 'custom'))`
+
+// DeleteToolWithFunction deletes the ai_tools row and linked functions row,
+// and removes the tool from any agent that referenced it — all in one
+// transaction. ai_tools must be deleted first because the FK from
+// ai_tools.function_id to functions.id is ON DELETE RESTRICT. Returns the
+// number of agents whose tool list was cleaned up.
+func (s *Service) DeleteToolWithFunction(ctx context.Context, toolID int, functionName string) (int, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 
 	if err := s.tools.DeleteTx(ctx, tx, toolID); err != nil {
-		return err
+		return 0, err
 	}
 	if err := s.functions.DeleteTx(ctx, tx, functionName); err != nil {
-		return err
+		return 0, err
 	}
-	return tx.Commit()
+	res, err := tx.ExecContext(ctx, removeAgentToolRef, toolID)
+	if err != nil {
+		return 0, err
+	}
+	agentsCleaned, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return int(agentsCleaned), nil
 }
