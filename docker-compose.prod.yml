@@ -4,9 +4,7 @@ services:
     container_name: merio_app
     restart: unless-stopped
     ports:
-      - "127.0.0.1:9100:9000"    
-    extra_hosts:
-      - "exec-runner:host-gateway" 
+      - "127.0.0.1:9100:9000"
     environment:
       MERIO_SYSTEM_USER_PASSWORD: ${MERIO_SYSTEM_USER_PASSWORD:?required}
       MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?required}
@@ -85,14 +83,17 @@ services:
     image: ghcr.io/aziz-tb/merio-exec-runner:${IMAGE_TAG:-latest}
     container_name: merio_exec_runner
     restart: unless-stopped
-    network_mode: host 
+    networks:
+      - merio
+    expose:
+      - "8090"
     devices:
       - /dev/kvm:/dev/kvm
     group_add:
       - "${KVM_GID:?required}"
     environment:
       SERVICE_TOKEN: ${EXEC_RUNNER_TOKEN:?required}
-      WARM_POOL_SIZE_PYTHON: ${EXEC_WARM_POOL_PYTHON:-5}
+      WARM_POOL_SIZE_PYTHON: ${EXEC_WARM_POOL_PYTHON:-1}
       WARM_POOL_SIZE_JS: ${EXEC_WARM_POOL_JS:-0}
       WARM_POOL_SIZE_RAW: ${EXEC_WARM_POOL_RAW:-0}
       DEFAULT_MEMORY_MB: ${EXEC_VM_MEMORY:-256}
@@ -185,8 +186,6 @@ services:
     image: ghcr.io/aziz-tb/merio-temporal-worker:${IMAGE_TAG:-latest}
     container_name: merio_temporal_worker
     restart: unless-stopped
-    extra_hosts:
-      - "exec-runner:host-gateway"
     environment:
       MERIO_SECRETS_KEK: ${MERIO_SECRETS_KEK:?required}
       MERIO_EXEC__SANDBOX_URL: ${SANDBOX_URL:-http://exec-runner:8090}
