@@ -31,7 +31,7 @@
         >
           <ChevronLeft class="w-3.5 h-3.5" />
         </router-link>
-        <span class="text-md font-semibold text-foreground truncate">
+        <span class="text-md font-semibold text-foreground truncate my-2">
           {{ sidebarTitle }}
         </span>
       </div>
