@@ -30,11 +30,17 @@ type sendExecutionResp struct {
 
 func handleGetAgentExecution(r *fastglue.Request) error {
 	app := r.Context.(*App)
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	idStr, _ := r.RequestCtx.UserValue("id").(string)
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
 			app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 
 	exec, err := app.aiExecutions.GetByID(id)
@@ -44,6 +50,18 @@ func handleGetAgentExecution(r *fastglue.Request) error {
 		}
 		return sendErrorEnvelope(r, err)
 	}
+
+	// This endpoint is keyed by execution id, not conversation uuid; the
+	// ai_agents:run perm is not conversation-scoped. Resolve the
+	// execution's conversation and enforce row-level access on it.
+	conv, err := app.conversation.GetConversation(int(exec.ConversationID), "", "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if allowed, err := app.authz.EnforceConversationAccess(user, conv); err != nil || !allowed {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil))
+	}
+
 	return r.SendEnvelope(exec)
 }
 
@@ -58,11 +76,18 @@ func handleGetAgentExecution(r *fastglue.Request) error {
 // the locked decision.
 func handleListLatestAgentExecutions(r *fastglue.Request) error {
 	app := r.Context.(*App)
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	uuid, _ := r.RequestCtx.UserValue("uuid").(string)
 	if uuid == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
-	conv, err := app.conversation.GetConversation(0, uuid, "")
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	// Enforce row-level access — the ai_agents:run perm alone is not
+	// conversation-scoped.
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -173,8 +198,9 @@ func handleSendAgentExecution(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// 1. Load the conversation by UUID and confirm scope.
-	conv, err := app.conversation.GetConversation(0, uuid, "")
+	// 1. Load the conversation by UUID and enforce row-level access
+	//    (the ai_agents:run perm alone is not conversation-scoped).
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

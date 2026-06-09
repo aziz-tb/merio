@@ -5,6 +5,7 @@ import (
 	"time"
 
 	aiexecutions "github.com/aziz-tb/merio/internal/ai/executions"
+	amodels "github.com/aziz-tb/merio/internal/auth/models"
 	"github.com/aziz-tb/merio/internal/envelope"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -12,13 +13,21 @@ import (
 
 func handleConversationAgentRunState(r *fastglue.Request) error {
 	app := r.Context.(*App)
+	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	uuid, _ := r.RequestCtx.UserValue("uuid").(string)
 	if uuid == "" {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
 			app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
 
-	conv, err := app.conversation.GetConversation(0, uuid, "")
+	user, err := app.user.GetAgent(auser.ID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	// Enforce row-level access — the ai_agents:run perm alone is not
+	// conversation-scoped.
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
