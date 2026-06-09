@@ -287,6 +287,7 @@
   "admin.inbox.livechat.showPoweredBy": "Show powered by",
   "admin.inbox.livechat.showPoweredBy.description": "Show \"Powered by Merio\" when a conversation is open in the widget",
   "admin.inbox.livechat.startConversationButtonText": "Start conversation button text",
+  "admin.inbox.livechat.livePreview": "Live preview",
   "admin.inbox.livechat.tabs.appearance": "Appearance",
   "admin.inbox.livechat.tabs.installation": "Installation",
   "admin.inbox.livechat.tabs.messages": "Messages",

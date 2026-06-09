@@ -2,9 +2,9 @@
 // dereferenced []ResolvedTool that the agent runtime + dispatcher +
 // translator all consume. v1's job is small but central: shape unification.
 //
-// The resolver doesn't dispatch — that's the dispatcher's job (chunk 10).
+// The resolver doesn't dispatch — that's the dispatcher's job.
 // It doesn't translate to provider format — that's the translator's job
-// (chunk 11). It just resolves slugs/ids into a single typed list and
+// It just resolves slugs/ids into a single typed list and
 // reports anything that won't fit.
 package resolver
 

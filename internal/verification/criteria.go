@@ -19,8 +19,7 @@ const phoneMinDigits = 7
 type StandardCriterion func(ctx models.CriterionContext) bool
 
 // standardCriteria maps a criterion name to its evaluator. Adding a 12th is
-// a one-line addition here (design §7.3 — kept in code as the source of
-// truth, mirrored as i18n labels on the frontend).
+// a one-line addition here.
 var standardCriteria = map[string]StandardCriterion{
 	"sender_email_matches_erp":           cSenderEmailMatchesERP,
 	"mentioned_email_matches_erp":        cMentionedEmailMatchesERP,
@@ -45,7 +44,7 @@ func EvaluateStandard(name string, ctx models.CriterionContext) bool {
 	return fn(ctx)
 }
 
-// --- the 11 standard criteria (design §7.3) ---
+// --- the 11 standard criteria ---
 
 // 1. sender_email_matches_erp — sender email equals the contract's email
 // (or the customer's email).

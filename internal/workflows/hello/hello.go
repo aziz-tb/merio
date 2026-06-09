@@ -1,10 +1,9 @@
 // Package hello holds the smoke-test workflow used to verify a
-// Temporal worker is wired end-to-end. See the deliverable checklist
-// in docs/claude-code/wave2-foundation-strategy.md (F1, chunk 10).
+// Temporal worker is wired end-to-end.
 //
 // The workflow follows every convention from
 // internal/temporal/CONVENTIONS.md so it doubles as a reference
-// example for the first real workflow author (F12).
+// example for the first real workflow author.
 package hello
 
 import (

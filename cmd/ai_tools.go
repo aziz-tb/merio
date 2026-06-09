@@ -200,7 +200,7 @@ type invokeAIToolReq struct {
 //   - 422: script raised an uncaught exception (sandbox returned KindError)
 //   - 503: sandbox circuit breaker open
 //
-// HTTP 422 vs 200-with-kind=error: the Chunk 6 contract maps Python
+// HTTP 422 vs 200-with-kind=error: maps Python
 // exceptions to 422 specifically. The runner returns Result.Kind=error
 // for both Python exceptions AND infrastructure errors; we use Result.Code
 // to distinguish: codes prefixed with "PY_" come from script-raised

@@ -76,7 +76,7 @@ itself cannot produce a script result, return HTTP 500 with:
 - This service runs code; it does NOT know about phases, tools, hooks, agents, or pipelines.
 - The Go binary owns business logic and dispatches scripts here.
 - The SDK (`import sdk` inside scripts) is a thin wrapper for inputs, outputs, and platform callbacks.
-- Idempotency is automatic on writes — script authors do not manage it.
+- Write idempotency is **planned but not yet implemented**: the SDK sends an `Idempotency-Key` header, but the Go platform does not yet honor it, so a retried write can double-execute.
 
 See [`docs/`](./docs) and [`app/sdk_image/sdk/README.md`](./app/sdk_image/sdk/README.md)
 for the full plan and SDK reference.

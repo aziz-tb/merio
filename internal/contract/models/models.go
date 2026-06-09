@@ -10,7 +10,7 @@ import (
 
 // Contract is the DB-wire representation of a contracts row — a cache of an
 // ERP-resolved contract record belonging to a customer. The struct mirrors
-// the CREATE TABLE contracts block (design Section 3.2) exactly.
+// the CREATE TABLE contracts block exactly.
 //
 // CustomerID is the ERP customer id FK to customers(customer_id). Email and
 // Phone can differ from the parent customer's (a holding at customer level,

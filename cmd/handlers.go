@@ -284,22 +284,20 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/ai/prompts", auth(handleGetAIPrompts))
 	g.POST("/api/v1/ai/completion", auth(handleAICompletion))
 
-	// AI agents (F9 — configuration data model).
+	// AI agents
 	g.GET("/api/v1/ai/agents", perm(handleListAIAgents, "ai_agents:manage"))
 	g.GET("/api/v1/ai/agents/{id}", perm(handleGetAIAgent, "ai_agents:manage"))
 	g.POST("/api/v1/ai/agents", perm(handleCreateAIAgent, "ai_agents:manage"))
 	g.PUT("/api/v1/ai/agents/{id}", perm(handleUpdateAIAgent, "ai_agents:manage"))
 	g.DELETE("/api/v1/ai/agents/{id}", perm(handleDeleteAIAgent, "ai_agents:manage"))
 
-	// AI tools (F9).
+	// AI tools
 	g.GET("/api/v1/ai/tools", perm(handleListAITools, "ai_tools:manage"))
 	g.GET("/api/v1/ai/tools/{id}", perm(handleGetAITool, "ai_tools:manage"))
 	g.POST("/api/v1/ai/tools", perm(handleCreateAITool, "ai_tools:manage"))
 	g.PUT("/api/v1/ai/tools/{id}", perm(handleUpdateAITool, "ai_tools:manage"))
 	g.DELETE("/api/v1/ai/tools/{id}", perm(handleDeleteAITool, "ai_tools:manage"))
-	// Manual tool invocation (F9 Chunk 6) — admin testing pre-agent-runtime.
-	// After the F5 dispatcher unification, this endpoint accepts both
-	// custom (Python) tools and internal capabilities; see handleInvokeAITool.
+	// Manual tool invocation — admin testing pre-agent-runtime.
 	g.POST("/api/v1/ai/tools/{slug}/invoke", perm(handleInvokeAITool, "ai_tools:invoke"))
 
 	// Unified functions (Unified Executor Framework batch). The HTTP surface

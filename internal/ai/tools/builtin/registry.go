@@ -32,8 +32,7 @@ type InternalCapability interface {
 
 	// InputSchema returns a JSON Schema (subset: object type, basic
 	// property types, enum, required) describing the parameters the
-	// capability accepts. Translated to the provider's tool-call format
-	// in chunk 11.
+	// capability accepts.
 	InputSchema() map[string]any
 
 	// OutputSchema returns an optional JSON Schema describing the
@@ -94,7 +93,7 @@ func (r *Registry) Register(cap InternalCapability) error {
 }
 
 // Get returns the capability with the given id, or nil + false. Used by
-// the unified dispatcher (chunk 10) and the test endpoint.
+// the unified dispatcher and the test endpoint.
 func (r *Registry) Get(id string) (InternalCapability, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -139,7 +138,7 @@ func (r *Registry) IDs() []string {
 var defaultRegistry = NewRegistry()
 
 // Default returns the singleton registry that init() blocks register
-// against. The agent runtime (chunk 10/12) holds a reference to this
+// against. The agent runtime holds a reference to this
 // at startup and never mutates it after.
 func Default() *Registry { return defaultRegistry }
 

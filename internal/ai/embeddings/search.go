@@ -64,7 +64,7 @@ type SearchResult struct {
 	RerankerScore float64 `json:"reranker_score"`
 }
 
-// MatchedChunk is the per-chunk excerpt surfaced inside a SearchResult.
+// MatchedChunk is the per-excerpt surfaced inside a SearchResult.
 type MatchedChunk struct {
 	ChunkIndex     int     `json:"chunk_index"`
 	ChunkText      string  `json:"chunk_text"`

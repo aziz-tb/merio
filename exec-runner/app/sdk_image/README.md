@@ -73,9 +73,12 @@ Secrets are configured by admins in Merio and are write-only after
 creation. `sdk.secret.get(name)` returns the plaintext string for this
 execution or `None` when the secret does not exist. There is no SDK write API.
 
-If a script accidentally prints a secret value to stdout, stderr, or a result
-message/data field, Merio replaces the value before storage with
-`[REDACTED:<secret_name>]`.
+**Do not print secret values.** There is currently **no** automatic redaction of
+script output — anything a script writes to stdout, stderr, or a result
+message/data field is stored verbatim in the execution audit log.
+
+> Planned (not yet implemented): automatic replacement of leaked secret values
+> with `[REDACTED:<secret_name>]` before storage.
 
 ## Outputs
 
@@ -102,7 +105,7 @@ carry human-readable messages. The distinction:
 
 ```python
 sdk.api.get(path, params=None)       # Reads — naturally idempotent
-sdk.api.post(path, body=None)        # Writes — auto-idempotent under retry
+sdk.api.post(path, body=None)        # Writes — NOT deduplicated server-side (see note below)
 sdk.api.patch(path, body=None)
 sdk.api.delete(path)
 ```
@@ -126,16 +129,20 @@ except sdk.TimeoutError:
     pass
 ```
 
-### Idempotency (you don't have to think about this)
+### Idempotency (NOT yet implemented — writes are not deduplicated)
 
 POST/PATCH/DELETE calls automatically include an `Idempotency-Key` header
-derived from `(execution_id, path, body)`. If the platform sees the same
-key within 1 hour, it returns the cached response instead of re-executing.
+derived from `(execution_id, path, body)`. **The platform does not yet consume
+this header** — there is no server-side replay cache, so the key is not
+deduplicated.
 
-This means: if your script crashes after a successful write but before
-emitting `__RESULT__`, the retry will not double-execute the write.
+This means: if your script crashes (or the run is retried) after a successful
+write but before emitting `__RESULT__`, the retry **will** re-execute the write.
+Treat writes as non-idempotent and design tools defensively (e.g. check before
+write).
 
-You don't need to opt in. There's no `idempotency_key` parameter. It just works.
+> Planned: a server-side ~1-hour replay cache keyed on `Idempotency-Key`. Until
+> then the header is sent but ignored.
 
 ## Deprecated tool composition
 

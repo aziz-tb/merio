@@ -211,7 +211,7 @@ const updateAutomationRulesExecutionMode = (data) =>
     }
   })
 
-// AI agents (F9 — configuration data model)
+// AI agents
 const getAIAgents = (params) => http.get('/api/v1/ai/agents', { params })
 const getAIAgent = (id) => http.get(`/api/v1/ai/agents/${id}`)
 const createAIAgent = (data) =>
@@ -224,7 +224,7 @@ const updateAIAgent = (id, data) =>
   })
 const deleteAIAgent = (id) => http.delete(`/api/v1/ai/agents/${id}`)
 
-// AI tools (F9)
+// AI tools
 const getAITools = (params) => http.get('/api/v1/ai/tools', { params })
 const getAITool = (id) => http.get(`/api/v1/ai/tools/${id}`)
 const createAITool = (data) =>
@@ -280,8 +280,7 @@ const runAIAgent = (id, body) =>
 const listAIAgentRuns = (id, params) =>
   http.get(`/api/v1/ai/agents/${id}/runs`, { params })
 
-// List internal capabilities — read-only registry view used by the
-// agent edit form's tool picker (added in chunk 9).
+// List internal capabilities — read-only registry view used by the agent edit form's tool picker.
 const getAIInternalCapabilities = () => http.get('/api/v1/ai/internal-capabilities')
 
 // List AI presets (config/ai_presets.json). Consumed by the agent edit

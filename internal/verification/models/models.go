@@ -1,5 +1,5 @@
 // Package models holds the input/output and rule shapes for the
-// verification engine (design §7). The engine is pure logic: given a
+// verification engine. The engine is pure logic: given a
 // prepared message, a resolved customer/contract, and extracted attributes,
 // it evaluates the channel's configured rules and returns a level + a
 // human-readable reason + a per-criterion trace.
@@ -41,7 +41,7 @@ type EvalInput struct {
 	Rules RulesAsync
 }
 
-// CriterionContext is the per-criterion evaluation context (design §7.3).
+// CriterionContext is the per-criterion evaluation context.
 type CriterionContext struct {
 	Message        convmodels.PreparedMessage
 	Customer       *custmodels.Customer
@@ -107,8 +107,7 @@ type RuleCriterion struct {
 }
 
 // CustomCriterion is one group-scoped custom criterion under
-// customer_identification.verification_rules_async.*.groups[].custom_criteria
-// (design §7.4).
+// customer_identification.verification_rules_async.*.groups[].custom_criteria.
 type CustomCriterion struct {
 	Label    string   `json:"label"`
 	Key      string   `json:"key"`

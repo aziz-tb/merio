@@ -582,6 +582,53 @@
             this.postToIframe({ type: 'CLEAR_SESSION' });
         }
 
+        // --- merio admin live-preview support ---
+        // Additive, self-contained: re-applies launcher styling/position in place
+        // (no DOM teardown) and forwards the full config to the panel iframe so the
+        // admin widget preview can reflect unsaved edits. Safe to drop on an
+        // upstream merge — nothing in the normal init path calls it.
+        updateConfig (settings) {
+            if (!settings) return;
+
+            if (settings.launcher || settings.colors) {
+                this.widgetSettings = Object.assign({}, this.widgetSettings, settings);
+                const launcher = this.widgetSettings.launcher || {};
+                const colors = this.widgetSettings.colors || {};
+                const launcherColor = launcher.color || colors.primary;
+
+                if (this.toggleButton && launcherColor) {
+                    this.toggleButton.style.backgroundColor = launcherColor;
+                    const arrowPath = this.arrowIcon && this.arrowIcon.querySelector('path');
+                    if (arrowPath) arrowPath.setAttribute('stroke', this.contrastColor(launcherColor));
+                }
+
+                // Sync launcher logo: add, swap, or remove the image as needed.
+                if (this.iconContainer) {
+                    if (launcher.logo_url) {
+                        if (!this.defaultIcon) {
+                            this.defaultIcon = document.createElement('img');
+                            this.defaultIcon.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;';
+                            this.iconContainer.insertBefore(this.defaultIcon, this.arrowIcon);
+                        }
+                        this.defaultIcon.src = launcher.logo_url;
+                    } else if (this.defaultIcon) {
+                        this.iconContainer.removeChild(this.defaultIcon);
+                        this.defaultIcon = null;
+                    }
+                }
+
+                // Re-apply position/spacing, clearing the opposite side first so a
+                // left<->right switch doesn't leave a stale offset.
+                if (launcher.spacing && this.widgetButtonWrapper) {
+                    this.widgetButtonWrapper.style.left = '';
+                    this.widgetButtonWrapper.style.right = '';
+                    this.setLauncherPosition();
+                }
+            }
+
+            this.postToIframe({ type: 'PREVIEW_CONFIG', config: settings });
+        }
+
         destroy () {
             this.stopPageTracking();
             window.removeEventListener('message', this._boundHandleMessage);

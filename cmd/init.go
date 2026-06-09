@@ -31,7 +31,6 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/runner"
 	runnerevents "github.com/aziz-tb/merio/internal/ai/runner/events"
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
-	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
 	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
 	auth_ "github.com/aziz-tb/merio/internal/auth"
 	"github.com/aziz-tb/merio/internal/authz"
@@ -757,7 +756,7 @@ func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 	return mgr
 }
 
-// initAIAgents initializes the ai_agents CRUD manager (F9).
+// initAIAgents initializes the ai_agents CRUD manager.
 func initAIAgents(db *sqlx.DB, i18n *i18n.I18n) *aiagents.Manager {
 	var lo = initLogger("ai-agents")
 	m, err := aiagents.New(aiagents.Opts{
@@ -771,7 +770,7 @@ func initAIAgents(db *sqlx.DB, i18n *i18n.I18n) *aiagents.Manager {
 	return m
 }
 
-// initAITools initializes the ai_tools CRUD manager (F9).
+// initAITools initializes the ai_tools CRUD manager.
 func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
 	var lo = initLogger("ai-tools")
 	m, err := aitools.New(aitools.Opts{
@@ -788,7 +787,7 @@ func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
 // initFunction initializes the unified functions manager — the single home
 // for every named, sandbox-runnable code blob (custom AI tools, customer-
 // identification executors, future domains). It runs functions through the
-// shared F6 exec runner.
+// shared exec runner.
 func initFunction(db *sqlx.DB, runner *execrunner.Manager, i18n *i18n.I18n) *function.Manager {
 	var lo = initLogger("function")
 	m, err := function.New(function.Opts{
@@ -880,9 +879,7 @@ func initAIUsage(db *sqlx.DB, cat *aicatalog.Catalog) *aiusage.Manager {
 // initSystemInboxID resolves the seeded "System (Internal)" inbox row
 // by its stable UUID (see migrations.SystemInboxUUID). Every ai_usage
 // row that has no real conversation context FKs to this id. Fails
-// loudly when the seed row is missing — that indicates the v2.7.7
-// migration didn't run, and a missing FK target means every system-
-// scoped LLM call would error at insert time.
+// loudly when the seed row is missing.
 func initSystemInboxID(db *sqlx.DB) int {
 	var id int
 	err := db.QueryRow(
@@ -1043,48 +1040,6 @@ func initLLMProvider(resolver *secret.Resolver, registry *aipreset.Registry, cat
 		log.Fatalf("error initializing LLM router: %v", err)
 	}
 	colorlog.Green("LLM router: ready (%d provider(s))", len(providers))
-	return r
-}
-
-// initAgentRunner wires up the agent runner. Returns nil when the
-// Anthropic provider isn't configured (agent runs error at run time
-// rather than at boot — keeps the rest of the app available).
-func initAgentRunner(
-	provider llm.LLMProvider,
-	agents *aiagents.Manager,
-	tools *aitools.Manager,
-	dispatcher *aitools.Dispatcher,
-	presetReg *aipreset.Registry,
-	knowledgeMgr *knowledge.Manager,
-	conversationMgr *conversation.Manager,
-	userMgr *user.Manager,
-	customerMgr *customer.Manager,
-	contractMgr *contract.Manager,
-	usageMgr *aiusage.Manager,
-	eventPub runner.EventPublisher,
-) *runner.Runner {
-	if provider == nil {
-		return nil
-	}
-	lo := initLogger("agent-runner")
-	r, err := runner.New(runner.Opts{
-		Provider:     provider,
-		Agents:       agents,
-		Resolver:     resolver.New(tools, nil),
-		Dispatcher:   dispatcher,
-		PresetReg:    presetReg,
-		Lo:           lo,
-		Events:       eventPub,
-		Knowledge:    knowledgeMgr,
-		Conversation: conversationMgr,
-		User:         userMgr,
-		Customer:     customerMgr,
-		Contract:     contractMgr,
-		Usage:        &runnerUsageAdapter{m: usageMgr},
-	})
-	if err != nil {
-		log.Fatalf("error initializing agent runner: %v", err)
-	}
 	return r
 }
 

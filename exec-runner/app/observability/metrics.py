@@ -1,7 +1,7 @@
 """
 Prometheus metrics for operator dashboards and alerts.
 
-Minimum set defined in the F6 plan. Exposed at /metrics by main.py.
+Minimum set for future implementations. Exposed at /metrics by main.py.
 """
 from __future__ import annotations
 

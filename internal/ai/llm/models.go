@@ -83,10 +83,11 @@ type Message struct {
 }
 
 // ToolDef is the provider-agnostic shape of a tool the assistant may call.
-// InputSchema is JSON Schema (the subset described in the F7+F5 plan:
-// basic types, enum, nested objects, arrays of objects; no oneOf/anyOf,
-// no format validators). Provider translators map this to the SDK's tool
-// definition shape.
+// InputSchema is JSON Schema:
+//
+//	basic types, enum, nested objects, arrays of objects; no oneOf/anyOf, no format validators.
+//
+// Provider translators map this to the SDK's tool definition shape.
 type ToolDef struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
@@ -192,7 +193,7 @@ const (
 // direct query (Anthropic returns prompt-cache hit/miss counts as
 // separate fields; we pre-aggregate into a single CachedTokens count).
 //
-// Per the F7 plan, cached_tokens hits cost ~10% of regular input tokens —
+// cached_tokens hits cost ~10% of regular input tokens —
 // keeping the breakout makes the savings calculable downstream.
 type Usage struct {
 	InputTokens  int `json:"input_tokens"`

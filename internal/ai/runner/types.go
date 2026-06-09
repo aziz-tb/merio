@@ -41,26 +41,26 @@ const (
 	StatusComplete RunStatus = "complete"
 
 	// StatusPartial — reserved for future flows that intentionally
-	// commit partial drafts. The Batch 4 produce_draft contract does not
+	// commit partial drafts. The produce_draft contract does not
 	// currently emit this status from the agent runner.
 	StatusPartial RunStatus = "partial"
 
 	// StatusRefused — reserved for future flows that explicitly commit a
-	// refusal as a draft. The Batch 4 produce_draft contract routes
+	// refusal as a draft. The produce_draft contract routes
 	// uncommitted refusals to StatusIncomplete.
 	StatusRefused RunStatus = "refused"
 
-	// StatusBudgetExceeded — reserved for future flows. The Batch 4
+	// StatusBudgetExceeded — reserved for future flows. The
 	// produce_draft contract routes budget exits without a committed
 	// draft to StatusIncomplete.
 	StatusBudgetExceeded RunStatus = "budget_exceeded"
 
-	// StatusDeadlineExceeded — reserved for future flows. The Batch 4
+	// StatusDeadlineExceeded — reserved for future flows. The
 	// produce_draft contract routes deadline exits without a committed
 	// draft to StatusIncomplete.
 	StatusDeadlineExceeded RunStatus = "deadline_exceeded"
 
-	// StatusMaxIterations — reserved for future flows. The Batch 4
+	// StatusMaxIterations — reserved for future flows. The
 	// produce_draft contract routes max-iteration exits without a
 	// committed draft to StatusIncomplete.
 	StatusMaxIterations RunStatus = "max_iterations"

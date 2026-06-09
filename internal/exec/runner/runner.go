@@ -406,7 +406,7 @@ func (m *Manager) singleCall(
 	case http.StatusServiceUnavailable:
 		// Exec-runner reports 503 in two cases: warm pool empty / not
 		// ready (transient — retry), or out of capacity (transient).
-		// Both retryable per the F6 plan.
+		// Both retryable.
 		return nil, fmt.Errorf("runner: sandbox 503: %w", ErrSandboxTransient)
 
 	case http.StatusTooManyRequests:

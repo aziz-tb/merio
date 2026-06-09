@@ -19,10 +19,7 @@ type queries struct {
 	InsertExecutionStmt *sqlx.Stmt `query:"insert-execution"`
 }
 
-// executionRow is the wire shape inserted into function_executions (was
-// tool_executions, and script_executions before that; column shape
-// unchanged, the table holds audit rows for both Python custom tools and —
-// once chunk 10's dispatcher unification lands — internal capabilities).
+// executionRow is the wire shape inserted into function_executions.
 // The column order matches queries.sql exactly.
 type executionRow struct {
 	ExecutionID    string

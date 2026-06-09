@@ -142,8 +142,7 @@ func NewDispatcherWithRegistry(tools *Manager, runner runnerExecutor, functions 
 	return &Dispatcher{tools: tools, runner: runner, functions: functions, registry: registry}
 }
 
-// Dispatch resolves the tool, validates the request, and invokes through
-// the right path (F6 sandbox for custom, in-process for internal).
+// Dispatch resolves the tool, validates the request, and invokes.
 // Returns an execModels.Result envelope in both cases so callers don't
 // branch on kind. Non-dispatch failures (not found, disabled, validation)
 // come back as one of the Err* sentinels.

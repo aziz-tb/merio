@@ -18,7 +18,7 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm/preset"
 )
 
-// Tunables. Hardcoded for v1 per the F7 plan; if production data shows
+// Tunables. Hardcoded for v1; if production data shows
 // any of them are wrong we'll move to per-preset config.
 const (
 	defaultConcurrency  = 30

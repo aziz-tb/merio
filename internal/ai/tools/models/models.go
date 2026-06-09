@@ -1,8 +1,8 @@
 // Package models holds DB-wire and domain types for the AI tools
 // configuration table (ai_tools). ai_tools holds only the AI-facing
 // metadata for Python/JS custom tools; the code itself lives in the
-// functions table, linked by function_id (Unified Executor Framework
-// batch). Internal capabilities (kb_search, etc.) live in Go code under
+// functions table, linked by function_id (Unified Executor Framework)
+// Internal capabilities (kb_search, etc.) live in Go code under
 // internal/ai/tools/builtin/.
 package models
 
@@ -16,9 +16,7 @@ import (
 //
 // InputParameters and OutputSchema are stored as raw JSONB on ai_tools.
 // The code/language/packages live on the linked functions row; the
-// dispatcher runs the tool via function.Manager.Run(tool.Slug). For the
-// admin API the linked code is reconstructed into Implementation so the
-// request/response JSON shape is unchanged from before the framework batch.
+// dispatcher runs the tool via function.Manager.Run(tool.Slug).
 //
 //   - InputParameters: array of {key, name, type, required, visibility,
 //     description, options}. Extra fields are ignored for compatibility

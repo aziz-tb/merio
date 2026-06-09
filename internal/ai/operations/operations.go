@@ -1,5 +1,5 @@
 // Package aioperations is the persistence layer for ai_operations, the
-// unified per-logical-AI-operation outcome audit (Batch 9). Feature
+// unified per-logical-AI-operation outcome audit. Feature
 // consumers (tag classification today; agent validation, OCR, … later)
 // build an Operation with an operation-specific payload and call Insert.
 // Reads power per-conversation AI-activity views.
