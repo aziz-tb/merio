@@ -548,7 +548,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		ContentType:       models.ContentTypeHTML,
 		Private:           false,
 		Media:             media,
-		SourceID:          null.StringFrom(sourceID),
+		SourceID:          null.NewString(sourceID, sourceID != ""),
 		SendInboxID:       null.IntFromPtr(sendInboxID),
 		MessageReceiverID: contactID,
 		Meta:              metaJSON,
@@ -566,6 +566,15 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	}
 	if len(message.Meta) == 0 || string(message.Meta) == "null" {
 		message.Meta = json.RawMessage(`{}`)
+	}
+
+	// source_id is a meaningful external identifier (e.g. an email Message-ID) or
+	// NULL — never "". An empty string is non-NULL, so it falls under the partial
+	// unique index and would collide across messages that simply have no source id
+	// (e.g. live-chat replies). Normalize empty to NULL at this single chokepoint
+	// so the invariant holds for every caller.
+	if message.SourceID.Valid && message.SourceID.String == "" {
+		message.SourceID = null.String{}
 	}
 
 	// Handle empty content type enum, default to text.
