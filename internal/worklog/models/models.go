@@ -15,9 +15,8 @@ const (
 	ActionTypeForward = "forward"
 )
 
-// Automation levels stored in worklogs.automation_level. Provisioned for the
-// Wave-2 AI work; the writer for L1-L5 is not exposed in this PR — every row
-// inserted today defaults to L0.
+// Automation levels stored in worklogs.automation_level. Provisioned for Future AI work;
+// the writer for L1-L5 is not exposed in this PR — every row inserted today defaults to L0.
 const (
 	AutomationLevelL0 = "L0"
 	AutomationLevelL1 = "L1"

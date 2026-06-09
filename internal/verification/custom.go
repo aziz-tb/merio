@@ -11,7 +11,7 @@ import (
 	"github.com/aziz-tb/merio/internal/verification/models"
 )
 
-// EvaluateCustom reports whether a custom criterion matches (design §7.4):
+// EvaluateCustom reports whether a custom criterion matches:
 // resolve the value at Key from the contract (fallback customer); if no
 // value, fail; otherwise look for it (case-insensitive substring) in the
 // message parts named by search_in.
@@ -109,7 +109,7 @@ func mergeExtraData(out map[string]any, raw json.RawMessage) {
 }
 
 // resolvePath walks a dot-notation path (e.g. "extra_data.malo") through
-// nested maps and arrays, mirroring Batch 7's universal-detection path
+// nested maps and arrays, mirroring universal-detection path
 // syntax. Returns the leaf value, or (nil,false) if any segment is missing.
 func resolvePath(root map[string]any, path string) (any, bool) {
 	if root == nil || strings.TrimSpace(path) == "" {

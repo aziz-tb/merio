@@ -15,8 +15,7 @@
 //
 // Run payload uses the existing /ai/agents/:id/run shape:
 //   { inbound_message, conversation_id, verification_level, ... }
-// Per the fork resolution, `safe_mode` is sent through (backend
-// accepts but doesn't yet enforce — separate batch).
+// Per the fork resolution, `safe_mode` is sent through.
 
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import { useStorage } from '@vueuse/core'

@@ -1,5 +1,5 @@
 // Package models holds the domain + DB-wire types for ai_operations, the
-// unified per-logical-AI-operation outcome audit (Batch 9). One row per
+// unified per-logical-AI-operation outcome audit. One row per
 // logical operation (a tag classification, a future agent validation, an
 // OCR pass, …); the underlying LLM provider call(s) live in ai_usage and
 // are joined via trace_id.

@@ -1,6 +1,6 @@
 // Package verification is the pure-logic engine that decides whether a
 // recognized customer is "verified" against a conversation's message
-// context (design §7). Given a prepared message, a resolved
+// context. Given a prepared message, a resolved
 // customer/contract, the channel's rules, and extracted attributes,
 // Evaluate runs the group/min_count rules and returns a level (0/1/2)
 // plus a human-readable reason plus a per-criterion trace.
@@ -9,8 +9,6 @@
 // pre-loads the rules (from the customer_identification.verification_rules_async
 // setting) and passes them in via EvalInput, so the data dependency is
 // visible at the call site and Evaluate stays a deterministic pure function.
-// Used by the identification workflow's Activity 6 (chunk 3) and reusable by
-// future sync bot channels.
 package verification
 
 import (
@@ -38,7 +36,7 @@ func New(opts Opts) *Manager {
 }
 
 // Evaluate runs the channel's verification rules against the input and
-// returns the level, message, and trace (design §7.2). It never returns
+// returns the level, message, and trace. It never returns
 // level 3 — that is operator-set only. It performs no I/O; rules and custom
 // criteria come from the input.
 func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalOutput, error) {
@@ -127,9 +125,9 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 		out.Level = models.VerificationLevelUnverified
 	}
 
-	// Per §7.5: level 1 (partial) carries an operator-facing Markdown
-	// explanation; level 0 ("nothing matched") and level 2 (full) carry no
-	// message.
+	// level 2 (full) carry no message.
+	// level 1 (partial) carries an operator-facing Markdown explanation.
+	// level 0 ("nothing matched")
 	if out.Level == models.VerificationLevelPartial {
 		out.Message = buildPartialVerificationMessage(partialGroups, cctx)
 	}
@@ -137,8 +135,7 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 }
 
 // renderReason substitutes {value} in a custom criterion's reason with the
-// value resolved at its key (design §7.4/§7.5). Missing value → empty
-// substitution.
+// value resolved at its key . Missing value → empty substitution.
 func renderReason(cc models.CustomCriterion, ctx models.CriterionContext) string {
 	if cc.Reason == "" {
 		return ""

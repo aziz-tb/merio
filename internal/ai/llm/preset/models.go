@@ -27,10 +27,5 @@ type Preset struct {
 	CachingEnabled     bool     `json:"caching_enabled"`
 	CachingExtendedTTL bool     `json:"caching_extended_ttl"`
 	Enabled            bool     `json:"enabled"`
-	// Visibility lists the UI preset-select use cases this preset shows up
-	// in (each value is a known llm.Purpose). It is decoupled from
-	// purpose_mappings: it controls which presets a user may *pick* in a
-	// given select, not which preset is the platform *default* for a
-	// purpose. Empty/omitted means the preset appears in no select.
-	Visibility []string `json:"visibility,omitempty"`
+	Visibility         []string `json:"visibility,omitempty"`
 }

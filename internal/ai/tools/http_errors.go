@@ -12,8 +12,6 @@ import (
 // triple every HTTP handler in the project hands to SendErrorEnvelope:
 // status code, human message, error type.
 //
-// The mapping is the F5 contract documented at chunk 10:
-//
 //	ErrToolNotFound                  → 404
 //	ErrToolDisabled                  → 403
 //	ErrAgentVerificationInsufficient → 409

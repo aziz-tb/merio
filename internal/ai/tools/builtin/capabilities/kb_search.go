@@ -36,7 +36,8 @@ var defaultKBSearch = &kbSearchCapability{}
 //  4. Nil agent scope (test harness / direct invoke) → unscoped.
 //
 // Does NOT filter on is_ai_groundable — agent kb_scope is the
-// authoritative gate for what each agent can see (F12 fork-5).
+// authoritative gate for what each agent can see.
+// DEPRECATED: the is_ai_groundable column is legacy and should be ignored by new logic;
 type kbSearchCapability struct {
 	searcher *embeddings.Searcher
 }

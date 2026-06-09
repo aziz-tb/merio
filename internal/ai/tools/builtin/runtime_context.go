@@ -68,10 +68,9 @@ type KBScope struct {
 //     it should error explicitly rather than misread 0 as "id 0".
 //   - AgentID == 0 means "outside agent context" (rewrite, Copilot, etc.).
 //   - ResolutionAttemptID == 0 means "not in the inbound pipeline yet"
-//     (foundation isn't here; placeholder for F3).
 //   - VerificationLevel == 0 is the default-public bucket.
 //
-// Capabilities are invoked through the unified dispatcher (chunk 10) which
+// Capabilities are invoked through the unified dispatcher which
 // validates parameters and applies verification gating before calling
 // Execute. They MAY assume those checks have already happened, but should
 // still be robust to bad input — defensive checks are cheap.

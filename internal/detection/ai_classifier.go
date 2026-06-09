@@ -70,7 +70,7 @@ func (m *Manager) evaluateAI(ctx context.Context, ai *AIClassifier, ec Evaluatio
 		return EvaluationResult{}, err
 	}
 
-	// Batch 9 audit-gap fix: record the LLM call to ai_usage so synchronous
+	// Record the LLM call to ai_usage so synchronous
 	// AI detection is visible to cost tracking. Best-effort — a write
 	// failure never fails the evaluation.
 	m.recordUsage(ctx, ec, resp, int(time.Since(startedAt).Milliseconds()))

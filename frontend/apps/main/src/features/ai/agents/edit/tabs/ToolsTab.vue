@@ -8,9 +8,6 @@
 
   Reads/writes the live agent record via inject.
 
-  Access badge: rendered when the tool row carries an access_type
-  field. Tool category split (read/write) is a separate batch; until
-  it lands the field is absent and the badge is omitted.
 -->
 <template>
   <div class="mx-auto px-6 py-6 max-w-5xl">

@@ -12,8 +12,7 @@ import (
 )
 
 // toolRegistry is the minimal interface this handler needs to look up a
-// tool by name. The full registry is implemented in `internal/ai` (the
-// AI infrastructure plan).
+// tool by name. The full registry is implemented in `internal/ai`
 //
 // Stub semantics for v1: until the AI registry exists, app.toolRegistry
 // is nil and every call to /api/v1/tools/:name/call returns 404. The

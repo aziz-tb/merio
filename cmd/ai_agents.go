@@ -127,9 +127,8 @@ func handleDeleteAIAgent(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
-// validateAIAgent enforces the F9 validation rules locked for Chunk 3.
-// Mutates the agent in place where appropriate (slug auto-generation
-// when empty).
+// validateAIAgent enforces the validation rules.
+// Mutates the agent in place where appropriate (slug auto-generation when empty).
 func validateAIAgent(app *App, a *agentmodels.Agent) error {
 	// Name required.
 	a.Name = strings.TrimSpace(a.Name)

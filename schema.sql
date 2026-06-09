@@ -509,16 +509,14 @@ CREATE TABLE conversation_tags (
 	-- row that applied it (NULL for manual/rule tags). Provenance only —
 	-- nothing reads it for logic; the FK SET NULLs if the op is purged.
 	ai_operation_id BIGINT NULL,
-	-- Natural key is sufficient; the surrogate BIGSERIAL id was dropped
-	-- in Batch 9 (discovery confirmed nothing read it).
+	-- Natural key is sufficient; the surrogate BIGSERIAL id was dropped.
 	PRIMARY KEY (conversation_id, tag_id),
 	CONSTRAINT constraint_conversation_tags_on_applied_by CHECK (applied_by IN ('manual', 'ai', 'rule'))
 );
 CREATE INDEX index_conversation_tags_on_applied_by ON conversation_tags(applied_by);
 
--- ai_operations — unified per-logical-AI-operation outcome audit (Batch 9,
--- replacing tag_classifications). Houses tag classification today and
--- future AI feature outcomes (agent validation, OCR, summarization, etc.).
+-- ai_operations — unified per-logical-AI-operation outcome audit. 
+-- Houses tag classification, agent validation today and future AI feature outcomes (OCR, summarization, etc.).
 -- Lightweight: operation-specific data lives in payload JSONB; the
 -- underlying LLM call(s) are joined from ai_usage via trace_id. Heavyweight
 -- agent runs stay in agent_executions and are UNIONed at query time.
@@ -804,7 +802,7 @@ CREATE TABLE kb_articles (
 	classification VARCHAR(32) NOT NULL,
 	status VARCHAR(32) NOT NULL DEFAULT 'draft',
 	-- is_ai_groundable: legacy flag retained for data compatibility. New
-	-- indexing logic ignores it (F12 fork-5 resolution); agent kb_scope
+	-- indexing logic ignores it; agent kb_scope
 	-- is the authoritative gate for what each agent can see.
 	is_ai_groundable BOOLEAN NOT NULL DEFAULT FALSE,
 	body_html TEXT NOT NULL DEFAULT '',
@@ -1259,7 +1257,7 @@ CREATE INDEX idx_function_executions_started_at
 CREATE INDEX idx_function_executions_invoker_user_id
 	ON function_executions(invoker_user_id);
 
--- Customer / contract identification (Wave 3 Batch 10). customers and
+-- Customer / contract identification. customers and
 -- contracts are caches of ERP-resolved records; last_synced_at drives the
 -- TTL. The conversations identification columns are added here (after both
 -- tables exist) to mirror the current baseline state exactly.
@@ -1500,7 +1498,7 @@ CREATE INDEX index_ai_usage_on_errors
 	ON ai_usage (outcome, created_at DESC) WHERE outcome != 'success';
 CREATE INDEX index_ai_usage_on_provider_model
 	ON ai_usage (provider, model, created_at DESC);
--- Cross-feature "all AI calls on conversation X" lookups (Batch 9).
+-- Cross-feature "all AI calls on conversation X" lookups.
 CREATE INDEX index_ai_usage_on_conversation_id_created_at
 	ON ai_usage (conversation_id, created_at DESC)
 	WHERE conversation_id IS NOT NULL;
@@ -1542,7 +1540,7 @@ VALUES
     ('notification.email.enabled', 'false'::jsonb),
     ('migrations', '["v0.1.0"]'::jsonb);
 
--- Customer / contract identification settings (Wave 3 Batch 10). 8 rows
+-- Customer / contract identification settings. 8 rows
 -- under the customer_identification.* namespace. Operators populate
 -- regexes, excluded domains, and rules via the admin UI on install.
 INSERT INTO settings ("key", value)

@@ -161,8 +161,7 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 // agent's per-purpose overrides on top of the global mapping. agentOverrides
 // may be nil for non-agent contexts (rewrite UI, ad-hoc test programs).
 //
-// Slugs in agentOverrides are validated at agent save time (chunk 1's
-// TODO landed here in chunk 2 — see Has + handler-side check). At Resolve
+// Slugs in agentOverrides are validated at agent save time. At Resolve
 // time, an unknown override slug returns ErrPresetNotFound rather than
 // silently falling back; this surfaces config/data drift loudly.
 func (r *Registry) Resolve(purpose llm.Purpose, agentOverrides map[string]string) (Preset, error) {

@@ -26,9 +26,8 @@ type Opts struct {
 	Lo             *logf.Logger
 	LLMProvider    llm.LLMProvider
 	PresetRegistry *aipreset.Registry
-	// UsageMgr + SystemInboxID enable ai_usage recording for AI-mode
-	// detection (Batch 9 audit-gap fix). Both optional: a nil UsageMgr
-	// or zero inbox id skips the write (the evaluation still runs).
+	// UsageMgr + SystemInboxID enable ai_usage recording for AI-mode detection.
+	// Both optional: a nil UsageMgr or zero inbox id skips the write (the evaluation still runs).
 	UsageMgr      *usage.Manager
 	SystemInboxID int
 }

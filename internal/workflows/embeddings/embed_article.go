@@ -58,7 +58,7 @@ func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArt
 
 	// Activity retry policy: aggressive on transient errors (Voyage
 	// 5xx / 429, transient DB blips). Five attempts with capped
-	// exponential backoff aligns with the F12 plan's chunk-7 spec.
+	// exponential backoff.
 	opts := workflow.ActivityOptions{
 		StartToCloseTimeout:    60 * time.Second,
 		ScheduleToCloseTimeout: 10 * time.Minute,

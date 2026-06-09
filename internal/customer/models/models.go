@@ -11,7 +11,7 @@ import (
 // Customer is the DB-wire representation of a customers row — a cache of an
 // ERP-resolved customer record. Stable fields from the executor return
 // shape are typed columns; everything else lives in ExtraData. The struct
-// mirrors the CREATE TABLE customers block (design Section 3.1) exactly.
+// mirrors the CREATE TABLE customers block exactly.
 //
 // Business toggles the firstname/lastname-vs-company branching enforced by
 // the constraint_customers_on_business_consistency CHECK: a company row

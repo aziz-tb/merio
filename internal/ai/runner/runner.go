@@ -64,7 +64,7 @@ type UsageRecorder interface {
 // fields the runner can populate from inside its loop, before handing
 // off to the persistence layer. The handler layer fills in
 // ConversationID / AgentExecutionID / UserID via the same Row shape
-// when it calls Record() itself (chunk 8 — rewrite manager wrapper).
+// when it calls Record() itself.
 //
 // Kept here so the runner doesn't import internal/ai/usage; the app
 // and worker adapters translate this to usage.Row at the boundary.
@@ -272,7 +272,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		iterations  int
 	)
 
-	// Per-agent iteration cap. The agent's max_iterations (F9 schema)
+	// Per-agent iteration cap. The agent's max_iterations
 	// is one source; the request's MaxIterations override is another;
 	// we use the agent's value as the default when the request didn't
 	// explicitly override.

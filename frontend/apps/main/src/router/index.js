@@ -77,10 +77,7 @@ const routes = [
         path: '/admin/knowledge/articles/:id/edit',
         redirect: (to) => ({ name: 'edit-article', params: { id: to.params.id } })
       },
-      // AI — top-level area (sibling to /knowledge, /contacts, /reports).
-      // Originally placed under /admin/ai/* in F9; promoted to top-level since
-      // AI will grow well beyond what fits as an admin sub-section (presets,
-      // eval, dashboards, audit trace, etc.). See navigation proposal in F9 plan.
+      // AI — top-level area (sibling to /knowledge, /contacts, /reports)
       {
         path: '/ai',
         name: 'ai',
