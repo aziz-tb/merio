@@ -16,7 +16,7 @@ internal/
     interceptors.go, sdklogger.go
 
 cmd/
-  temporal_worker.go       -- worker binary entry point
+  temporal_worker/main.go  -- worker binary entry point
 ```
 
 **Workflows and activities live in sibling top-level packages, never co-mingled.** This separation is the structural enforcement of the determinism rules below. Importing workflow helpers into an activity is fine; importing activity code into a workflow is the bug-causing mistake — keeping the packages separated makes it visible.
@@ -28,7 +28,7 @@ cmd/
 | Workflow type | `<Verb><Noun>Workflow` | `EmbedArticleWorkflow` |
 | Workflow ID | `<workflow-type-slug>:<unique-key>[:v<version>]` | `embed-article:123:v4` |
 | Activity type | `<Verb><Noun>` (no "Activity" suffix) | `GenerateEmbedding` |
-| Task queue | snake-case constant in `temporal/queues.go` | `Queue_embeddings = "embeddings"` |
+| Task queue | Go constant in `temporal/queues.go` (kebab-case value) | `QueueEmbeddings = "embeddings"` |
 | Version tag | descriptive string, not a number | `"add-pii-redaction"` |
 
 **Workflow IDs MUST be deterministic for idempotency.** Same logical work → same workflow ID. Reusing an existing ID with `WorkflowIDReusePolicy_AllowDuplicateFailedOnly` is the standard idempotent-start pattern.
@@ -103,13 +103,15 @@ ctx = workflow.WithActivityOptions(ctx, opts)
 
 Every workflow attaches search attributes at start time. Registered once with Temporal (one-time setup; see `internal/temporal/search_attributes.go`).
 
+All custom search attributes are registered as **Keyword** (see `client.go` `registerSearchAttributes`); numeric ids (`inbox_id`, `entity_id`) are stamped as their string form at workflow-start time.
+
 | Name | Type | Purpose |
 |---|---|---|
 | `trace_id` | Keyword | Correlate with `ai_usage` / `script_executions` |
-| `inbox_id` | Int | Per-inbox filtering |
+| `inbox_id` | Keyword | Per-inbox filtering (numeric id stored as string) |
 | `workflow_kind` | Keyword | Category — `embedding`, `pipeline`, `sla`, … |
 | `entity_type` | Keyword | The thing being processed — `kb_article`, `ticket`, … |
-| `entity_id` | Int | Numeric id of that entity |
+| `entity_id` | Keyword | Id of that entity (numeric id stored as string) |
 
 ## Workflow versioning
 
@@ -143,7 +145,7 @@ Workflow-starting code paths check `app.temporal != nil`. The fallback is one of
 
 - Aggressive retry → give up after `MaximumAttempts` → workflow marked Failed → visible in Temporal UI.
 - Failed workflows surface to operators via Temporal UI search. Trace correlation via `trace_id` ties them to `ai_usage` rows.
-- No separate DLQ table in v1. Failed pipeline runs surface on the conversation UI (per F3 plan) with a "Retry AI processing" button.
+- No separate DLQ table in v1. Failed pipeline runs surface on the conversation UI with a "Retry AI processing" button.
 - Treat `failed workflows / hour > N` as an on-call signal when a metrics stack lands.
 
 ## Things that look fine but aren't
