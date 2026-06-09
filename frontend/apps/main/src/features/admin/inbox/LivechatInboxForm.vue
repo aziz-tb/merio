@@ -2,6 +2,7 @@
   <form @submit="onSubmit" class="space-y-6 w-full">
     <!-- Main Tabs -->
     <Tabs v-model="activeTab" class="w-full">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
       <TabsList class="flex flex-wrap gap-1 h-auto p-1 w-fit">
         <TabsTrigger value="general">{{ $t('globals.terms.general') }}</TabsTrigger>
         <TabsTrigger value="appearance">{{
@@ -16,6 +17,14 @@
           $t('admin.inbox.livechat.tabs.installation')
         }}</TabsTrigger>
       </TabsList>
+
+        <!-- Live preview toggle (only meaningful for an already-saved inbox). -->
+        <div v-if="props.initialValues?.uuid" class="flex items-center gap-2 pt-1">
+          <Eye class="size-4 text-muted-foreground" />
+          <Label for="widget-live-preview" class="text-sm cursor-pointer">{{ $t('admin.inbox.livechat.livePreview') }}</Label>
+          <Switch id="widget-live-preview" :checked="showPreview" @update:checked="showPreview = $event" />
+        </div>
+      </div>
 
       <div class="mt-8">
         <!-- General Tab -->
@@ -1004,7 +1013,9 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group'
 import { Label } from '@shared-ui/components/ui/label'
-import { Plus, X, TriangleExclamation as TriangleAlert, GripVertical, Lightbulb } from '@qall/icons'
+import { Switch } from '@shared-ui/components/ui/switch'
+import { Plus, X, TriangleExclamation as TriangleAlert, GripVertical, Lightbulb, Eye } from '@qall/icons'
+import { useWidgetPreview } from './useWidgetPreview.js'
 import Draggable from 'vuedraggable'
 import { useI18n } from 'vue-i18n'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
@@ -1042,6 +1053,7 @@ const props = defineProps({
 const { t } = useI18n()
 const activeTab = ref('general')
 const selectedUserTab = ref('visitors')
+const showPreview = ref(false)
 const homeApps = ref([])
 const prechatConfig = ref({
   enabled: false,
@@ -1209,6 +1221,22 @@ const form = useForm({
 
 const submitLabel = computed(() => {
   return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+})
+
+// Live snapshot fed to the widget preview. home_apps and prechat live in their
+// own reactive refs, so merge them over the form's config.
+const previewConfig = computed(() => ({
+  ...form.values.config,
+  home_apps: homeApps.value,
+  prechat_form: prechatConfig.value
+}))
+
+// Render the real widget over this page as a live preview when toggled on.
+useWidgetPreview({
+  enabled: showPreview,
+  baseUrl,
+  inboxUuid: computed(() => props.initialValues?.uuid),
+  config: previewConfig
 })
 
 const addHomeApp = (type) => {

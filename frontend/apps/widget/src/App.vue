@@ -126,6 +126,9 @@ const setupParentMessageListeners = () => {
           signalWidgetLoaded()
         }
       }
+    } else if (event.data.type === 'PREVIEW_CONFIG') {
+      // merio admin live preview: apply unsaved widget config edits in place.
+      widgetStore.updateConfig(event.data.config)
     } else if (event.data.type === 'CLEAR_SESSION') {
       userStore.clearSessionToken()
     } else if (event.data.type === 'PAGE_VISIT') {
