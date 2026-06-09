@@ -163,8 +163,6 @@ type App struct {
 	// LLM provider — nil when no provider API key is configured. Run
 	// endpoint returns 503 in that case.
 	aiProvider llm.LLMProvider
-	// Agent runner — nil when aiProvider is nil. The handler checks.
-	agentRunner *runner.Runner
 	// aiRunEvents publishes live progress for manual agent runs.
 	aiRunEvents      runner.EventPublisher
 	search           *search.Manager
@@ -485,23 +483,6 @@ func main() {
 	// Wire the AI tool dispatcher now that App is built — it needs both
 	// the tools manager and the execRunner.
 	app.aiToolDispatcher = aitools.NewDispatcher(app.aiTools, app.execRunner, app.function)
-	// Wire the agent runner — depends on the dispatcher above. Returns
-	// nil when the Anthropic provider isn't configured; the run endpoint
-	// returns 503 in that case.
-	app.agentRunner = initAgentRunner(
-		app.aiProvider,
-		app.aiAgents,
-		app.aiTools,
-		app.aiToolDispatcher,
-		app.aiPresets,
-		app.knowledge,
-		app.conversation,
-		app.user,
-		app.customer,
-		app.contract,
-		app.aiUsage,
-		app.aiRunEvents,
-	)
 
 	// Keep the ai_usage monthly partition runway extended. Boot-time
 	// EnsureRunway is a no-op when the migration's pre-created
