@@ -1,3 +1,4 @@
+// Package models defines the search result row types.
 package models
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// ConversationResult is a conversation search-result row.
 type ConversationResult struct {
 	CreatedAt          time.Time `db:"created_at" json:"created_at"`
 	UUID               string    `db:"uuid" json:"uuid"`
@@ -17,6 +19,7 @@ type ConversationResult struct {
 	Status             string    `db:"status" json:"status"`
 }
 
+// MessageResult is a message search-result row, carrying its parent conversation's context.
 type MessageResult struct {
 	CreatedAt                   time.Time `db:"created_at" json:"created_at"`
 	TextContent                 string    `db:"text_content" json:"text_content"`
@@ -26,6 +29,7 @@ type MessageResult struct {
 	ConversationStatus          string    `db:"conversation_status" json:"conversation_status"`
 }
 
+// ContactResult is a contact search-result row.
 type ContactResult struct {
 	CreatedAt      time.Time   `db:"created_at" json:"created_at"`
 	FirstName      string      `db:"first_name" json:"first_name"`

@@ -1,9 +1,11 @@
+// Package models defines the activity-log entry type and its activity-type constants.
 package models
 
 import (
 	"time"
 )
 
+// Activity types recorded in ActivityLog.ActivityType.
 const (
 	AgentLogin                  = "agent_login"
 	AgentLogout                 = "agent_logout"
@@ -14,6 +16,7 @@ const (
 	AgentRolePermissionsChanged = "agent_role_permissions_changed"
 )
 
+// ActivityLog is a single audit-log entry for an agent action.
 type ActivityLog struct {
 	ID                  int64     `db:"id" json:"id"`
 	CreatedAt           time.Time `db:"created_at" json:"created_at"`
@@ -25,5 +28,6 @@ type ActivityLog struct {
 	TargetModelID       int       `db:"target_model_id" json:"target_model_id"`
 	IP                  string    `db:"ip" json:"ip"`
 
+	// Total is the list-query row count, for pagination (not a stored column).
 	Total int `db:"total" json:"-"`
 }

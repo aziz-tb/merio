@@ -1,3 +1,4 @@
+// Package models defines the uploaded-media type and its association constants.
 package models
 
 import (
@@ -7,8 +8,10 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// Media association targets (Media.Model) and disposition values.
+//
+// TODO: source these table names from their respective package/models packages.
 const (
-	// TODO: pick these table names from their respective package/models/models.go
 	ModelMessages = "messages"
 	ModelUser     = "users"
 

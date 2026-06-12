@@ -1,3 +1,4 @@
+// Package models defines the user-notification types and their constants.
 package models
 
 import (
@@ -10,6 +11,7 @@ import (
 // NotificationType represents the type of user notification.
 type NotificationType string
 
+// Recognized user-notification types.
 const (
 	NotificationTypeMention    NotificationType = "mention"
 	NotificationTypeAssignment NotificationType = "assignment"

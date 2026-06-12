@@ -1,8 +1,9 @@
-// package colorlog provides ANSI color logging for the terminal.
+// Package colorlog provides ANSI color logging for the terminal.
 package colorlog
 
 import "log"
 
+// ANSI escape codes for terminal colors.
 const (
 	ANSIColourGreen = "\x1b[32m"
 	ANSIColourRed   = "\x1b[31m"

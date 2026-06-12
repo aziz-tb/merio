@@ -1,5 +1,7 @@
+// Package models defines the data structures returned by reporting queries.
 package models
 
+// OverviewSLA holds the aggregated SLA compliance metrics for the reporting overview.
 type OverviewSLA struct {
 	FirstResponseMetCount          int     `json:"first_response_met_count" db:"first_response_met_count"`
 	FirstResponseBreachedCount     int     `json:"first_response_breached_count" db:"first_response_breached_count"`

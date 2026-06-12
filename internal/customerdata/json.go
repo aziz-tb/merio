@@ -1,6 +1,6 @@
 // Package customerdata contains small JSON helpers shared by the customer and
 // contract cache normalizers. The helpers keep ERP-authored JSON key order
-// intact for Zone 2 pass-through data.
+// intact for custom pass-through keys.
 package customerdata
 
 import (
@@ -41,9 +41,9 @@ func UnwrapObject(raw json.RawMessage, key string) (json.RawMessage, map[string]
 	return raw, data, nil
 }
 
-// BuildRemainder removes Zone 1 keys from an object while preserving the
+// BuildRemainder removes custom keys from an object while preserving the
 // original order and casing of the remaining fields.
-func BuildRemainder(raw json.RawMessage, zone1Keys map[string]bool) json.RawMessage {
+func BuildRemainder(raw json.RawMessage, customKeys map[string]bool) json.RawMessage {
 	var out bytes.Buffer
 	out.WriteByte('{')
 
@@ -68,7 +68,7 @@ func BuildRemainder(raw json.RawMessage, zone1Keys map[string]bool) json.RawMess
 		if err := dec.Decode(&value); err != nil {
 			return json.RawMessage(`{}`)
 		}
-		if zone1Keys[key] {
+		if customKeys[key] {
 			continue
 		}
 		if !first {
@@ -84,6 +84,8 @@ func BuildRemainder(raw json.RawMessage, zone1Keys map[string]bool) json.RawMess
 	return out.Bytes()
 }
 
+// FirstRaw returns the raw value of the first of keys that is present and non-null,
+// or nil if none match. Keys are tried in order, so callers can pass aliases.
 func FirstRaw(data map[string]json.RawMessage, keys ...string) json.RawMessage {
 	for _, key := range keys {
 		raw, ok := data[key]
@@ -95,6 +97,8 @@ func FirstRaw(data map[string]json.RawMessage, keys ...string) json.RawMessage {
 	return nil
 }
 
+// FirstString returns the first of keys coerced to a trimmed string (numbers and bools
+// are stringified), or "" if none match.
 func FirstString(data map[string]json.RawMessage, keys ...string) string {
 	for _, key := range keys {
 		raw, ok := data[key]
@@ -108,6 +112,9 @@ func FirstString(data map[string]json.RawMessage, keys ...string) string {
 	return ""
 }
 
+// FirstBool parses the first of keys as a bool, accepting JSON booleans or quoted
+// strings. The second result reports whether a key was present; the error is non-nil
+// only when a present value cannot be parsed as a bool.
 func FirstBool(data map[string]json.RawMessage, keys ...string) (bool, bool, error) {
 	for _, key := range keys {
 		raw, ok := data[key]
@@ -130,6 +137,9 @@ func FirstBool(data map[string]json.RawMessage, keys ...string) (bool, bool, err
 	return false, false, nil
 }
 
+// FirstStringSlice decodes the first of keys as a JSON array of strings, dropping blank
+// entries. The second result reports whether a key was present; the error is non-nil
+// only when a present value is not an array.
 func FirstStringSlice(data map[string]json.RawMessage, keys ...string) ([]string, bool, error) {
 	for _, key := range keys {
 		raw, ok := data[key]

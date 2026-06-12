@@ -1,3 +1,4 @@
+// Package models defines the role type and the built-in role names.
 package models
 
 import (
@@ -6,16 +7,20 @@ import (
 	"github.com/lib/pq"
 )
 
+// Built-in role names.
 const (
 	RoleAdmin = "Admin"
 	RoleAgent = "Agent"
 )
 
+// DefaultRoles lists the built-in roles; the manager refuses to delete them.
 var DefaultRoles = []string{
 	RoleAdmin,
 	RoleAgent,
 }
 
+// Role is a named set of permissions assignable to users; Permissions holds authz
+// permission keys.
 type Role struct {
 	ID          int            `db:"id" json:"id"`
 	CreatedAt   time.Time      `db:"created_at" json:"created_at"`

@@ -1,3 +1,4 @@
+// Package models defines the message template type.
 package models
 
 import (
@@ -6,6 +7,9 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// Template is a stored message template. Type identifies its kind; IsDefault marks the
+// default for that type (one per type), and IsBuiltIn marks a shipped template that
+// cannot be deleted.
 type Template struct {
 	ID        int         `db:"id" json:"id"`
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`

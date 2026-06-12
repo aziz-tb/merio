@@ -1,12 +1,22 @@
+// Package models defines the authorization permission keys recognized by the
+// authz enforcer. Each value is a "resource:action" string persisted on roles
+// and checked when a request is authorized.
 package models
 
 const (
-	// Conversation
-	PermConversationsReadAll            = "conversations:read_all"
-	PermConversationsReadUnassigned     = "conversations:read_unassigned"
-	PermConversationsReadAssigned       = "conversations:read_assigned"
-	PermConversationsReadTeamInbox      = "conversations:read_team_inbox"
-	PermConversationsReadTeamAll        = "conversations:read_team_all"
+	// PermConversationsReadAll grants all conversations; it is the superset that
+	// short-circuits the rest.
+	PermConversationsReadAll = "conversations:read_all"
+	// PermConversationsReadUnassigned additionally grants conversations not assigned to anyone.
+	PermConversationsReadUnassigned = "conversations:read_unassigned"
+	// PermConversationsReadAssigned additionally grants conversations assigned to the user.
+	PermConversationsReadAssigned = "conversations:read_assigned"
+	// PermConversationsReadTeamInbox additionally grants unassigned conversations in the
+	// user's team inboxes (subsumed by ReadTeamAll).
+	PermConversationsReadTeamInbox = "conversations:read_team_inbox"
+	// PermConversationsReadTeamAll additionally grants all conversations in the user's teams.
+	PermConversationsReadTeamAll = "conversations:read_team_all"
+	// PermConversationsRead grants reading an individual conversation and team views.
 	PermConversationsRead               = "conversations:read"
 	PermConversationsUpdateUserAssignee = "conversations:update_user_assignee"
 	PermConversationsUpdateTeamAssignee = "conversations:update_team_assignee"
@@ -18,101 +28,75 @@ const (
 	PermMessagesWrite                   = "messages:write"
 	PermMessagesWriteAsContact          = "messages:write_as_contact"
 
-	// View
 	PermViewManage        = "view:manage"
 	PermSharedViewsManage = "shared_views:manage"
 
-	// Status
 	PermStatusManage = "status:manage"
 
-	// Tags
 	PermTagsManage      = "tags:manage"
 	PermTagsViewPrivate = "tags:view_private"
 
-	// Macros
 	PermMacrosManage = "macros:manage"
 
-	// Users
 	PermUsersManage = "users:manage"
 
-	// Teams
 	PermTeamsManage = "teams:manage"
 
-	// Automations
 	PermAutomationsManage = "automations:manage"
 
-	// Inboxes
 	PermInboxesManage = "inboxes:manage"
 
-	// Roles
 	PermRolesManage = "roles:manage"
 
-	// Webhooks
 	PermWebhooksManage = "webhooks:manage"
 
-	// Templates
 	PermTemplatesManage = "templates:manage"
 
-	// Reports
 	PermReportsManage = "reports:manage"
 
-	// Business Hours
 	PermBusinessHoursManage = "business_hours:manage"
 
-	// SLA
 	PermSLAManage = "sla:manage"
 
-	// General Settings
 	PermGeneralSettingsManage = "general_settings:manage"
 
-	// Notification Settings
 	PermNotificationSettingsManage = "notification_settings:manage"
 
-	// OpenID Connect SSO
 	PermOIDCManage = "oidc:manage"
 
-	// AI
 	PermAIManage = "ai:manage"
 
-	// Contacts
 	PermContactsReadAll = "contacts:read_all"
 	PermContactsRead    = "contacts:read"
 	PermContactsWrite   = "contacts:write"
 	PermContactsBlock   = "contacts:block"
 
-	// Contact Notes
 	PermContactNotesRead   = "contact_notes:read"
 	PermContactNotesWrite  = "contact_notes:write"
 	PermContactNotesDelete = "contact_notes:delete"
 
-	// Custom attributes
 	PermCustomAttributesManage = "custom_attributes:manage"
 
-	// Activity log
 	PermActivityLogsManage = "activity_logs:manage"
 
-	// Worklog
 	PermWorklogViewOwn  = "worklog:view_own"
 	PermWorklogViewTeam = "worklog:view_team"
 	PermWorklogViewAll  = "worklog:view_all"
 
-	// Knowledge
 	PermKnowledgeRead    = "knowledge:read"
 	PermKnowledgeWrite   = "knowledge:write"
 	PermKnowledgePublish = "knowledge:publish"
 	PermKnowledgeDelete  = "knowledge:delete"
 
-	// Tools (script execution
+	// PermToolsCall authorizes invoking tools (script execution).
 	PermToolsCall = "tools:call"
 
-	// AI agents and tools
 	PermAIAgentsManage = "ai_agents:manage"
-	// PermAIAgentsRun gates the agent runner's manual-run endpoint
+	// PermAIAgentsRun gates the agent runner's manual-run endpoint.
 	PermAIAgentsRun   = "ai_agents:run"
 	PermAIToolsManage = "ai_tools:manage"
 	PermAIToolsInvoke = "ai_tools:invoke"
 
-	// Customer identification
 	PermCustomersAssign = "customers:assign"
 	PermCustomersSearch = "customers:search"
 	PermCustomersManage = "customers:manage"
@@ -184,7 +168,7 @@ var validPermissions = map[string]struct{}{
 	PermSecretsManage:                   {},
 }
 
-// PermissionExists returns true if the permission exists else false
+// PermissionExists reports whether permission is a recognized permission key.
 func PermissionExists(permission string) bool {
 	_, exists := validPermissions[permission]
 	return exists

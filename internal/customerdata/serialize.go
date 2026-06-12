@@ -70,6 +70,8 @@ func ContractToAPIResponse(c contractmodels.Contract) json.RawMessage {
 	return out.Bytes()
 }
 
+// CustomerToMap returns CustomerToAPIResponse (Zone 1 + Zone 2 fields, plus contracts)
+// decoded into a map, for use as detection/template variables.
 func CustomerToMap(c customermodels.Customer, contracts []contractmodels.Contract) (map[string]any, error) {
 	var out map[string]any
 	if err := json.Unmarshal(CustomerToAPIResponse(c, contracts), &out); err != nil {
@@ -78,6 +80,7 @@ func CustomerToMap(c customermodels.Customer, contracts []contractmodels.Contrac
 	return out, nil
 }
 
+// ContractToMap returns ContractToAPIResponse decoded into a map.
 func ContractToMap(c contractmodels.Contract) (map[string]any, error) {
 	var out map[string]any
 	if err := json.Unmarshal(ContractToAPIResponse(c), &out); err != nil {

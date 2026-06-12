@@ -1,5 +1,8 @@
+// Package models defines the application settings; each field's json tag is the
+// persisted config key.
 package models
 
+// General holds the app.* settings.
 type General struct {
 	SiteName                    string   `json:"app.site_name"`
 	Lang                        string   `json:"app.lang"`
@@ -12,6 +15,7 @@ type General struct {
 	BusinessHoursID             string   `json:"app.business_hours_id"`
 }
 
+// EmailNotification holds the SMTP settings (notification.email.*).
 type EmailNotification struct {
 	Username      string `json:"notification.email.username" db:"notification.email.username"`
 	Host          string `json:"notification.email.host" db:"notification.email.host"`
@@ -29,6 +33,7 @@ type EmailNotification struct {
 	Enabled       bool   `json:"notification.email.enabled" db:"notification.email.enabled"`
 }
 
+// Settings aggregates every settings group.
 type Settings struct {
 	EmailNotification
 	General

@@ -1,3 +1,4 @@
+// Package models defines the WebSocket message envelopes and message-type constants.
 package models
 
 // Action constants for WebSocket messages.

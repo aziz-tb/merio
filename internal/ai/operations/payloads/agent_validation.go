@@ -18,10 +18,13 @@ type AgentValidationDetail struct {
 	Reasoning  string  `json:"reasoning,omitempty"`
 }
 
+// Marshal renders the payload to JSON for ai_operations.payload.
 func (p AgentValidationPayload) Marshal() (json.RawMessage, error) {
 	return json.Marshal(p)
 }
 
+// UnmarshalAgentValidation parses an ai_operations.payload back into the typed shape;
+// an empty payload (failed/skipped op) yields the zero value.
 func UnmarshalAgentValidation(raw json.RawMessage) (AgentValidationPayload, error) {
 	var p AgentValidationPayload
 	if len(raw) == 0 {

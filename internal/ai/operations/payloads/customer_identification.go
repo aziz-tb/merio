@@ -1,3 +1,4 @@
+// Package payloads defines the typed payload shapes persisted on ai_operations records.
 package payloads
 
 import "encoding/json"
@@ -16,6 +17,7 @@ type CustomerIdentificationPayload struct {
 	Result                 CustomerIdentificationLink `json:"result"`
 }
 
+// CustomerVerificationResult is the outcome of verifying a candidate customer match.
 type CustomerVerificationResult struct {
 	Level        int      `json:"level"`
 	Source       string   `json:"source"`
@@ -24,6 +26,8 @@ type CustomerVerificationResult struct {
 	RulesFailed  []string `json:"rules_failed,omitempty"`
 }
 
+// CustomerIdentificationLink is the resolved link to a customer and contract, with the
+// previous link it superseded (if any).
 type CustomerIdentificationLink struct {
 	CustomerID         *string `json:"customer_id,omitempty"`
 	ContractID         *string `json:"contract_id,omitempty"`
@@ -31,10 +35,13 @@ type CustomerIdentificationLink struct {
 	PreviousContractID *string `json:"previous_contract_id,omitempty"`
 }
 
+// Marshal renders the payload to JSON for ai_operations.payload.
 func (p CustomerIdentificationPayload) Marshal() (json.RawMessage, error) {
 	return json.Marshal(p)
 }
 
+// UnmarshalCustomerIdentification parses an ai_operations.payload back into the typed
+// shape; an empty payload (failed/skipped op) yields the zero value.
 func UnmarshalCustomerIdentification(raw json.RawMessage) (CustomerIdentificationPayload, error) {
 	var p CustomerIdentificationPayload
 	if len(raw) == 0 {
