@@ -10,29 +10,25 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-var (
-	// disallowedKeys contains keys that are not allowed for custom attributes as they're the default fields.
-	disallowedKeys = []string{
-		"contact_email",
-		"content",
-		"subject",
-		"status",
-		"priority",
-		"assigned_team",
-		"assigned_user",
-		"hours_since_created",
-		"hours_since_first_reply",
-		"hours_since_last_reply",
-		"hours_since_resolved",
-		"inbox",
-	}
-)
+// disallowedKeys contains keys that are not allowed for custom attributes as they're the default fields.
+var disallowedKeys = []string{
+	"contact_email",
+	"content",
+	"subject",
+	"status",
+	"priority",
+	"assigned_team",
+	"assigned_user",
+	"hours_since_created",
+	"hours_since_first_reply",
+	"hours_since_last_reply",
+	"hours_since_resolved",
+	"inbox",
+}
 
 // handleGetCustomAttribute retrieves a custom attribute by its ID.
 func handleGetCustomAttribute(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -102,9 +98,7 @@ func handleUpdateCustomAttribute(r *fastglue.Request) error {
 
 // handleDeleteCustomAttribute deletes a custom attribute from the database.
 func handleDeleteCustomAttribute(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

@@ -12,10 +12,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Manager handles changes to priorities.
 type Manager struct {
@@ -52,7 +50,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetAll retrieves all priorities.
 func (m *Manager) GetAll() ([]models.Priority, error) {
-	var priorities = make([]models.Priority, 0)
+	priorities := make([]models.Priority, 0)
 	if err := m.q.GetAll.Select(&priorities); err != nil {
 		m.lo.Error("error fetching priorities", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

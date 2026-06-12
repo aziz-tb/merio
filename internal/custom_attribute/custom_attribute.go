@@ -14,10 +14,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 type Manager struct {
 	q    queries
@@ -69,7 +67,7 @@ func (m *Manager) Get(id int) (models.CustomAttribute, error) {
 
 // GetAll retrieves all custom attributes.
 func (m *Manager) GetAll(appliesTo string) ([]models.CustomAttribute, error) {
-	var customAttributes = make([]models.CustomAttribute, 0)
+	customAttributes := make([]models.CustomAttribute, 0)
 	if err := m.q.GetAllCustomAttributes.Select(&customAttributes, appliesTo); err != nil {
 		m.lo.Error("error fetching custom attributes", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

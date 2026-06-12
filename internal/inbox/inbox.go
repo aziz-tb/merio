@@ -206,7 +206,7 @@ func (m *Manager) GetDBRecord(identifier any) (imodels.Inbox, error) {
 
 // GetAll returns all inboxes from the DB.
 func (m *Manager) GetAll() ([]imodels.Inbox, error) {
-	var inboxes = make([]imodels.Inbox, 0)
+	inboxes := make([]imodels.Inbox, 0)
 	if err := m.queries.GetAll.Select(&inboxes); err != nil {
 		m.lo.Error("error fetching inboxes", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

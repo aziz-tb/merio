@@ -18,10 +18,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Manager records and reads worklog entries.
 type Manager struct {

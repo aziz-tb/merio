@@ -71,7 +71,7 @@ func (m *Manager) Get(id int) (models.BusinessHours, error) {
 
 // GetAll retrieves all business hours.
 func (m *Manager) GetAll() ([]models.BusinessHours, error) {
-	var hours = make([]models.BusinessHours, 0)
+	hours := make([]models.BusinessHours, 0)
 	if err := m.q.GetAllBusinessHours.Select(&hours); err != nil {
 		m.lo.Error("error fetching business hours", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

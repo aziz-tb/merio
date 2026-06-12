@@ -14,9 +14,7 @@ import (
 
 // handleGetRoles returns all roles
 func handleGetRoles(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	roles, err := app.role.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)

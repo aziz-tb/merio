@@ -4,10 +4,10 @@ import "testing"
 
 func TestIsIPBlocked(t *testing.T) {
 	tests := []struct {
-		name      string
-		clientIP  string
-		blocked   []string
-		want      bool
+		name     string
+		clientIP string
+		blocked  []string
+		want     bool
 	}{
 		{"empty list", "1.2.3.4", nil, false},
 		{"exact match", "10.0.0.1", []string{"10.0.0.1"}, true},

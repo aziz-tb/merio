@@ -20,7 +20,7 @@ import (
 
 // handleGetInboxes returns all inboxes
 func handleGetInboxes(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	inboxes, err := app.inbox.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -135,9 +135,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 
 // handleToggleInbox toggles an inbox
 func handleToggleInbox(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
@@ -329,7 +327,6 @@ func validateInbox(app *App, inbox imodels.Inbox) error {
 			// Ensure linked inbox is enabled
 			if !linkedInbox.Enabled {
 				return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
-
 			}
 		}
 	}

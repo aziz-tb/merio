@@ -25,10 +25,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Store defines the interface for media storage operations.
 type Store interface {
@@ -306,7 +304,7 @@ func (r *readSeekerBytes) Seek(offset int64, whence int) (int64, error) {
 
 // GetByModel retrieves all media files attached to a specific model.
 func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) {
-	var media = make([]models.Media, 0)
+	media := make([]models.Media, 0)
 	if err := m.queries.GetByModel.Select(&media, model, modelID); err != nil {
 		m.lo.Error("error getting model media", "model", model, "model_id", modelID, "error", err)
 		return nil, fmt.Errorf("fetching media for model:%s model_id:%d: %w", model, modelID, err)

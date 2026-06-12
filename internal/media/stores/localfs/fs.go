@@ -40,7 +40,7 @@ func (c *Client) Put(filename string, cType string, src io.ReadSeeker) (string, 
 
 	// Get the directory path
 	dir := getDir(c.opts.UploadPath)
-	o, err := os.OpenFile(filepath.Join(dir, filename), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
+	o, err := os.OpenFile(filepath.Join(dir, filename), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o664)
 	if err != nil {
 		return "", err
 	}

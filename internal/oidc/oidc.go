@@ -90,7 +90,7 @@ func (o *Manager) Get(id int) (models.OIDC, error) {
 
 // GetAll retrieves all oidc.
 func (o *Manager) GetAll() ([]models.OIDC, error) {
-	var oidc = make([]models.OIDC, 0)
+	oidc := make([]models.OIDC, 0)
 	if err := o.q.GetAllOIDC.Select(&oidc); err != nil {
 		o.lo.Error("error fetching oidc", "error", err)
 		return oidc, envelope.NewError(envelope.GeneralError, o.i18n.T("globals.messages.somethingWentWrong"), nil)

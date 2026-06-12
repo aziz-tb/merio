@@ -314,7 +314,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
-	var fromAddress = strings.ToLower(env.From[0].Addr())
+	fromAddress := strings.ToLower(env.From[0].Addr())
 
 	// Determine final Message ID - prefer IMAP-parsed, fallback to raw header extraction
 	messageID := env.MessageID
@@ -361,10 +361,10 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	}
 
 	// Lowercase and set the `to`, `cc`, `from` and `bcc` addresses in message meta.
-	var ccAddr = make([]string, 0, len(env.Cc))
-	var toAddr = make([]string, 0, len(env.To))
-	var bccAddr = make([]string, 0, len(env.Bcc))
-	var fromAddr = make([]string, 0, len(env.From))
+	ccAddr := make([]string, 0, len(env.Cc))
+	toAddr := make([]string, 0, len(env.To))
+	bccAddr := make([]string, 0, len(env.Bcc))
+	fromAddr := make([]string, 0, len(env.From))
 	for _, cc := range env.Cc {
 		if cc.Addr() != "" {
 			ccAddr = append(ccAddr, strings.ToLower(cc.Addr()))

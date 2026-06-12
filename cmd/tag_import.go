@@ -15,7 +15,7 @@ import (
 const importNSTags = "tags"
 
 func handleImportTags(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 
 	file, err := r.RequestCtx.FormFile("file")
 	if err != nil {
@@ -44,7 +44,6 @@ func handleImportTags(r *fastglue.Request) error {
 	err = app.importer.Submit(importNSTags, func() error {
 		return processTagImport(app, records)
 	})
-
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("importer.importAlreadyInProgress"), nil, envelope.GeneralError)
 	}
@@ -53,7 +52,7 @@ func handleImportTags(r *fastglue.Request) error {
 }
 
 func handleGetTagImportStatus(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	status, err := app.importer.GetStatus(importNSTags)
 	if err != nil {
 		return sendErrorEnvelope(r, err)

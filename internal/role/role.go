@@ -15,10 +15,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Manager handles role-related operations.
 type Manager struct {
@@ -60,7 +58,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetAll retrieves all roles.
 func (u *Manager) GetAll() ([]models.Role, error) {
-	var roles = make([]models.Role, 0)
+	roles := make([]models.Role, 0)
 	if err := u.q.GetAll.Select(&roles); err != nil {
 		u.lo.Error("error fetching roles", "error", err)
 		return roles, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -70,7 +68,7 @@ func (u *Manager) GetAll() ([]models.Role, error) {
 
 // Get retrieves a role by ID.
 func (u *Manager) Get(id int) (models.Role, error) {
-	var role = models.Role{}
+	role := models.Role{}
 	if err := u.q.Get.Get(&role, id); err != nil {
 		if err == sql.ErrNoRows {
 			return role, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundRole"), nil)

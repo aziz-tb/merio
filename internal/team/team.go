@@ -17,10 +17,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Manager handles team-related operations.
 type Manager struct {
@@ -65,7 +63,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetAll retrieves all teams.
 func (u *Manager) GetAll() ([]models.Team, error) {
-	var teams = make([]models.Team, 0)
+	teams := make([]models.Team, 0)
 	if err := u.q.GetTeams.Select(&teams); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
@@ -78,7 +76,7 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 
 // GetAllCompact retrieves all teams with limited fields.
 func (u *Manager) GetAllCompact() ([]models.TeamCompact, error) {
-	var teams = make([]models.TeamCompact, 0)
+	teams := make([]models.TeamCompact, 0)
 	if err := u.q.GetTeamsCompact.Select(&teams); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
@@ -137,7 +135,7 @@ func (u *Manager) Delete(id int) error {
 
 // GetUserTeams retrieves teams of a user by user ID.
 func (u *Manager) GetUserTeams(userID int) ([]models.Team, error) {
-	var teams = make([]models.Team, 0)
+	teams := make([]models.Team, 0)
 	if err := u.q.GetUserTeams.Select(&teams, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
@@ -169,7 +167,7 @@ func (u *Manager) UserBelongsToTeam(teamID, userID int) (bool, error) {
 
 // GetMembers retrieves members of a team.
 func (u *Manager) GetMembers(id int) ([]models.TeamMember, error) {
-	var members = make([]models.TeamMember, 0)
+	members := make([]models.TeamMember, 0)
 	if err := u.q.GetTeamMembers.Select(&members, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return members, nil

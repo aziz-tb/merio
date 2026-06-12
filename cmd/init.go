@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"html/template"
 
 	activitylog "github.com/aziz-tb/merio/internal/activity_log"
 	aiagents "github.com/aziz-tb/merio/internal/ai/agents"
@@ -224,7 +223,6 @@ func initFS(staticDir string) stuffbin.FileSystem {
 
 	// Load embedded files in the executable.
 	fs, err := stuffbin.UnStuff(path)
-
 	if err != nil {
 		if err == stuffbin.ErrNoID {
 			// Running in local/dev mode, use the local filesystem.
@@ -382,7 +380,7 @@ func initConversations(
 
 // initTag inits tag manager.
 func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
-	var lo = initLogger("tag_manager")
+	lo := initLogger("tag_manager")
 	mgr, err := tag.New(tag.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -396,7 +394,7 @@ func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
 
 // initViews inits view manager.
 func initView(db *sqlx.DB, i18n *i18n.I18n) *view.Manager {
-	var lo = initLogger("view_manager")
+	lo := initLogger("view_manager")
 	m, err := view.New(view.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -410,7 +408,7 @@ func initView(db *sqlx.DB, i18n *i18n.I18n) *view.Manager {
 
 // initMacro inits macro manager.
 func initMacro(db *sqlx.DB, i18n *i18n.I18n) *macro.Manager {
-	var lo = initLogger("macro")
+	lo := initLogger("macro")
 	m, err := macro.New(macro.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -424,7 +422,7 @@ func initMacro(db *sqlx.DB, i18n *i18n.I18n) *macro.Manager {
 
 // initKnowledge inits knowledge base manager.
 func initKnowledge(db *sqlx.DB, i18n *i18n.I18n) *knowledge.Manager {
-	var lo = initLogger("knowledge")
+	lo := initLogger("knowledge")
 	m, err := knowledge.New(knowledge.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -515,7 +513,7 @@ func initSecret(db *sqlx.DB, i18n *i18n.I18n, kek []byte) *secret.Manager {
 
 // initBusinessHours inits business hours manager.
 func initBusinessHours(db *sqlx.DB, i18n *i18n.I18n) *businesshours.Manager {
-	var lo = initLogger("business-hours")
+	lo := initLogger("business-hours")
 	m, err := businesshours.New(businesshours.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -529,7 +527,7 @@ func initBusinessHours(db *sqlx.DB, i18n *i18n.I18n) *businesshours.Manager {
 
 // initSLA inits SLA manager.
 func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, template *tmpl.Manager, userManager *user.Manager, i18n *i18n.I18n, dispatcher *notifier.Dispatcher) *sla.Manager {
-	var lo = initLogger("sla")
+	lo := initLogger("sla")
 	m, err := sla.New(sla.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -543,7 +541,7 @@ func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, 
 
 // initCSAT inits CSAT manager.
 func initCSAT(db *sqlx.DB, i18n *i18n.I18n) *csat.Manager {
-	var lo = initLogger("csat")
+	lo := initLogger("csat")
 	m, err := csat.New(csat.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -671,7 +669,7 @@ func reloadTemplates(app *App) error {
 
 // initTeam inits team manager.
 func initTeam(db *sqlx.DB, i18n *i18n.I18n) *team.Manager {
-	var lo = initLogger("team-manager")
+	lo := initLogger("team-manager")
 	mgr, err := team.New(team.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -748,7 +746,7 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 
 // initInbox initializes the inbox manager without registering inboxes.
 func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
-	var lo = initLogger("inbox-manager")
+	lo := initLogger("inbox-manager")
 	mgr, err := inbox.New(lo, db, i18n, ko.MustString("app.encryption_key"))
 	if err != nil {
 		log.Fatalf("error initializing inbox manager: %v", err)
@@ -758,7 +756,7 @@ func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 
 // initAIAgents initializes the ai_agents CRUD manager.
 func initAIAgents(db *sqlx.DB, i18n *i18n.I18n) *aiagents.Manager {
-	var lo = initLogger("ai-agents")
+	lo := initLogger("ai-agents")
 	m, err := aiagents.New(aiagents.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -772,7 +770,7 @@ func initAIAgents(db *sqlx.DB, i18n *i18n.I18n) *aiagents.Manager {
 
 // initAITools initializes the ai_tools CRUD manager.
 func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
-	var lo = initLogger("ai-tools")
+	lo := initLogger("ai-tools")
 	m, err := aitools.New(aitools.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -789,7 +787,7 @@ func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
 // identification executors, future domains). It runs functions through the
 // shared exec runner.
 func initFunction(db *sqlx.DB, runner *execrunner.Manager, i18n *i18n.I18n) *function.Manager {
-	var lo = initLogger("function")
+	lo := initLogger("function")
 	m, err := function.New(function.Opts{
 		DB:     db,
 		Runner: runner,
@@ -835,7 +833,7 @@ func initContract(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager, funct
 // agent_execution_outcomes (the Composer tab's storage layer, migration
 // v2_7_6).
 func initAIExecutions(db *sqlx.DB, i18n *i18n.I18n) *aiexecutions.Manager {
-	var lo = initLogger("ai-executions")
+	lo := initLogger("ai-executions")
 	m, err := aiexecutions.New(aiexecutions.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -864,7 +862,7 @@ func initAIOperations(db *sqlx.DB) *aioperations.Manager {
 // per-million-token rates from there); fails loudly if the catalog
 // hasn't been loaded yet.
 func initAIUsage(db *sqlx.DB, cat *aicatalog.Catalog) *aiusage.Manager {
-	var lo = initLogger("ai-usage")
+	lo := initLogger("ai-usage")
 	m, err := aiusage.New(aiusage.Opts{
 		DB:      db,
 		Catalog: cat,
@@ -1108,7 +1106,7 @@ func initDetectionManager(provider llm.LLMProvider, presets *aipreset.Registry, 
 
 // initAutomationEngine initializes the automation engine.
 func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n, detectionMgr *detection.Manager, customerMgr *customer.Manager, contractMgr *contract.Manager) *automation.Engine {
-	var lo = initLogger("automation_engine")
+	lo := initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
 		DB:           db,
 		Lo:           lo,
@@ -1210,7 +1208,6 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		Lo:                   initLogger("email_inbox"),
 		TokenRefreshCallback: tokenRefreshCallback,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error : %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
@@ -1239,7 +1236,6 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 		Lo:            initLogger("livechat_inbox"),
 		SignAvatarURL: signAvatarURL,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error : %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
@@ -1426,7 +1422,7 @@ func initDB() *sqlx.DB {
 
 // initRedis inits role manager.
 func initRole(db *sqlx.DB, i18n *i18n.I18n) *role.Manager {
-	var lo = initLogger("role_manager")
+	lo := initLogger("role_manager")
 	r, err := role.New(role.Opts{
 		DB:   db,
 		Lo:   lo,
@@ -1536,7 +1532,7 @@ func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
 
 // initWebhook inits webhook manager.
 func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
-	var lo = initLogger("webhook")
+	lo := initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
 		DB:            db,
 		Lo:            lo,
@@ -1555,7 +1551,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n) *webhook.Manager {
 
 // initUserNotification inits user notification manager.
 func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificationManager {
-	var lo = initLogger("user-notification")
+	lo := initLogger("user-notification")
 	m, err := notifier.NewUserNotificationManager(notifier.UserNotificationOpts{
 		DB:   db,
 		Lo:   lo,

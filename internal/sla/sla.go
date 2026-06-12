@@ -178,7 +178,7 @@ func (m *Manager) Get(id int) (models.SLAPolicy, error) {
 
 // GetAll fetches all SLA policies.
 func (m *Manager) GetAll() ([]models.SLAPolicy, error) {
-	var slas = make([]models.SLAPolicy, 0)
+	slas := make([]models.SLAPolicy, 0)
 	if err := m.q.GetAllSLAPolicies.Select(&slas); err != nil {
 		m.lo.Error("error fetching SLAs", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -394,7 +394,7 @@ func (m *Manager) evaluatePendingSLAEvents(ctx context.Context) error {
 	m.lo.Info("found pending SLA events for evaluation", "count", len(slaEvents))
 
 	// Cache for SLA policies.
-	var slaPolicyCache = make(map[int]models.SLAPolicy)
+	slaPolicyCache := make(map[int]models.SLAPolicy)
 	for _, event := range slaEvents {
 		select {
 		case <-ctx.Done():
@@ -690,7 +690,6 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 					"Email":     "",
 				},
 			})
-
 		if err != nil {
 			m.lo.Error("error rendering email template", "template", template.TmplConversationAssigned, "scheduled_notification_id", scheduledNotification.ID, "error", err)
 			continue

@@ -10,9 +10,7 @@ import (
 )
 
 func handleGetStatuses(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	out, err := app.status.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -42,9 +40,7 @@ func handleCreateStatus(r *fastglue.Request) error {
 }
 
 func handleDeleteStatus(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

@@ -200,7 +200,7 @@ func writeModelCatalog(t *testing.T, pre preset.Preset) *catalog.Catalog {
 	require.NoError(t, err)
 
 	path := filepath.Join(t.TempDir(), "azure_models.json")
-	require.NoError(t, os.WriteFile(path, raw, 0600))
+	require.NoError(t, os.WriteFile(path, raw, 0o600))
 	cat, err := catalog.LoadMulti(map[string]string{"azure": path})
 	require.NoError(t, err)
 	return cat
@@ -222,7 +222,7 @@ func writePresetRegistry(t *testing.T, pre preset.Preset) *preset.Registry {
 	require.NoError(t, err)
 
 	path := filepath.Join(t.TempDir(), "presets.json")
-	require.NoError(t, os.WriteFile(path, raw, 0600))
+	require.NoError(t, os.WriteFile(path, raw, 0o600))
 	reg, err := preset.Load(path, nil)
 	require.NoError(t, err)
 	return reg

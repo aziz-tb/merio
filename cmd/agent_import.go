@@ -13,7 +13,7 @@ import (
 
 // handleImportAgents handles CSV upload and starts import job
 func handleImportAgents(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 
 	file, err := r.RequestCtx.FormFile("file")
 	if err != nil {
@@ -42,7 +42,6 @@ func handleImportAgents(r *fastglue.Request) error {
 	err = app.importer.Submit("agents", func() error {
 		return processAgentImport(app, records)
 	})
-
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("importer.importAlreadyInProgress"), nil, envelope.GeneralError)
 	}
@@ -52,7 +51,7 @@ func handleImportAgents(r *fastglue.Request) error {
 
 // handleGetAgentImportStatus returns current import status
 func handleGetAgentImportStatus(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	status, err := app.importer.GetStatus("agents")
 	if err != nil {
 		return sendErrorEnvelope(r, err)

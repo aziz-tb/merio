@@ -56,7 +56,7 @@ type agentReq struct {
 
 // handleGetAgents returns all agents.
 func handleGetAgents(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	agents, err := app.user.GetAgents()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -66,7 +66,7 @@ func handleGetAgents(r *fastglue.Request) error {
 
 // handleGetAgentsCompact returns all agents in a compact format.
 func handleGetAgentsCompact(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	agents, err := app.user.GetAgentsCompact()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -76,7 +76,7 @@ func handleGetAgentsCompact(r *fastglue.Request) error {
 
 // handleGetAgent returns an agent.
 func handleGetAgent(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -464,7 +464,7 @@ func handleSetPassword(r *fastglue.Request) error {
 
 // uploadUserAvatar uploads the user avatar.
 func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.FileHeader) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 
 	fileHeader := files[0]
 	file, err := fileHeader.Open()
@@ -581,7 +581,7 @@ func handleRevokeAPIKey(r *fastglue.Request) error {
 
 // validateAgentRequest validates common agent request fields and normalizes the email
 func validateAgentRequest(r *fastglue.Request, req *agentReq) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 
 	// Normalize email
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))

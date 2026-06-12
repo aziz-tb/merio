@@ -15,9 +15,7 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	ErrClientNotConnected = fmt.Errorf("client not connected")
-)
+var ErrClientNotConnected = fmt.Errorf("client not connected")
 
 const (
 	ChannelLiveChat       = "livechat"

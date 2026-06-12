@@ -202,7 +202,7 @@ func (e *Engine) Close() {
 
 // GetAllRules retrieves all rules of a specific type.
 func (e *Engine) GetAllRules(typ []byte) ([]models.RuleRecord, error) {
-	var rules = make([]models.RuleRecord, 0)
+	rules := make([]models.RuleRecord, 0)
 	if err := e.q.GetAll.Select(&rules, typ); err != nil {
 		e.lo.Error("error fetching rules", "error", err)
 		return rules, envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)

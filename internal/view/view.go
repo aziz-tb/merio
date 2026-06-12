@@ -14,10 +14,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 type Manager struct {
 	q    queries
@@ -58,7 +56,7 @@ func New(opts Opts) (*Manager, error) {
 
 // Get returns a view by ID.
 func (v *Manager) Get(id int) (models.View, error) {
-	var view = models.View{}
+	view := models.View{}
 	if err := v.q.GetView.Get(&view, id); err != nil {
 		if err == sql.ErrNoRows {
 			return view, envelope.NewError(envelope.NotFoundError, v.i18n.T("validation.notFoundView"), nil)

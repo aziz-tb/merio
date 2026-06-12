@@ -17,10 +17,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 type Manager struct {
 	q    queries
@@ -75,7 +73,7 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int)
 	defer tx.Rollback()
 
 	// Execute query
-	var activityLogs = make([]models.ActivityLog, 0)
+	activityLogs := make([]models.ActivityLog, 0)
 	if err := tx.Select(&activityLogs, query, qArgs...); err != nil {
 		m.lo.Error("error fetching activity logs", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

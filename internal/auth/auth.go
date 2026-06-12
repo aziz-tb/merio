@@ -394,7 +394,6 @@ func simpleSessGetCookieCB(name string, r interface{}) (*http.Cookie, error) {
 		} else {
 			return nil, err
 		}
-
 	}
 
 	// Convert fasthttp cookie to net http cookie.

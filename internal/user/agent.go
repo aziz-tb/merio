@@ -78,7 +78,7 @@ func (u *Manager) InvalidateAllAgentCache() {
 
 // GetAgentsCompact returns a compact list of agents with limited fields.
 func (u *Manager) GetAgentsCompact() ([]models.UserCompact, error) {
-	var users = make([]models.UserCompact, 0)
+	users := make([]models.UserCompact, 0)
 	if err := u.db.Select(&users, u.q.GetUsersCompact, pq.Array([]string{models.UserTypeAgent})); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
 		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -94,7 +94,7 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	var id = 0
+	id := 0
 	avatarURL := null.String{}
 	email = strings.TrimSpace(strings.ToLower(email))
 	if err := u.q.InsertAgent.QueryRow(email, firstName, lastName, password, avatarURL, pq.Array(roles)).Scan(&id); err != nil {

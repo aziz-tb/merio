@@ -131,6 +131,6 @@ func TestLoadMultiRejectsProviderMismatch(t *testing.T) {
 func writeCatalog(t *testing.T, provider, raw string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), provider+"_models.json")
-	require.NoError(t, os.WriteFile(path, []byte(raw), 0600))
+	require.NoError(t, os.WriteFile(path, []byte(raw), 0o600))
 	return path
 }

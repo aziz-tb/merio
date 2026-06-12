@@ -106,7 +106,7 @@ func (u *Manager) UpdateContactLinkedCustomer(id int, customerID null.String) er
 
 // GetContactsLinkedToCustomer returns contacts that share the same linked customer ID.
 func (u *Manager) GetContactsLinkedToCustomer(customerID string, excludeContactID int) ([]models.LinkedContact, error) {
-	var contacts = make([]models.LinkedContact, 0)
+	contacts := make([]models.LinkedContact, 0)
 	if err := u.q.GetContactsLinkedToCustomer.Select(&contacts, strings.TrimSpace(customerID), excludeContactID); err != nil {
 		u.lo.Error("error fetching contacts linked to customer", "customer_id", customerID, "error", err)
 		return contacts, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)

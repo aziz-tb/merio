@@ -23,7 +23,7 @@ func (m *Manager) UpsertConversationDraft(conversationID, userID int, content st
 
 // GetAllUserDrafts retrieves all drafts for a user.
 func (m *Manager) GetAllUserDrafts(userID int) ([]models.ConversationDraft, error) {
-	var drafts = make([]models.ConversationDraft, 0)
+	drafts := make([]models.ConversationDraft, 0)
 	if err := m.q.GetAllUserDrafts.Select(&drafts, userID); err != nil {
 		m.lo.Error("error fetching user drafts", "user_id", userID, "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

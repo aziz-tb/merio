@@ -215,8 +215,8 @@ func New(
 	webhook webhookStore,
 	worklog worklogStore,
 	dispatcher *notifier.Dispatcher,
-	opts Opts) (*Manager, error) {
-
+	opts Opts,
+) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 
 // GetContactPreviousConversations retrieves previous conversations for a contact with a configurable limit.
 func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]models.PreviousConversation, error) {
-	var conversations = make([]models.PreviousConversation, 0)
+	conversations := make([]models.PreviousConversation, 0)
 	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -435,7 +435,7 @@ func (c *Manager) GetConversationsByContact(ctx context.Context, contactID, page
 		pageSize = conversationsListMaxPageSize
 	}
 
-	var conversations = make([]models.ContactConversationHistoryItem, 0)
+	conversations := make([]models.ContactConversationHistoryItem, 0)
 	offset := (page - 1) * pageSize
 	if err := c.q.GetConversationsByContact.SelectContext(ctx, &conversations, contactID, strings.TrimSpace(excludeUUID), pageSize, offset); err != nil {
 		c.lo.Error("error fetching contact conversation history", "contact_id", contactID, "error", err)
@@ -453,7 +453,7 @@ func (c *Manager) GetConversationsByContact(ctx context.Context, contactID, page
 
 // GetContactChatConversations retrieves chat conversations for a contact in a specific inbox.
 func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.ChatConversation, error) {
-	var conversations = make([]models.ChatConversation, 0)
+	conversations := make([]models.ChatConversation, 0)
 	if err := c.q.GetContactChatConversations.Select(&conversations, contactID, inboxID); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -499,7 +499,7 @@ func (c *Manager) SignAvatarURL(avatarURL *null.String) {
 
 // GetConversationsCreatedAfter retrieves conversations created after the specified time.
 func (c *Manager) GetConversationsCreatedAfter(time time.Time) ([]models.Conversation, error) {
-	var conversations = make([]models.Conversation, 0)
+	conversations := make([]models.Conversation, 0)
 	if err := c.q.GetConversationsCreatedAfter.Select(&conversations, time); err != nil {
 		c.lo.Error("error fetching conversation", "error", err)
 		return conversations, err
@@ -625,7 +625,7 @@ func (c *Manager) GetViewConversationsList(viewingUserID, userID int, teamIDs []
 // GetConversations retrieves conversations list based on user ID, type, and optional filtering, ordering, and pagination.
 // viewingUserID is used to calculate per-agent unread counts.
 func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, listTypes []string, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
-	var conversations = make([]models.ConversationListItem, 0)
+	conversations := make([]models.ConversationListItem, 0)
 
 	// Make the query.
 	query, qArgs, err := c.makeConversationsListQuery(viewingUserID, userID, teamIDs, listTypes, c.q.GetConversations, order, orderBy, page, pageSize, filters)
@@ -1864,7 +1864,7 @@ func (m *Manager) BuildWidgetConversationView(conversation models.Conversation) 
 
 // BuildWidgetConversationResponse builds the full conversation response for widget including messages
 func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversation, includeMessages bool) (WidgetConversationResponse, error) {
-	var resp = WidgetConversationResponse{}
+	resp := WidgetConversationResponse{}
 
 	chatConversation, err := m.GetChatConversation(conversation.UUID)
 	if err != nil {

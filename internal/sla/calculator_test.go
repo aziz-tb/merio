@@ -267,7 +267,7 @@ func TestCalculateDeadline(t *testing.T) {
 				}),
 			},
 			timeZone:       "UTC",
-			expectedResult: time.Date(2023, 10, 17, 00, 02, 0, 0, locUTC),
+			expectedResult: time.Date(2023, 10, 17, 0o0, 0o2, 0, 0, locUTC),
 		},
 		{
 			name:       "Closed All Day",
@@ -413,7 +413,7 @@ func TestCalculateDeadline(t *testing.T) {
 		},
 		{
 			name:      "Short Working Day #2",
-			startTime: time.Date(2025, 03, 22, 18, 01, 0, 0, locIST),
+			startTime: time.Date(2025, 0o3, 22, 18, 0o1, 0, 0, locIST),
 			// 24 hours.
 			slaMinutes: 1440,
 			businessHours: models.BusinessHours{
@@ -423,11 +423,11 @@ func TestCalculateDeadline(t *testing.T) {
 				}),
 			},
 			timeZone:       "UTC",
-			expectedResult: time.Date(2025, 04, 9, 15, 30, 0, 0, locUTC),
+			expectedResult: time.Date(2025, 0o4, 9, 15, 30, 0, 0, locUTC),
 		},
 		{
 			name:       "Monday to Friday 10:00 to 18:00",
-			startTime:  time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
+			startTime:  time.Date(2025, 0o3, 22, 18, 1, 43, 0, locIST), // Sat
 			slaMinutes: 1439,
 			businessHours: models.BusinessHours{
 				Hours: mustMarshalJSON(map[string]models.WorkingHours{
@@ -440,11 +440,11 @@ func TestCalculateDeadline(t *testing.T) {
 				}),
 			},
 			timeZone:       "Asia/Kolkata",
-			expectedResult: time.Date(2025, 03, 26, 17, 59, 0, 0, locIST),
+			expectedResult: time.Date(2025, 0o3, 26, 17, 59, 0, 0, locIST),
 		},
 		{
 			name:      "Monday to Friday 10:00 to 18:00",
-			startTime: time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
+			startTime: time.Date(2025, 0o3, 22, 18, 1, 43, 0, locIST), // Sat
 			// 24 hours.
 			slaMinutes: 1440,
 			businessHours: models.BusinessHours{
@@ -458,11 +458,11 @@ func TestCalculateDeadline(t *testing.T) {
 				}),
 			},
 			timeZone:       "Asia/Kolkata",
-			expectedResult: time.Date(2025, 03, 26, 18, 0, 0, 0, locIST),
+			expectedResult: time.Date(2025, 0o3, 26, 18, 0, 0, 0, locIST),
 		},
 		{
 			name:       "Monday to Friday 10:00 to 18:00 #2",
-			startTime:  time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
+			startTime:  time.Date(2025, 0o3, 22, 18, 1, 43, 0, locIST), // Sat
 			slaMinutes: 1430,
 			businessHours: models.BusinessHours{
 				Hours: mustMarshalJSON(map[string]models.WorkingHours{
@@ -475,11 +475,11 @@ func TestCalculateDeadline(t *testing.T) {
 				}),
 			},
 			timeZone:       "Asia/Kolkata",
-			expectedResult: time.Date(2025, 03, 26, 17, 50, 0, 0, locIST),
+			expectedResult: time.Date(2025, 0o3, 26, 17, 50, 0, 0, locIST),
 		},
 		{
 			name:       "Monday to Friday 10:00 to 18:00 #3",
-			startTime:  time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
+			startTime:  time.Date(2025, 0o3, 22, 18, 1, 43, 0, locIST), // Sat
 			slaMinutes: 1450,
 			businessHours: models.BusinessHours{
 				Hours: mustMarshalJSON(map[string]models.WorkingHours{
@@ -492,7 +492,7 @@ func TestCalculateDeadline(t *testing.T) {
 				}),
 			},
 			timeZone:       "Asia/Kolkata",
-			expectedResult: time.Date(2025, 03, 27, 10, 10, 0, 0, locIST),
+			expectedResult: time.Date(2025, 0o3, 27, 10, 10, 0, 0, locIST),
 		},
 	}
 

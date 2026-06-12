@@ -29,5 +29,4 @@ func handleGetActivityLogs(r *fastglue.Request) error {
 		TotalPages: (total + pageSize - 1) / pageSize,
 		Page:       page,
 	})
-
 }

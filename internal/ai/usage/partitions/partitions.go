@@ -32,10 +32,10 @@ import (
 
 // Manager owns the partition runway for a single partitioned table.
 type Manager struct {
-	db        *sqlx.DB
-	table     string // e.g. "ai_usage"
-	premake   int    // number of future months to keep pre-created (inclusive of current)
-	lo        *logf.Logger
+	db      *sqlx.DB
+	table   string // e.g. "ai_usage"
+	premake int    // number of future months to keep pre-created (inclusive of current)
+	lo      *logf.Logger
 }
 
 // Opts configures Manager.

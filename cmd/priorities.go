@@ -6,7 +6,7 @@ import (
 
 // handleGetPriorities returns all priorities.
 func handleGetPriorities(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	out, err := app.priority.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)

@@ -58,7 +58,7 @@ func NewUserNotificationManager(opts UserNotificationOpts) (*UserNotificationMan
 
 // GetAll retrieves notifications for a user with pagination.
 func (m *UserNotificationManager) GetAll(userID, limit, offset int) ([]models.UserNotification, error) {
-	var notifications = make([]models.UserNotification, 0)
+	notifications := make([]models.UserNotification, 0)
 	if err := m.q.GetNotifications.Select(&notifications, userID, limit, offset); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return notifications, nil

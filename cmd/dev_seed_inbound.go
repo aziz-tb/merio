@@ -196,7 +196,8 @@ func bootstrapDevSeedInboundApp(configPath string) (*App, error) {
 
 func requireEmailInbox(db interface {
 	Get(dest any, query string, args ...any) error
-}, inboxID int) error {
+}, inboxID int,
+) error {
 	var channel string
 	if err := db.Get(&channel, `SELECT channel FROM inboxes WHERE id = $1`, inboxID); err != nil {
 		return fmt.Errorf("inbox %d not found: %w", inboxID, err)

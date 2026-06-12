@@ -11,9 +11,7 @@ import (
 
 // handleGetTeams returns a list of all teams.
 func handleGetTeams(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	teams, err := app.team.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -23,9 +21,7 @@ func handleGetTeams(r *fastglue.Request) error {
 
 // handleGetTeamsCompact returns a list of all teams in a compact format.
 func handleGetTeamsCompact(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	teams, err := app.team.GetAllCompact()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -103,9 +99,7 @@ func handleUpdateTeam(r *fastglue.Request) error {
 
 // handleDeleteTeam deletes a team
 func handleDeleteTeam(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

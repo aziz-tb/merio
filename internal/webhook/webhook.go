@@ -32,10 +32,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Manager handles webhook-related operations.
 type Manager struct {
@@ -120,7 +118,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetAll retrieves all webhooks.
 func (m *Manager) GetAll() ([]models.Webhook, error) {
-	var webhooks = make([]models.Webhook, 0)
+	webhooks := make([]models.Webhook, 0)
 	if err := m.q.GetAllWebhooks.Select(&webhooks); err != nil {
 		m.lo.Error("error fetching webhooks", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -404,7 +402,7 @@ func (m *Manager) generateSignature(payload []byte, secret string) string {
 
 // getWebhooksByEvent retrieves active webhooks that are subscribed to a specific event.
 func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
-	var webhooks = make([]models.Webhook, 0)
+	webhooks := make([]models.Webhook, 0)
 	if err := m.q.GetWebhooksByEvent.Select(&webhooks, event); err != nil {
 		return nil, err
 	}

@@ -15,7 +15,7 @@ import (
 
 // handleGetMacros returns all macros.
 func handleGetMacros(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	macros, err := app.macro.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -124,7 +124,7 @@ func handleUpdateMacro(r *fastglue.Request) error {
 
 // handleDeleteMacro deletes macro.
 func handleDeleteMacro(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

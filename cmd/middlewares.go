@@ -160,7 +160,7 @@ func tryAuth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 // Supports both API key authentication (Authorization header) and session-based authentication.
 func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
-		var app = r.Context.(*App)
+		app := r.Context.(*App)
 
 		// Authenticate user using shared authentication logic
 		user, err := authenticateUser(r, app)
@@ -190,7 +190,7 @@ func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 // Supports both API key authentication (Authorization header) and session-based authentication.
 func perm(handler fastglue.FastRequestHandler, perm string) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
-		var app = r.Context.(*App)
+		app := r.Context.(*App)
 
 		// Authenticate user using shared authentication logic
 		user, err := authenticateUser(r, app)

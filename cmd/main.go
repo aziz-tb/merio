@@ -44,6 +44,7 @@ import (
 	aibuiltin "github.com/aziz-tb/merio/internal/ai/tools/builtin"
 	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
 	aiusagepartitions "github.com/aziz-tb/merio/internal/ai/usage/partitions"
+
 	// aicapabilities is imported by alias so cmd/main.go can call
 	// SetKBSearcher after the embeddings subsystem boots. The init()
 	// blocks under capabilities/ still fire on import and register
@@ -393,7 +394,7 @@ func main() {
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
 
-	var app = &App{
+	app := &App{
 		ctx:             ctx,
 		db:              db,
 		lo:              lo,

@@ -14,10 +14,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 const (
 	maxStatusNameLength  = 25
@@ -63,7 +61,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetAll retrieves all statuses.
 func (m *Manager) GetAll() ([]models.Status, error) {
-	var statuses = make([]models.Status, 0)
+	statuses := make([]models.Status, 0)
 	if err := m.q.GetAllStatuses.Select(&statuses); err != nil {
 		m.lo.Error("error fetching statuses", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

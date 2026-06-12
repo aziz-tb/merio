@@ -7,7 +7,7 @@ import (
 
 // GetNotes returns all notes for a user.
 func (u *Manager) GetNotes(id int) ([]models.Note, error) {
-	var notes = make([]models.Note, 0)
+	notes := make([]models.Note, 0)
 	if err := u.q.GetNotes.Select(&notes, id); err != nil {
 		u.lo.Error("error fetching user notes", "error", err)
 		return notes, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)

@@ -45,7 +45,7 @@ func (m *Manager) CalculateDeadline(start time.Time, slaMinutes int, businessHou
 	}
 
 	// Unmarshal holidays.
-	var holidays = []models.Holiday{}
+	holidays := []models.Holiday{}
 	if len(businessHours.Holidays) > 0 {
 		if err := json.Unmarshal(businessHours.Holidays, &holidays); err != nil {
 			return time.Time{}, fmt.Errorf("could not unmarshal holidays for SLA deadline calcuation: %v", err)

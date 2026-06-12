@@ -8,13 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
-
-	"log"
 
 	"github.com/aziz-tb/merio/internal/dbutil"
 	"github.com/aziz-tb/merio/internal/envelope"
@@ -167,7 +166,7 @@ func (u *Manager) GetAllUsers(page, pageSize int, userTypes []string, order, ord
 	defer tx.Rollback()
 
 	// Execute query
-	var users = make([]models.UserCompact, 0)
+	users := make([]models.UserCompact, 0)
 	if err := tx.Select(&users, query, qArgs...); err != nil {
 		u.lo.Error("error fetching users", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)

@@ -253,9 +253,7 @@ func rewriteCoalesce(values ...string) string {
 
 // handleGetAIPrompts returns AI prompts
 func handleGetAIPrompts(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	resp, err := app.rewrite.GetPrompts()
 	if err != nil {
 		return sendErrorEnvelope(r, err)

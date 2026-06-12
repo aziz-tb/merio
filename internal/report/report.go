@@ -16,10 +16,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 type Manager struct {
 	q    queries
@@ -61,7 +59,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetOverViewCounts returns overview counts
 func (m *Manager) GetOverViewCounts() (json.RawMessage, error) {
-	var counts = json.RawMessage{}
+	counts := json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
@@ -119,7 +117,7 @@ func (m *Manager) GetOverviewSLA(days int) (json.RawMessage, error) {
 
 // GetOverviewChart returns overview chart data
 func (m *Manager) GetOverviewChart(days int) (json.RawMessage, error) {
-	var stats = json.RawMessage{}
+	stats := json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
@@ -139,7 +137,7 @@ func (m *Manager) GetOverviewChart(days int) (json.RawMessage, error) {
 
 // GetOverviewCSAT returns CSAT metrics for the overview dashboard
 func (m *Manager) GetOverviewCSAT(days int) (json.RawMessage, error) {
-	var stats = json.RawMessage{}
+	stats := json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
@@ -159,7 +157,7 @@ func (m *Manager) GetOverviewCSAT(days int) (json.RawMessage, error) {
 
 // GetOverviewMessageVolume returns message volume metrics for the overview dashboard
 func (m *Manager) GetOverviewMessageVolume(days int) (json.RawMessage, error) {
-	var stats = json.RawMessage{}
+	stats := json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
@@ -179,7 +177,7 @@ func (m *Manager) GetOverviewMessageVolume(days int) (json.RawMessage, error) {
 
 // GetOverviewTagDistribution returns tag distribution metrics for the overview dashboard
 func (m *Manager) GetOverviewTagDistribution(days int) (json.RawMessage, error) {
-	var stats = json.RawMessage{}
+	stats := json.RawMessage{}
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})

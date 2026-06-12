@@ -15,10 +15,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 type Manager struct {
 	q    queries
@@ -58,7 +56,7 @@ func New(opts Opts) (*Manager, error) {
 
 // GetAll retrieves all tags, optionally including private tags.
 func (t *Manager) GetAll(includePrivate bool) ([]models.Tag, error) {
-	var tags = make([]models.Tag, 0)
+	tags := make([]models.Tag, 0)
 	stmt := t.q.GetPublicTags
 	if includePrivate {
 		stmt = t.q.GetAllTags
@@ -72,7 +70,7 @@ func (t *Manager) GetAll(includePrivate bool) ([]models.Tag, error) {
 
 // GetEnabledForClassification returns tags with non-manual detection enabled.
 func (t *Manager) GetEnabledForClassification() ([]models.Tag, error) {
-	var tags = make([]models.Tag, 0)
+	tags := make([]models.Tag, 0)
 	if err := t.q.GetEnabledForClassification.Select(&tags); err != nil {
 		t.lo.Error("error fetching classification tags", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, t.i18n.T("globals.messages.somethingWentWrong"), nil)

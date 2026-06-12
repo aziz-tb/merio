@@ -25,7 +25,7 @@ func handleGetAllOIDC(r *fastglue.Request) error {
 
 // handleGetOIDC returns an OIDC record by id.
 func handleGetOIDC(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -109,7 +109,7 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 
 // handleDeleteOIDC deletes an OIDC record.
 func handleDeleteOIDC(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

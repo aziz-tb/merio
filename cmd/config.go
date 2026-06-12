@@ -9,7 +9,7 @@ import (
 
 // handleGetConfig returns the public configuration needed for app initialization, this includes minimal app settings and enabled SSO providers (without secrets).
 func handleGetConfig(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 
 	// Get app settings
 	settingsJSON, err := app.setting.GetByPrefix("app")

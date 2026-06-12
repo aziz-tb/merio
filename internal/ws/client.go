@@ -50,7 +50,7 @@ type Client struct {
 
 // Serve handles heartbeats and sending messages to the client.
 func (c *Client) Serve() {
-	var heartBeatTicker = time.NewTicker(2 * time.Second)
+	heartBeatTicker := time.NewTicker(2 * time.Second)
 	defer heartBeatTicker.Stop()
 	defer c.Conn.Close()
 

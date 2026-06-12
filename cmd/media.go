@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"strings"
-
 	"slices"
+	"strings"
 
 	"github.com/aziz-tb/merio/internal/attachment"
 	amodels "github.com/aziz-tb/merio/internal/auth/models"
@@ -48,7 +47,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	defer file.Close()
 
 	// Inline?
-	var disposition = null.StringFrom(attachment.DispositionAttachment)
+	disposition := null.StringFrom(attachment.DispositionAttachment)
 	inline, ok := form.Value["inline"]
 	if ok && len(inline) > 0 && inline[0] == "true" {
 		disposition = null.StringFrom(attachment.DispositionInline)
@@ -90,7 +89,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Delete files on any error.
-	var uuid = uuid.New()
+	uuid := uuid.New()
 	thumbName := image.ThumbPrefix + uuid.String()
 	defer func() {
 		if cleanUp {
@@ -100,7 +99,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}()
 
 	// Generate and upload thumbnail and store image dimensions in the media meta.
-	var meta = []byte("{}")
+	meta := []byte("{}")
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		file.Seek(0, 0)
 		thumbFile, err := image.CreateThumb(image.DefThumbSize, file)

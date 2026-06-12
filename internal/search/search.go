@@ -12,10 +12,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Manager is the search manager
 type Manager struct {
@@ -49,7 +47,7 @@ func New(opts Opts) (*Manager, error) {
 
 // Conversations searches conversations based on the query
 func (s *Manager) Conversations(query string) ([]models.ConversationResult, error) {
-	var results = make([]models.ConversationResult, 0)
+	results := make([]models.ConversationResult, 0)
 	if err := s.q.SearchConversations.Select(&results, query); err != nil {
 		s.lo.Error("error searching conversations", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -59,7 +57,7 @@ func (s *Manager) Conversations(query string) ([]models.ConversationResult, erro
 
 // Messages searches messages based on the query
 func (s *Manager) Messages(query string) ([]models.MessageResult, error) {
-	var results = make([]models.MessageResult, 0)
+	results := make([]models.MessageResult, 0)
 	if err := s.q.SearchMessages.Select(&results, query); err != nil {
 		s.lo.Error("error searching messages", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -69,7 +67,7 @@ func (s *Manager) Messages(query string) ([]models.MessageResult, error) {
 
 // Contacts searches contacts based on the query
 func (s *Manager) Contacts(query string) ([]models.ContactResult, error) {
-	var results = make([]models.ContactResult, 0)
+	results := make([]models.ContactResult, 0)
 	if err := s.q.SearchContacts.Select(&results, query); err != nil {
 		s.lo.Error("error searching contacts", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)

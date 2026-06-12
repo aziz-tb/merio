@@ -57,7 +57,7 @@ type Engine struct {
 // New initializes a new Engine instance, set up with the provided team manager,
 // conversation manager, and logger.
 func New(teamStore teamStore, conversationStore conversationStore, systemUser umodels.User, lo *logf.Logger) (*Engine, error) {
-	var e = Engine{
+	e := Engine{
 		conversationStore:      conversationStore,
 		teamStore:              teamStore,
 		systemUser:             systemUser,

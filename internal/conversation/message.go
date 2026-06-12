@@ -765,7 +765,7 @@ func (m *Manager) getConversationUUIDFromMessageUUID(uuid string) (string, error
 
 // getMessageActivityContent generates activity content based on the activity type.
 func (m *Manager) getMessageActivityContent(activityType, newValue, actorName string) (string, error) {
-	var content = ""
+	content := ""
 	switch activityType {
 	case models.ActivityAssignedUserChange:
 		content = fmt.Sprintf("Assigned to %s by %s", newValue, actorName)
@@ -1036,7 +1036,7 @@ func (m *Manager) EnqueueIncoming(message models.IncomingMessage) error {
 
 // GetConversationByMessageID returns conversation by message id.
 func (m *Manager) GetConversationByMessageID(id int) (models.Conversation, error) {
-	var conversation = models.Conversation{}
+	conversation := models.Conversation{}
 	if err := m.q.GetConversationByMessageID.Get(&conversation, id); err != nil {
 		if err == sql.ErrNoRows {
 			return conversation, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundConversation"), nil)
@@ -1244,7 +1244,7 @@ func (m *Manager) attachAttachmentsToMessage(message *models.Message) error {
 
 // getOutgoingProcessingMessageIDs returns the IDs of outgoing messages currently being processed.
 func (m *Manager) getOutgoingProcessingMessageIDs() []int {
-	var out = make([]int, 0)
+	out := make([]int, 0)
 	m.outgoingProcessingMessages.Range(func(key, _ any) bool {
 		if k, ok := key.(int); ok {
 			out = append(out, k)

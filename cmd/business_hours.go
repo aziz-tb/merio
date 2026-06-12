@@ -12,9 +12,7 @@ import (
 
 // handleGetBusinessHours returns all business hours.
 func handleGetBusinessHours(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	businessHours, err := app.businessHours.GetAll()
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, "")
@@ -24,9 +22,7 @@ func handleGetBusinessHours(r *fastglue.Request) error {
 
 // handleGetBusinessHour returns the business hour with the given id.
 func handleGetBusinessHour(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -65,9 +61,7 @@ func handleCreateBusinessHours(r *fastglue.Request) error {
 
 // handleDeleteBusinessHour deletes the business hour with the given id.
 func handleDeleteBusinessHour(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

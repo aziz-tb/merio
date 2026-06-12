@@ -8,9 +8,7 @@ import (
 
 // handleOverviewCounts retrieves general dashboard counts for all users.
 func handleOverviewCounts(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	counts, err := app.report.GetOverViewCounts()
 	if err != nil {
 		return sendErrorEnvelope(r, err)

@@ -12,9 +12,7 @@ import (
 
 // handleGetSLAs returns all SLAs.
 func handleGetSLAs(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	slas, err := app.sla.GetAll()
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, err.Error(), nil, "")
@@ -24,9 +22,7 @@ func handleGetSLAs(r *fastglue.Request) error {
 
 // handleGetSLA returns the SLA with the given ID.
 func handleGetSLA(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -92,9 +88,7 @@ func handleUpdateSLA(r *fastglue.Request) error {
 
 // handleDeleteSLA deletes the SLA with the given ID.
 func handleDeleteSLA(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

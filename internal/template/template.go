@@ -93,7 +93,7 @@ func (m *Manager) Create(t models.Template) (models.Template, error) {
 
 // GetAll returns all templates by type.
 func (m *Manager) GetAll(typ string) ([]models.Template, error) {
-	var templates = make([]models.Template, 0)
+	templates := make([]models.Template, 0)
 	if err := m.q.GetAllTemplates.Select(&templates, typ); err != nil {
 		m.lo.Error("error fetching templates", "error", err)
 		return templates, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -103,7 +103,7 @@ func (m *Manager) GetAll(typ string) ([]models.Template, error) {
 
 // Get returns a template by id.
 func (m *Manager) Get(id int) (models.Template, error) {
-	var templates = models.Template{}
+	templates := models.Template{}
 	if err := m.q.GetTemplate.Get(&templates, id); err != nil {
 		if err == sql.ErrNoRows {
 			return templates, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundTemplate"), nil)

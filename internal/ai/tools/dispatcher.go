@@ -389,6 +389,7 @@ func (d *Dispatcher) loadTool(req DispatchRequest) (models.Tool, error) {
 func IsRunnerErrSandboxUnavailable(err error) bool {
 	return errors.Is(err, execRunner.ErrSandboxUnavailable)
 }
+
 func IsRunnerErrInvalidRequest(err error) bool {
 	return errors.Is(err, execRunner.ErrInvalidRequest)
 }

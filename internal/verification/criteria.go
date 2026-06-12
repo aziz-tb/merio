@@ -312,36 +312,42 @@ func custEmail(c *custmodels.Customer) string {
 	}
 	return c.Email.String
 }
+
 func custPhone(c *custmodels.Customer) string {
 	if c == nil || !c.Phone.Valid {
 		return ""
 	}
 	return c.Phone.String
 }
+
 func custFirstname(c *custmodels.Customer) string {
 	if c == nil || !c.Firstname.Valid {
 		return ""
 	}
 	return c.Firstname.String
 }
+
 func custLastname(c *custmodels.Customer) string {
 	if c == nil || !c.Lastname.Valid {
 		return ""
 	}
 	return c.Lastname.String
 }
+
 func custDelivery(c *custmodels.Customer) string {
 	if c == nil || !c.DeliveryAddress.Valid {
 		return ""
 	}
 	return c.DeliveryAddress.String
 }
+
 func custBilling(c *custmodels.Customer) string {
 	if c == nil || !c.BillingAddress.Valid {
 		return ""
 	}
 	return c.BillingAddress.String
 }
+
 func custCustomerID(c *custmodels.Customer) string {
 	if c == nil {
 		return ""
@@ -355,36 +361,42 @@ func conEmail(c *contractmodels.Contract) string {
 	}
 	return c.Email.String
 }
+
 func conPhone(c *contractmodels.Contract) string {
 	if c == nil || !c.Phone.Valid {
 		return ""
 	}
 	return c.Phone.String
 }
+
 func conFirstname(c *contractmodels.Contract) string {
 	if c == nil || !c.Firstname.Valid {
 		return ""
 	}
 	return c.Firstname.String
 }
+
 func conLastname(c *contractmodels.Contract) string {
 	if c == nil || !c.Lastname.Valid {
 		return ""
 	}
 	return c.Lastname.String
 }
+
 func conDelivery(c *contractmodels.Contract) string {
 	if c == nil || !c.DeliveryAddress.Valid {
 		return ""
 	}
 	return c.DeliveryAddress.String
 }
+
 func conBilling(c *contractmodels.Contract) string {
 	if c == nil || !c.BillingAddress.Valid {
 		return ""
 	}
 	return c.BillingAddress.String
 }
+
 func conContractID(c *contractmodels.Contract) string {
 	if c == nil {
 		return ""

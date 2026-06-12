@@ -13,9 +13,7 @@ import (
 
 // handleGetWebhooks returns all webhooks from the database.
 func handleGetWebhooks(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	webhooks, err := app.webhook.GetAll()
 	if err != nil {
 		return sendErrorEnvelope(r, err)

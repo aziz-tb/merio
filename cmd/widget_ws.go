@@ -99,7 +99,7 @@ func (sc *safeConn) allow(kind string, minInterval time.Duration) bool {
 }
 
 func handleWidgetWS(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 
 	clientIP := realip.FromRequest(r.RequestCtx)
 

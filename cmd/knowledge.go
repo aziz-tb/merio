@@ -32,7 +32,7 @@ type folderMoveRequest struct {
 }
 
 func handleListKnowledgeFolders(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	folders, err := app.knowledge.ListAllFolders()
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -115,7 +115,7 @@ func handleMoveKnowledgeFolder(r *fastglue.Request) error {
 }
 
 func handleDeleteKnowledgeFolder(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -135,7 +135,7 @@ type articleMoveRequest struct {
 }
 
 func handleListKnowledgeArticles(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	args := r.RequestCtx.QueryArgs()
 
 	opts := models.ListArticlesOpts{
@@ -172,7 +172,7 @@ func handleListKnowledgeArticles(r *fastglue.Request) error {
 }
 
 func handleGetKnowledgeArticle(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -234,7 +234,7 @@ func handleUpdateKnowledgeArticle(r *fastglue.Request) error {
 }
 
 func handlePublishKnowledgeArticle(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -249,7 +249,7 @@ func handlePublishKnowledgeArticle(r *fastglue.Request) error {
 }
 
 func handleUnpublishKnowledgeArticle(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
@@ -288,7 +288,7 @@ func handleMoveKnowledgeArticle(r *fastglue.Request) error {
 }
 
 func handleDeleteKnowledgeArticle(r *fastglue.Request) error {
-	var app = r.Context.(*App)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)

@@ -14,9 +14,7 @@ import (
 
 // handleGetGeneralSettings fetches general settings, this endpoint is not behind auth as it has no sensitive data and is required for the app to function.
 func handleGetGeneralSettings(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-	)
+	app := r.Context.(*App)
 	out, err := app.setting.GetByPrefix("app")
 	if err != nil {
 		return sendErrorEnvelope(r, err)

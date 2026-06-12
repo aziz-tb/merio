@@ -13,10 +13,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-var (
-	//go:embed queries.sql
-	efs embed.FS
-)
+//go:embed queries.sql
+var efs embed.FS
 
 // Prompt is a rewrite prompt shown in the reply-box AI menu.
 type Prompt struct {
@@ -76,7 +74,7 @@ func (m *Manager) PromptContent(k string) (string, error) {
 
 // GetPrompts returns rewrite prompts for the reply-box AI menu.
 func (m *Manager) GetPrompts() ([]Prompt, error) {
-	var prompts = make([]Prompt, 0)
+	prompts := make([]Prompt, 0)
 	if err := m.q.GetPrompts.Select(&prompts); err != nil {
 		m.lo.Error("error fetching rewrite prompts", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
