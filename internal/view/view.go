@@ -17,6 +17,7 @@ import (
 //go:embed queries.sql
 var efs embed.FS
 
+// Manager handles persistence of saved conversation views (personal, team, and global).
 type Manager struct {
 	q    queries
 	lo   *logf.Logger

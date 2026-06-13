@@ -1,28 +1,14 @@
-// Package redact rewrites a JSON payload (LLM request or response)
-// into a PII-stripped copy safe to land in ai_usage.request_payload /
-// ai_usage.response_payload for storage and analysis.
+// Package redact rewrites a JSON payload (LLM request or response) into a
+// PII-stripped copy safe to store in ai_usage.request_payload /
+// ai_usage.response_payload. Two layers:
 //
-// Strategy — two layers:
+//  1. Pattern-based redaction over every string value, at any nesting.
+//  2. Field-aware redaction for known PII keys (e.g. first_name / address
+//     in a get_customer_data tool result) that aren't shaped like PII.
 //
-//  1. **Pattern-based redaction** over every string value in the
-//     payload, regardless of nesting. Catches emails, German IBANs,
-//     phone numbers, contract numbers, customer IDs, and Zählernummer.
-//
-//  2. **Field-aware redaction** for known structured shapes — the
-//     `get_customer_data` tool result holds first_name / last_name /
-//     address fields that aren't shaped like generic PII. These are
-//     replaced by sentinel placeholders when the field name matches
-//     a known PII key.
-//
-// **Default bias: aggressive.** Over-redaction hurts debuggability but
-// not compliance. Under-redaction (PII leaks through to stored audit
-// rows) is non-negotiable under DSGVO Article 32 for the German energy
-// sector at our scale (200k+ customers). False positives are worth it.
-//
-// Performance: each payload is walked once recursively; per-string
-// regex passes are bounded by the precompiled pattern set. At 50ms p99
-// for a 5kB payload (typical LLM message) this is well within the
-// usage.Manager's synchronous-write budget.
+// Bias is intentionally aggressive: over-redaction only hurts debuggability,
+// under-redaction leaks PII into audit rows (DSGVO Art. 32), so false
+// positives are acceptable.
 package redact
 
 import (
@@ -33,8 +19,7 @@ import (
 	"unicode"
 )
 
-// Sentinel replacements. Kept short — the audit row needs to be
-// human-readable when an operator pulls it for debugging.
+// Sentinel replacements, kept short so audit rows stay human-readable.
 const (
 	SentinelEmail    = "[EMAIL]"
 	SentinelIBAN     = "[IBAN]"
@@ -47,18 +32,10 @@ const (
 	SentinelCustom   = "[REDACTED]"
 )
 
-// Field names (case-insensitive) we treat as PII when they appear as
-// JSON object keys. Values under these keys get replaced with the
-// matching sentinel regardless of their literal shape.
-//
-//	first_name / last_name / full_name → [NAME]
-//	address / street / postal_code / zip / city → [ADDRESS]
-//	email → [EMAIL]
-//	phone / phone_number → [PHONE]
-//	iban → [IBAN]
-//
-// The map uses canonical snake_case keys for O(1) lookup; rewriter
-// normalizes incoming snake_case, camelCase, and PascalCase keys.
+// piiFields maps JSON object keys whose values are PII to their sentinel,
+// regardless of the value's literal shape. Keys are canonical snake_case;
+// normalizeFieldName folds incoming snake_case, camelCase, and PascalCase
+// into them, so matching is effectively case-insensitive.
 var piiFields = map[string]string{
 	"first_name":     SentinelName,
 	"last_name":      SentinelName,
@@ -81,9 +58,8 @@ var piiFields = map[string]string{
 	"meter_number":   SentinelMeter,
 }
 
-// Patterns. The order matters — IBAN matches before phone (an IBAN can
-// look like a long phone-number-shaped string), and email matches
-// before name fragments. All precompiled once.
+// Pattern order matters: IBAN is matched before phone, since an IBAN can
+// look like a long phone-shaped string.
 type compiledPattern struct {
 	re       *regexp.Regexp
 	sentinel string
@@ -97,36 +73,26 @@ var (
 func loadPatterns() {
 	patternsOnce.Do(func() {
 		patterns = []compiledPattern{
-			// Email (RFC 5322 simplified). Captures common shapes
-			// including dots, plus-signs, hyphens. Doesn't try to
-			// validate the full RFC — false positives are fine.
+			// Email, RFC 5322 simplified; not fully validated since false
+			// positives are fine.
 			{
 				re:       regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`),
 				sentinel: SentinelEmail,
 			},
-			// German IBAN: DE + 2 digits + 18 digits = 22 chars total.
-			// We allow optional internal spaces (DE89 3704 ...) which
-			// IBAN printouts often carry. The pattern is loose on
-			// total length so non-DE IBANs (FR, NL, AT, CH) also match.
+			// IBAN with optional internal spaces. Loose on length so non-DE
+			// IBANs (FR, NL, AT, CH) match too.
 			{
 				re:       regexp.MustCompile(`\b[A-Z]{2}\s?\d{2}(?:\s?[A-Z0-9]){12,30}\b`),
 				sentinel: SentinelIBAN,
 			},
-			// Phone numbers. Matches:
-			//   +49 170 1234567
-			//   +49-170-1234567
-			//   0170 1234567
-			//   01701234567
-			// Constraint: leading + or 0, then 8+ digits with optional
-			// spaces/dashes between groups. Tight enough to avoid
-			// catching arbitrary numeric strings like ticket IDs.
+			// Phone: leading + or 0 then 8+ digits with optional spaces or
+			// dashes, e.g. +49 170 1234567 or 01701234567. Tight enough to
+			// avoid plain numeric strings like ticket IDs.
 			{
 				re:       regexp.MustCompile(`(?:\+\d{1,3}[\s\-]?|\b0)(?:\d[\s\-]?){8,13}\d\b`),
 				sentinel: SentinelPhone,
 			},
-			// German contract identifiers — generic ALL-CAPS prefix +
-			// dash + 4+ digits. Catches CNT-12345, VERT-789, KD-100001,
-			// etc.
+			// Contract IDs: ALL-CAPS prefix + dash + 4+ digits, e.g. CNT-12345.
 			{
 				re:       regexp.MustCompile(`\b(?:CNT|VERT|KD|VK|VTR|ZN)-\d{4,}\b`),
 				sentinel: SentinelContract,
@@ -135,12 +101,9 @@ func loadPatterns() {
 	})
 }
 
-// Bytes is the top-level entrypoint. Takes a raw JSON payload, walks
-// it recursively, applies field-aware redaction to known PII keys and
-// pattern-based redaction to every remaining string value. Returns
-// the redacted JSON or the original bytes if parsing fails (which
-// means the caller passed non-JSON; we don't try to redact opaque
-// strings here — that's the caller's job).
+// Bytes redacts a raw JSON payload, applying field-aware redaction to known
+// PII keys and pattern-based redaction to every other string value. Returns
+// the input unchanged if it doesn't parse as JSON.
 func Bytes(in []byte) []byte {
 	if len(in) == 0 {
 		return in
@@ -148,7 +111,6 @@ func Bytes(in []byte) []byte {
 	loadPatterns()
 	var v interface{}
 	if err := json.Unmarshal(in, &v); err != nil {
-		// Caller passed non-JSON; we don't redact unstructured bytes.
 		return in
 	}
 	walk(&v, "")
@@ -159,19 +121,17 @@ func Bytes(in []byte) []byte {
 	return out
 }
 
-// String redacts a free-form string (not JSON) using the pattern set
-// only. Field-aware redaction doesn't apply — there's no surrounding
-// key context.
+// String redacts a free-form (non-JSON) string using patterns only; with no
+// surrounding key context, field-aware redaction doesn't apply.
 func String(s string) string {
 	loadPatterns()
 	return applyPatterns(s)
 }
 
-// walk recurses through a parsed JSON value, applying field-aware
-// rules at object keys and pattern rules at leaf strings.
-//
-// parentKey is the normalized key under which the current value sits in
-// its parent object. It's empty at the root + on array elements.
+// walk recurses through a parsed JSON value, applying field-aware rules at
+// object keys and pattern rules at leaf strings. parentKey is the normalized
+// key of the current value in its parent object, empty at the root and on
+// array elements.
 func walk(v *interface{}, parentKey string) {
 	if sentinel, ok := piiFields[parentKey]; ok && isRedactableFieldValue(*v) {
 		*v = sentinel
@@ -188,7 +148,7 @@ func walk(v *interface{}, parentKey string) {
 		}
 	case []interface{}:
 		for i := range x {
-			walk(&x[i], "") // array elements have no parent key context
+			walk(&x[i], "")
 		}
 	}
 }
@@ -258,9 +218,8 @@ func shouldInsertFieldUnderscore(runes []rune, i int) bool {
 	return false
 }
 
-// applyPatterns runs every precompiled regex over the string in order.
-// Each match is replaced wholesale by the pattern's sentinel; subsequent
-// patterns see the already-redacted string so we never double-redact.
+// applyPatterns replaces each pattern's matches with its sentinel, in order.
+// Later patterns see the already-redacted string, so no double-redaction.
 func applyPatterns(s string) string {
 	for _, p := range patterns {
 		s = p.re.ReplaceAllString(s, p.sentinel)

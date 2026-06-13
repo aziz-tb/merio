@@ -1,3 +1,4 @@
+// Package models defines the OpenID Connect SSO configuration type.
 package models
 
 import (

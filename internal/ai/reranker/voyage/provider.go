@@ -107,7 +107,9 @@ func New(opt Opts) (*Provider, error) {
 
 // Model returns the project-namespaced model id.
 func (p *Provider) Model() string { return "voyage/" + p.model + "@" + modelVersionTag }
-func (p *Provider) Name() string  { return "voyage" }
+
+// Name returns the provider name.
+func (p *Provider) Name() string { return "voyage" }
 
 // Rerank scores `candidates` against `query` and returns up to topK
 // results in descending relevance order.

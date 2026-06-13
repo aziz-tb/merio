@@ -1,12 +1,10 @@
 // Package chunking implements the locked F12 chunking strategy:
 // heading-aware primary split → recursive structural fallback for
-// oversized sections → merge of undersized siblings. Reusable across
-// content types (KB articles today; tickets, customer notes tomorrow).
+// oversized sections → merge of undersized siblings.
 //
-// Why this matters for German content: the recursive fallback's "never
-// mid-word, never mid-sentence" guarantee preserves compound words
-// (Abschlagszahlung, Stromversorgungsvertrag) and sentence-level
-// semantics. Character-based splitters break both.
+// The recursive fallback never splits mid-word or mid-sentence, which
+// preserves German compound words (Abschlagszahlung) and sentence
+// semantics where character-based splitters would break both.
 package chunking
 
 import (
@@ -19,26 +17,21 @@ import (
 // Config controls chunk size targets in tokens (estimated via
 // tokenize.EstimateTokens). Defaults at DefaultConfig().
 type Config struct {
-	// TargetTokens is the size each chunk aims for after a recursive
-	// split runs. Hard targets are softened by structural boundaries —
-	// the splitter never breaks a sentence in two just to hit
-	// TargetTokens exactly.
+	// TargetTokens is the size each chunk aims for during a recursive
+	// split, softened by structural boundaries (never breaks a sentence
+	// to hit it exactly).
 	TargetTokens int
 
-	// OverlapTokens reserved for a future sliding-window fallback in
-	// recursive splits. Currently unused — recursive structural splits
-	// produce non-overlapping chunks because the structural boundaries
-	// give each chunk meaningful self-contained context.
+	// OverlapTokens is reserved for a future sliding-window fallback;
+	// currently unused — structural splits are non-overlapping.
 	OverlapTokens int
 
 	// MaxTokens is the threshold above which a section is recursively
 	// split. Sections at or below this size pass through unchanged.
 	MaxTokens int
 
-	// MinTokens is the threshold below which a section is merged with
-	// an adjacent sibling. Merging avoids vector-DB noise from
-	// near-empty chunks (a 2-sentence section produces a vector that
-	// doesn't usefully discriminate against anything).
+	// MinTokens is the threshold below which a section is merged with an
+	// adjacent sibling, to avoid vector-DB noise from near-empty chunks.
 	MinTokens int
 }
 
@@ -54,17 +47,17 @@ func DefaultConfig() Config {
 
 // Chunk is one logical unit of text to embed with provenance.
 type Chunk struct {
-	// Index is the chunk's position within the source (0, 1, 2, …).
-	// Stable across re-runs of the chunker on the same input.
+	// Index is the chunk's position within the source (0, 1, 2, …),
+	// stable across re-runs on the same input.
 	Index int
 
 	// Text is the actual content to embed.
 	Text string
 
-	// SourcePath is a human-readable hint about where this chunk came
-	// from within the source (e.g., "## Payment Terms > ### Late Fees"
-	// for KB Markdown; empty for atomic content). Surfaces in the
-	// kb_search response so operators understand why a chunk matched.
+	// SourcePath is the heading breadcrumb this chunk came from (e.g.
+	// "## Payment Terms > ### Late Fees"; empty for atomic content). It
+	// surfaces in the kb_search response so operators see why a chunk
+	// matched.
 	SourcePath string
 
 	// ContentHash is sha256(Text) hex-encoded. Stored on the embeddings
@@ -79,25 +72,16 @@ type section struct {
 	path string
 }
 
-// headingRE matches Markdown ATX headings of level 1-6 at line start.
-// Only ATX-style headings (#, ##, …) — Setext (underlined ===) headings
-// are uncommon in KB content authored via TipTap.
+// headingRE matches ATX headings (#, ##, … level 1-6) at line start.
+// Setext (underlined ===) headings are not handled.
 var headingRE = regexp.MustCompile(`(?m)^(#{1,6})\s+(.+?)\s*$`)
 
-// ChunkMarkdown splits a Markdown article using the locked strategy.
-//
-// Algorithm:
-//  1. Parse headings, build a flat list of sections with hierarchical
-//     SourcePath ("H1 title > H2 title > H3 title").
-//  2. For each section: if estimated tokens > MaxTokens, recursively
-//     split it on progressively smaller structural boundaries
-//     (paragraph → sentence → clause → whitespace). Otherwise pass
-//     through unchanged.
-//  3. Merge sections with < MinTokens into their adjacent neighbor (the
-//     later one — preserves the earlier section's heading context).
+// ChunkMarkdown splits a Markdown article using the locked strategy:
+//  1. Split on headings into sections with a hierarchical SourcePath.
+//  2. Recursively split any section over MaxTokens; pass the rest through.
+//  3. Merge sections under MinTokens into the next neighbor (which keeps
+//     the earlier section's heading context).
 //  4. Renumber Index and compute ContentHash.
-//
-// Token estimation lives in tokenize.go.
 func ChunkMarkdown(text string, cfg Config) []Chunk {
 	cfg = withDefaults(cfg)
 	sections := splitByHeading(text)
@@ -113,9 +97,8 @@ func ChunkMarkdown(text string, cfg Config) []Chunk {
 	return finalize(chunks)
 }
 
-// ChunkAtomicText is the non-Markdown path: tickets, customer notes,
-// any single-block text. Skips the heading-aware step; goes straight to
-// recursive split if needed.
+// ChunkAtomicText is the non-Markdown path for single-block text: skips
+// the heading step and recursively splits only if over MaxTokens.
 func ChunkAtomicText(text string, cfg Config) []Chunk {
 	cfg = withDefaults(cfg)
 	if strings.TrimSpace(text) == "" {
@@ -180,8 +163,8 @@ func splitByHeading(text string) []section {
 			bodyEnd = len(text)
 		}
 		body := strings.TrimSpace(text[bodyStart:bodyEnd])
-		// Include the heading text itself in the body — it carries
-		// useful keyword signal for the keyword half of hybrid search.
+		// Prepend the heading text to the body — it carries keyword
+		// signal for the keyword half of hybrid search.
 		body = stack[len(stack)-1].title + "\n\n" + body
 		body = strings.TrimSpace(body)
 
@@ -220,9 +203,8 @@ func recursiveSplit(sec section, cfg Config) []Chunk {
 
 func recursiveSplitWith(text string, cfg Config, splitters []func(string) []string, depth int, path string) []Chunk {
 	if depth >= len(splitters) {
-		// Last-resort: emit as-is even if over MaxTokens. This
-		// shouldn't happen with whitespaceSplitter because no word is
-		// >MaxTokens, but guard against pathological inputs.
+		// Last-resort: emit as-is even if over MaxTokens. Guards against
+		// pathological input; the whitespace splitter normally prevents it.
 		return []Chunk{{Text: text, SourcePath: path}}
 	}
 	parts := splitters[depth](text)
@@ -273,10 +255,8 @@ func recursiveSplitWith(text string, cfg Config, splitters []func(string) []stri
 	return out
 }
 
-// splitterJoinChar returns the boundary character to re-insert between
-// packed parts so the chunk text reads naturally. Paragraphs join with
-// a blank line; sentences with a space; clauses with a comma+space;
-// words with a single space.
+// splitterJoinChar returns the boundary string to re-insert between
+// packed parts (indexed by splitter depth) so the text reads naturally.
 func splitterJoinChar(depth int) string {
 	switch depth {
 	case 0:
@@ -302,9 +282,9 @@ func splitByParagraph(text string) []string {
 	return out
 }
 
-// sentenceEndRE matches sentence-terminating punctuation followed by
-// whitespace and an uppercase letter. Avoids false positives on
-// abbreviations followed by lowercase (e.g., "z. B." in German).
+// sentenceEndRE matches terminating punctuation, whitespace, then an
+// uppercase letter — the uppercase requirement avoids splitting on
+// abbreviations followed by lowercase (e.g. German "z. B.").
 var sentenceEndRE = regexp.MustCompile(`([.!?])\s+([A-ZÄÖÜ])`)
 
 func splitBySentence(text string) []string {
@@ -339,10 +319,8 @@ func splitByWhitespace(text string) []string {
 	return strings.Fields(text)
 }
 
-// mergeSmall merges adjacent chunks whose individual size is below
-// MinTokens. Merge direction: append the small chunk to the next chunk
-// (or the previous if there's no next), preserving heading paths from
-// the larger neighbor.
+// mergeSmall merges each chunk below MinTokens into the next chunk (or
+// the previous if there's no next), keeping the larger neighbor's path.
 func mergeSmall(chunks []Chunk, cfg Config) []Chunk {
 	if len(chunks) <= 1 {
 		return chunks
@@ -354,8 +332,8 @@ func mergeSmall(chunks []Chunk, cfg Config) []Chunk {
 			out = append(out, c)
 			continue
 		}
-		// Too small. Try to merge forward; if that overflows or there
-		// is no next chunk, merge backward instead.
+		// Too small: merge forward, falling back to backward if forward
+		// overflows MaxTokens or there is no next chunk.
 		if i+1 < len(chunks) {
 			next := chunks[i+1]
 			merged := c.Text + "\n\n" + next.Text
@@ -372,8 +350,7 @@ func mergeSmall(chunks []Chunk, cfg Config) []Chunk {
 				continue
 			}
 		}
-		// Neither merge fits — keep the small chunk as-is rather than
-		// drop it (data preservation wins over chunk-size discipline).
+		// Neither merge fits — keep the small chunk rather than drop it.
 		out = append(out, c)
 	}
 	return out

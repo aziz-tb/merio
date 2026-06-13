@@ -18,7 +18,8 @@ import (
 
 var (
 	//go:embed queries.sql
-	efs                  embed.FS
+	efs embed.FS
+	// ErrCSATAlreadyExists is returned when a CSAT response already exists for the conversation.
 	ErrCSATAlreadyExists = errors.New("CSAT already exists")
 )
 

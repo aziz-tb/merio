@@ -19,16 +19,10 @@ type CleanupOldVectorsInput struct {
 }
 
 // CleanupOldVectorsWorkflow durably waits GraceDays then deletes the
-// superseded version's vectors — but only if the operator hasn't
-// rolled back to it in the meantime.
-//
-// This is the canonical Temporal "durable wait" pattern. workflow.Sleep
-// survives worker restarts; a goroutine-based timer would lose the
-// cleanup on any deploy.
-//
-// Idempotency: the workflow id is "cleanup-vectors:<id>:v<version>"
-// (set by EmbedArticleWorkflow). Re-running deletes any remaining rows;
-// already-deleted rows make the DELETE a no-op.
+// superseded version's vectors, unless the operator has rolled back to
+// it in the meantime. workflow.Sleep is used (not a goroutine timer) so
+// the wait survives worker restarts. Re-running is a no-op once rows are
+// already deleted.
 func CleanupOldVectorsWorkflow(ctx workflow.Context, in CleanupOldVectorsInput) error {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("CleanupOldVectorsWorkflow scheduled",
@@ -40,8 +34,7 @@ func CleanupOldVectorsWorkflow(ctx workflow.Context, in CleanupOldVectorsInput) 
 		in.GraceDays = 7
 	}
 
-	// 1. Durable wait. workflow.Sleep is replay-safe and persists
-	// across worker restarts.
+	// 1. Durable wait.
 	if err := workflow.Sleep(ctx, time.Duration(in.GraceDays)*24*time.Hour); err != nil {
 		return fmt.Errorf("cleanup: sleep: %w", err)
 	}
@@ -57,10 +50,9 @@ func CleanupOldVectorsWorkflow(ctx workflow.Context, in CleanupOldVectorsInput) 
 	}
 	ctx = workflow.WithActivityOptions(ctx, opts)
 
-	// 2. Confirm the operator hasn't rolled back to the version we're
-	// about to delete. GetIndexState returns ActiveVersion=0 when no
-	// state row exists (never-indexed article); both 0 and "not equal
-	// to the superseded version" mean it's safe to proceed.
+	// 2. Confirm no rollback to the version we're about to delete.
+	// GetIndexState returns ActiveVersion=0 for a never-indexed article;
+	// anything but an exact match to SupersededVersion is safe to delete.
 	var st actembeddings.GetIndexStateOutput
 	var acts *actembeddings.Activities
 	if err := workflow.ExecuteActivity(ctx, acts.GetIndexState, &actembeddings.GetIndexStateInput{

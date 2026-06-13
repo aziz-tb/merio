@@ -1,26 +1,14 @@
 // Package runner is the LLM↔tool loop that turns an inbound customer
-// message + an agent definition into a customer-facing draft. It's the
-// validation milestone for the F7+F5 foundation: every prior chunk
-// (provider abstraction, preset registry, capability registry, resolver,
-// translator, dispatcher) is plumbing the runner consumes.
+// message + an agent definition into a customer-facing draft. It loads
+// the agent, resolves and translates its tools, builds the initial
+// messages, then loops with the provider — dispatching tool_use blocks
+// and accumulating cache markers — until the model calls produce_draft
+// or a terminal condition fires, returning a RunResponse.
 //
-// The runner is a primitive — it doesn't know about the inbound pipeline
-// or the composer; those wrap it later. What it does:
-//
-//  1. Loads an agent (ai_agents row) by id.
-//  2. Resolves agent.tools to ResolvedTools (internal + custom).
-//  3. Translates ResolvedTools to provider-agnostic llm.ToolDef.
-//  4. Builds the initial messages (system prompt + caller-supplied context + inbound).
-//  5. Loops with the LLM provider, dispatching tool_use blocks through the
-//     unified dispatcher, accumulating cache markers, until the model
-//     calls produce_draft or a terminal failure condition fires.
-//  6. Returns RunResponse with the final draft, status, full per-turn
-//     trace, and aggregate metrics.
-//
-// All terminal conditions map to one of 8 RunStatus values; downstream
-// consumers (composer, GATE, pipeline) switch on these to decide what
-// to do with the draft. Conflating them at this layer is a bug —
-// "partial" and "incomplete" carry different operational signals.
+// The runner is a primitive: the inbound pipeline and composer wrap it,
+// not the reverse. Every terminal condition maps to one RunStatus value;
+// conflating them at this layer is a bug — "partial" and "incomplete"
+// carry different operational signals.
 package runner
 
 import (
@@ -35,39 +23,21 @@ import (
 type RunStatus string
 
 const (
-	// StatusComplete — assistant committed a final draft via the
-	// mandatory produce_draft terminal tool. Pipeline GATE can consider
-	// sending.
+	// StatusComplete — assistant committed a draft via produce_draft.
+	// Pipeline GATE can consider sending.
 	StatusComplete RunStatus = "complete"
 
-	// StatusPartial — reserved for future flows that intentionally
-	// commit partial drafts. The produce_draft contract does not
-	// currently emit this status from the agent runner.
-	StatusPartial RunStatus = "partial"
-
-	// StatusRefused — reserved for future flows that explicitly commit a
-	// refusal as a draft. The produce_draft contract routes
-	// uncommitted refusals to StatusIncomplete.
-	StatusRefused RunStatus = "refused"
-
-	// StatusBudgetExceeded — reserved for future flows. The
-	// produce_draft contract routes budget exits without a committed
-	// draft to StatusIncomplete.
-	StatusBudgetExceeded RunStatus = "budget_exceeded"
-
-	// StatusDeadlineExceeded — reserved for future flows. The
-	// produce_draft contract routes deadline exits without a committed
-	// draft to StatusIncomplete.
+	// Reserved for future flows; the current produce_draft contract does
+	// not emit these — every uncommitted exit (refusal, budget, deadline,
+	// max-iteration) routes to StatusIncomplete instead.
+	StatusPartial          RunStatus = "partial"
+	StatusRefused          RunStatus = "refused"
+	StatusBudgetExceeded   RunStatus = "budget_exceeded"
 	StatusDeadlineExceeded RunStatus = "deadline_exceeded"
+	StatusMaxIterations    RunStatus = "max_iterations"
 
-	// StatusMaxIterations — reserved for future flows. The
-	// produce_draft contract routes max-iteration exits without a
-	// committed draft to StatusIncomplete.
-	StatusMaxIterations RunStatus = "max_iterations"
-
-	// StatusIncomplete — the run ended without a successful
-	// produce_draft commit, or otherwise violated the platform contract
-	// for producing a customer-facing draft.
+	// StatusIncomplete — the run ended without a successful produce_draft
+	// commit, or otherwise violated the draft-producing contract.
 	StatusIncomplete RunStatus = "incomplete"
 
 	// StatusFailed — unrecoverable error (provider terminal failure
@@ -76,16 +46,9 @@ const (
 	StatusFailed RunStatus = "failed"
 )
 
-// ConversationMessage is one prior message on the current ticket, fed
-// into the runner so the agent can ground its reply in the conversation
-// so far. v1 carries only sender + text — no timestamps, no author IDs,
-// no message UUIDs. Sender is either "customer" or "agent".
-//
-// The runner formats this slice into a system message before the LLM
-// call (see buildInitialMessages); the format spec is shared across
-// every caller — operator-driven Composer runs today, pipeline-driven
-// runs when F3/F8 ship — so the agent's contract with the LLM stays
-// uniform regardless of who invoked it.
+// ConversationMessage is one prior message on the current ticket. Sender
+// is "customer" or "agent". The runner formats this slice into a system
+// message before the LLM call (see buildInitialMessages).
 type ConversationMessage struct {
 	Sender string `json:"sender"`
 	Text   string `json:"text"`
@@ -103,16 +66,13 @@ type RunRequest struct {
 	InboundMessage string
 
 	// ConversationHistory is the prior messages on the current ticket,
-	// oldest-first, excluding the latest customer message (which lives
-	// in InboundMessage). Nil/empty when there's no prior turn — the
-	// first message of a brand-new conversation, the agent-test panel
-	// invoking with synthetic input, etc. Capped upstream (the Composer
-	// tab caps at 20 messages for v1; longer summarization is deferred).
+	// oldest-first, excluding the latest customer message (which lives in
+	// InboundMessage). Nil/empty when there's no prior turn. Capped
+	// upstream (Composer caps at 20 for v1).
 	//
 	// Distinct from the get_conversation_history capability, which
-	// surfaces PRIOR conversations from the same customer. This field
-	// is the CURRENT ticket's history, formatted into a system message
-	// the LLM sees before the user turn.
+	// surfaces PRIOR conversations from the same customer; this is the
+	// CURRENT ticket's history.
 	ConversationHistory []ConversationMessage
 
 	// Context is caller-supplied pre-prepared context (customer data,
@@ -127,12 +87,9 @@ type RunRequest struct {
 	// passes whatever the admin provides.
 	ConversationID int
 
-	// InboxID stamps every ai_usage row this run produces. The HTTP
-	// handler loads the conversation and resolves its inbox; the
-	// AgentTestPanel and any non-conversation caller passes the System
-	// inbox id (see internal/migrations/v2_7_7.go::SystemInboxUUID).
-	// Required for persistence — the runner refuses to call
-	// Usage.Record when zero, but the run itself still proceeds.
+	// InboxID stamps every ai_usage row this run produces. Non-conversation
+	// callers pass the System inbox id. Required for persistence — the
+	// runner skips Usage.Record when zero, but the run still proceeds.
 	InboxID int
 
 	// VerificationLevel gates agent execution upstream and controls PII
@@ -154,12 +111,9 @@ type RunRequest struct {
 	// checks fire at iteration boundaries.
 	Deadline time.Duration
 
-	// TraceID flows through every log line, every ai_usage row (when
-	// F4 lands), every Temporal workflow id, and every Redis event
-	// stream key. Caller MUST generate it before invoking Run().
-	//
-	// The runner treats an empty TraceID as a programmer error and
-	// returns StatusFailed with a terminal error.
+	// TraceID flows through every log line, ai_usage row, workflow id, and
+	// event-stream key. Caller MUST generate it before invoking Run(); an
+	// empty TraceID is a programmer error and returns StatusFailed.
 	TraceID string
 
 	// EventPublisher overrides the runner's default publisher for this
@@ -215,11 +169,9 @@ type RunResponse struct {
 	// against ai_agents.
 	AgentSlug string `json:"agent_slug,omitempty"`
 
-	// AgentUpdatedAt is the loaded agent's updated_at at the moment of
-	// the run. The HTTP handler stamps this into
-	// agent_executions.agent_updated_at so the Composer tab can later
-	// detect stale runs (agent edited after the run was generated).
-	// Zero on the failure paths that never load the agent.
+	// AgentUpdatedAt is the loaded agent's updated_at, stamped into
+	// agent_executions so the Composer tab can detect stale runs (agent
+	// edited after generation). Zero on failure paths that never load it.
 	AgentUpdatedAt time.Time `json:"agent_updated_at,omitempty"`
 
 	// Drops is non-nil when the resolver dropped tools at run time
@@ -300,9 +252,8 @@ type ToolCallLog struct {
 	// Retryable mirrors sdk.error(..., retryable=True) for LLM planning.
 	Retryable bool `json:"retryable,omitempty"`
 
-	// StartedAt is when dispatch entered Execute. Captured by
-	// dispatchOneTool. Stable across parallel execution; downstream
-	// consumers use this with FinishedAt to visualize overlap.
+	// StartedAt is when dispatch entered Execute. Stable across parallel
+	// execution; pair with FinishedAt to visualize overlap.
 	StartedAt time.Time `json:"started_at"`
 
 	// FinishedAt is when Execute returned (success or error).

@@ -10,10 +10,9 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm/catalog"
 )
 
-// Registry is the in-memory set of presets and purpose→preset mappings loaded
-// from config/ai_presets.json. After Load it's read-only (concurrent Resolve /
-// Has calls are safe without locks). Provider API keys are resolved by
-// secret.Resolver, not by the preset registry.
+// Registry holds presets and purpose→preset mappings from config/ai_presets.json.
+// Read-only after Load, so Resolve/Has are safe to call concurrently without
+// locks. Provider API keys are resolved elsewhere (secret.Resolver), not here.
 type Registry struct {
 	presets         map[string]Preset // slug → preset
 	purposeMappings map[llm.Purpose]string
@@ -33,23 +32,11 @@ var allowedProviders = map[string]struct{}{
 	"azure":     {},
 }
 
-// Load reads config/ai_presets.json at path and validates it against the
-// supplied catalog. Validation is strict — any failure is returned and
-// the caller is expected to fail startup loudly:
-//
-//   - presets is non-empty
-//   - every preset has a non-empty unique slug
-//   - every preset's provider is one of anthropic, openai, azure
-//   - every preset's model exists in the catalog
-//   - temperature in [0, 2]; max_tokens > 0 and ≤ catalog max_output_tokens
-//   - caching_enabled only true when the model supports prompt caching
-//   - caching_extended_ttl only true when the model supports it (catalog flag)
-//   - every visibility entry is a known llm.Purpose
-//   - purpose_mappings covers exactly llm.KnownPurposes
-//   - every mapped slug exists in presets
-//   - every mapped slug references an enabled preset
-//
-// If catalog is nil, model-existence checks are skipped (useful in tests).
+// Load reads config/ai_presets.json at path and strictly validates it (slug
+// uniqueness, provider/model/caching against the catalog, temperature/token
+// ranges, and that purpose_mappings cover llm.KnownPurposes via enabled
+// presets). Any failure returns an error; callers should fail startup loudly.
+// If cat is nil, model-existence checks are skipped (useful in tests).
 func Load(path string, cat *catalog.Catalog) (*Registry, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -115,8 +102,7 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 		order = append(order, p.Slug)
 	}
 
-	// Validate purpose_mappings: keys cover exactly llm.KnownPurposes,
-	// values point to enabled presets.
+	// purpose_mappings: keys must be known purposes; values enabled presets.
 	if len(f.PurposeMappings) == 0 {
 		return nil, fmt.Errorf("preset: %s purpose_mappings is empty", source)
 	}
@@ -133,10 +119,8 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 		}
 	}
 	for _, p := range llm.KnownPurposes {
-		// Non-LLM purposes (embedding, future reranking) are typed for
-		// ai_usage.purpose safety but don't resolve to a chat preset.
-		// They are exempt from the "every known purpose has a mapping"
-		// check.
+		// Non-LLM purposes (e.g. embedding) don't resolve to a chat preset,
+		// so they're exempt from the "every purpose has a mapping" check.
 		if llm.IsNonLLMPurpose(p) {
 			continue
 		}
@@ -157,13 +141,10 @@ func build(source string, f presetsFile, cat *catalog.Catalog) (*Registry, error
 	}, nil
 }
 
-// Resolve returns the preset to use for the given purpose, applying the
-// agent's per-purpose overrides on top of the global mapping. agentOverrides
-// may be nil for non-agent contexts (rewrite UI, ad-hoc test programs).
-//
-// Slugs in agentOverrides are validated at agent save time. At Resolve
-// time, an unknown override slug returns ErrPresetNotFound rather than
-// silently falling back; this surfaces config/data drift loudly.
+// Resolve returns the preset for purpose, applying agentOverrides on top of the
+// global mapping. agentOverrides may be nil (non-agent contexts). An unknown
+// override slug returns ErrPresetNotFound rather than silently falling back, to
+// surface config/data drift loudly.
 func (r *Registry) Resolve(purpose llm.Purpose, agentOverrides map[string]string) (Preset, error) {
 	if r == nil {
 		return Preset{}, fmt.Errorf("preset: registry is nil")

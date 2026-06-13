@@ -11,10 +11,8 @@ import (
 	"github.com/aziz-tb/merio/internal/verification/models"
 )
 
-// EvaluateCustom reports whether a custom criterion matches:
-// resolve the value at Key from the contract (fallback customer); if no
-// value, fail; otherwise look for it (case-insensitive substring) in the
-// message parts named by search_in.
+// EvaluateCustom reports whether the value at c.Key (contract, fallback
+// customer) appears case-insensitively in any message part named by search_in.
 func EvaluateCustom(c models.CustomCriterion, ctx models.CriterionContext) bool {
 	val, found := resolveCustomValue(c, ctx)
 	if !found {
@@ -33,10 +31,9 @@ func EvaluateCustom(c models.CustomCriterion, ctx models.CriterionContext) bool 
 	return false
 }
 
-// resolveCustomValue resolves the value at c.Key from the contract first,
-// then the customer. Returns the value as a string and whether it was found
-// (a present-but-empty value counts as found="" so reason rendering can
-// still substitute it).
+// resolveCustomValue resolves the value at c.Key from the contract, then the
+// customer. A present-but-empty value returns ("", true) so reason rendering
+// can still substitute it.
 func resolveCustomValue(c models.CustomCriterion, ctx models.CriterionContext) (string, bool) {
 	if ctx.Contract != nil {
 		if v, ok := resolvePath(toMap(ctx.Contract), c.Key); ok && v != nil {
@@ -68,7 +65,7 @@ func searchInText(part string, msg convmodels.PreparedMessage) string {
 }
 
 // toMap JSON-round-trips a struct (Customer/Contract) into a navigable map,
-// then merges the raw Zone 2 record so both top-level ERP keys and
+// then merges the raw custom pass-through record so both top-level ERP keys and
 // extra_data.* custom criteria paths resolve.
 func toMap(v any) map[string]any {
 	raw, err := json.Marshal(v)

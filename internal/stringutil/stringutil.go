@@ -13,6 +13,10 @@ import (
 	"github.com/k3a/html2text"
 )
 
+// PasswordDummy is the masking character used to redact secrets (passwords,
+// webhook/OIDC secrets) in API responses, typically repeated to a fixed width.
+// It doubles as a sentinel: on write, handlers treat a value containing it as
+// "unchanged" and keep the stored secret rather than overwriting it with the mask.
 const (
 	PasswordDummy = "•"
 )

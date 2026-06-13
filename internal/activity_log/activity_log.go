@@ -1,4 +1,5 @@
-// Package activity manages activity logs for all users.
+// Package activitylog records and queries the audit log of agent actions
+// (logins, availability changes, password and role-permission edits).
 package activitylog
 
 import (
@@ -20,6 +21,8 @@ import (
 //go:embed queries.sql
 var efs embed.FS
 
+// Manager manages the activity (audit) log. Its recorder methods each insert
+// one row with a localized, human-readable description; GetAll reads them back.
 type Manager struct {
 	q    queries
 	lo   *logf.Logger

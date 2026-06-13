@@ -17,35 +17,27 @@ func init() {
 	builtin.RegisterInternal(defaultKBSearch)
 }
 
-// defaultKBSearch is the package-level singleton registered into the
-// builtin registry at init time. The Searcher field is nil until
-// SetKBSearcher is called from cmd/init.go after main wires up the
-// embedding subsystem. Capabilities expose Execute regardless; the
-// nil-searcher branch returns a clear error so a misconfigured deploy
-// fails loudly instead of silently returning empty results.
+// defaultKBSearch is the package-level singleton registered at init time.
+// Its searcher is nil until SetKBSearcher runs (from cmd/init.go); Execute
+// returns a clear error in that window rather than empty results.
 var defaultKBSearch = &kbSearchCapability{}
 
 // kbSearchCapability — hybrid (semantic + keyword + reranker) KB search.
-//
-// Replaces the title-only ILIKE implementation. Preserves all four
-// existing KB-scope semantics:
+// Four KB-scope semantics:
 //
 //  1. Out-of-scope folder → soft error to LLM ("course-correct" pattern).
 //  2. Article-scope branch when KBScope.ArticleIDs is non-empty.
 //  3. Empty agent scope (both arrays non-nil but empty) → no access.
 //  4. Nil agent scope (test harness / direct invoke) → unscoped.
 //
-// Does NOT filter on is_ai_groundable — agent kb_scope is the
-// authoritative gate for what each agent can see.
-// DEPRECATED: the is_ai_groundable column is legacy and should be ignored by new logic;
+// agent kb_scope is the authoritative gate; the is_ai_groundable column is
+// legacy and deliberately ignored.
 type kbSearchCapability struct {
 	searcher *embeddings.Searcher
 }
 
 // SetKBSearcher injects the hybrid-search engine. Called once from
-// cmd/init.go after the embedding subsystem boots. Concurrent-safe:
-// the assignment is one pointer store; subsequent Execute calls see
-// the new value via Go's standard happens-before for init-after-main.
+// cmd/init.go after the embedding subsystem boots, before any Execute.
 func SetKBSearcher(s *embeddings.Searcher) {
 	defaultKBSearch.searcher = s
 }
@@ -126,9 +118,7 @@ func (k *kbSearchCapability) OutputSchema() map[string]any {
 func (k *kbSearchCapability) Category() string { return "read" }
 
 // Execute runs the four-way scope dispatch and delegates to the hybrid
-// searcher. The semantics are deliberately identical to the legacy
-// title-ILIKE implementation; only the underlying ranking method has
-// changed.
+// searcher.
 func (k *kbSearchCapability) Execute(ctx context.Context, params map[string]any, rt *builtin.ToolRuntimeContext) (any, error) {
 	if k.searcher == nil {
 		return nil, fmt.Errorf("kb_search: searcher not configured (RAG subsystem not initialized?)")
@@ -147,8 +137,8 @@ func (k *kbSearchCapability) Execute(ctx context.Context, params map[string]any,
 		limit = v
 	}
 
-	// folder_ids — the LLM-supplied subset to intersect with the
-	// agent's scope. Type comes through as []any (per JSON spec); coerce.
+	// folder_ids — LLM-supplied subset to intersect with the agent's
+	// scope. Arrives as []any per JSON; coerce.
 	folderIDs, err := paramIntSlice(params, "folder_ids")
 	if err != nil {
 		return nil, fmt.Errorf("kb_search: %w", err)
@@ -156,7 +146,6 @@ func (k *kbSearchCapability) Execute(ctx context.Context, params map[string]any,
 
 	hasAgentScope := rt != nil && (rt.KBScope.FolderIDs != nil || rt.KBScope.ArticleIDs != nil)
 
-	// Scope semantics, preserved from the legacy capability:
 	if hasAgentScope {
 		// 1) Out-of-scope folder → soft error ("course-correct").
 		allowed := make(map[int]struct{}, len(rt.KBScope.FolderIDs))
@@ -181,12 +170,11 @@ func (k *kbSearchCapability) Execute(ctx context.Context, params map[string]any,
 		}
 	}
 
-	// Build the search input. ArticleIDs are passed alongside FolderIDs
-	// in v2 by augmenting the SQL query; for v1 we treat the article
-	// scope as a post-filter applied after the hybrid search returns.
+	// Article scope is applied as a post-filter after the hybrid search
+	// returns (see the article-scope branch below).
 	folderIDs64 := toInt64Slice(folderIDs)
 
-	locale := "de" // v1: KB is German energy-domain.
+	locale := "de" // KB is German energy-domain.
 	searchInput := embeddings.SearchInput{
 		Query:       queryRaw,
 		ContentType: "kb_chunk",
@@ -207,13 +195,8 @@ func (k *kbSearchCapability) Execute(ctx context.Context, params map[string]any,
 		return nil, fmt.Errorf("kb_search: %w", err)
 	}
 
-	// 2) Article-scope branch — when the agent has explicit article
-	// whitelist, also include those articles (even if outside the
-	// folder scope), as long as they actually matched the query. v1
-	// approach: keep results as-is when the search already returned
-	// whitelisted articles; merge in any whitelisted articles the
-	// hybrid search didn't surface (rare — usually they'd be in scope
-	// anyway) up to the limit.
+	// 2) Article-scope branch — merge in whitelisted articles that matched
+	// the query but fell outside the folder scope, up to the limit.
 	if hasAgentScope && len(rt.KBScope.ArticleIDs) > 0 && len(results) < limit {
 		seen := make(map[int64]struct{}, len(results))
 		for _, r := range results {
@@ -231,12 +214,8 @@ func (k *kbSearchCapability) Execute(ctx context.Context, params map[string]any,
 	}, nil
 }
 
-// searchArticleScope runs a second search restricted to the agent's
-// whitelisted article ids. Implementation v1: tiny fan-in — for each
-// whitelisted id, run a per-article search of 1 result if the hybrid
-// pipeline can be reused. Simplest correct v1: rerun the hybrid search
-// without folder filter and post-filter to whitelist. Since article
-// whitelist is rare and usually short, the cost is bounded.
+// searchArticleScope reruns the hybrid search without a folder filter and
+// post-filters the results to the agent's whitelisted article ids.
 func (k *kbSearchCapability) searchArticleScope(
 	ctx context.Context,
 	query string,

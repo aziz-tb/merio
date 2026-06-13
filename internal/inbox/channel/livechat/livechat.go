@@ -15,8 +15,11 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// ErrClientNotConnected is returned by Send when the recipient has no websocket connected — an
+// expected, non-fatal "offline" condition, not a delivery failure to surface.
 var ErrClientNotConnected = fmt.Errorf("client not connected")
 
+// Channel name, connection limit (MaxConnectionsPerUser caps per-user connections), and valid HomeApps[].Type values.
 const (
 	ChannelLiveChat       = "livechat"
 	MaxConnectionsPerUser = 10
@@ -25,6 +28,8 @@ const (
 	HomeAppExternalLink = "external_link"
 )
 
+// PreChatFormField is one field of the widget's pre-chat form. A non-default field links to a
+// CustomAttributeID and is dropped at render if that attribute is gone; IsDefault fields are kept.
 type PreChatFormField struct {
 	Key               string `json:"key"`
 	Type              string `json:"type"`

@@ -37,8 +37,7 @@ type SearchInput struct {
 	TopK int
 
 	// RerankCandidates is the number of fused candidates passed to the
-	// reranker (default 30). Lower = faster + cheaper but reduces
-	// recall; higher = more accurate ranking but more reranker spend.
+	// reranker (default 30). Trades recall against reranker latency/spend.
 	RerankCandidates int
 
 	// SemanticCandidates and KeywordCandidates control stage-1 fan-out
@@ -86,9 +85,8 @@ type Searcher struct {
 	minRerankerScore      float64
 }
 
-// SearcherOpts wires dependencies. The two threshold fields default to
-// zero (no filter); callers are responsible for supplying tuned values.
-// Use NewConfiguredSearcher when building from the shared app config.
+// SearcherOpts wires dependencies. The threshold fields default to zero
+// (no filter); use NewConfiguredSearcher to build from the app config.
 type SearcherOpts struct {
 	Store                 *Store
 	Embed                 Provider
@@ -123,13 +121,11 @@ func NewSearcher(opt SearcherOpts) (*Searcher, error) {
 	}, nil
 }
 
-// Search runs the three-stage hybrid pipeline.
-//
-// Stage 1: semantic (chunk-level cosine) + keyword (article-level
-// tsvector + ts_rank_cd) in parallel.
-// Stage 2: RRF fusion with k=60, deduplicated by article id.
-// Stage 3: cross-encoder reranking of the top-RerankCandidates fused
-// results down to TopK. Reranker failure falls back to RRF order.
+// Search runs the three-stage hybrid pipeline:
+//   - Stage 1: semantic (chunk cosine) + keyword (article tsvector) in parallel.
+//   - Stage 2: RRF fusion (k=60), deduplicated by article id.
+//   - Stage 3: cross-encoder rerank of top-RerankCandidates down to TopK;
+//     reranker failure falls back to RRF order.
 func (s *Searcher) Search(ctx context.Context, in SearchInput) ([]SearchResult, error) {
 	if in.TopK == 0 {
 		in.TopK = 5
@@ -147,9 +143,8 @@ func (s *Searcher) Search(ctx context.Context, in SearchInput) ([]SearchResult, 
 		in.ContentType = "kb_chunk"
 	}
 
-	// Stage 1 — both halves run in parallel; both queries hit Postgres
-	// independently. Errors from either half fail the whole search; we
-	// could fall back to single-half but that masks a real DB issue.
+	// Stage 1 — halves run in parallel. An error from either half fails the
+	// whole search rather than degrading to one half, which would mask a DB issue.
 	queryVec, err := s.getOrEmbedQuery(ctx, in.Query)
 	if err != nil {
 		return nil, fmt.Errorf("hybrid search: embed query: %w", err)
@@ -221,9 +216,8 @@ func (s *Searcher) Search(ctx context.Context, in SearchInput) ([]SearchResult, 
 	return final, nil
 }
 
-// filterChunksBySimilarity drops chunks whose cosine similarity is below
-// the threshold. Used to keep weak retrieval candidates out of fusion +
-// reranking. The kept order is preserved.
+// filterChunksBySimilarity drops chunks below the cosine-similarity
+// threshold, preserving order, to keep weak candidates out of fusion.
 func filterChunksBySimilarity(chunks []candidateRow, min float64) []candidateRow {
 	if min <= 0 || len(chunks) == 0 {
 		return chunks
@@ -237,9 +231,8 @@ func filterChunksBySimilarity(chunks []candidateRow, min float64) []candidateRow
 	return out
 }
 
-// filterResultsByReranker drops articles whose reranker score is below
-// the threshold. Applied after the cross-encoder pass. Preserves the
-// caller-chosen ordering.
+// filterResultsByReranker drops articles below the reranker-score
+// threshold after the cross-encoder pass, preserving order.
 func filterResultsByReranker(results []SearchResult, min float64) []SearchResult {
 	if min <= 0 || len(results) == 0 {
 		return results
@@ -275,12 +268,9 @@ func (s *Searcher) getOrEmbedQuery(ctx context.Context, query string) ([]float32
 }
 
 // reciprocalRankFusion fuses semantic + keyword candidates into a
-// per-article ranked list. k=60 is the standard RRF constant from
-// Cormack et al; controls how steeply rank-1 dominates the score.
-//
-// Per-article aggregation: each article's matched chunks are
-// accumulated (a multi-chunk match is signal). semantic_rank +
-// keyword_rank are stamped for trace visibility.
+// per-article ranked list; k is the RRF constant (60 per Cormack et al).
+// Matched chunks accumulate per article (a multi-chunk match is signal),
+// and semantic_rank + keyword_rank are stamped for trace visibility.
 func reciprocalRankFusion(semantic []candidateRow, keyword []keywordRow, k float64) []SearchResult {
 	byArticle := make(map[int64]*SearchResult)
 	for rank, c := range semantic {

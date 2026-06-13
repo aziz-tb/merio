@@ -60,12 +60,10 @@ func handleGetAITool(r *fastglue.Request) error {
 	return r.SendEnvelope(out)
 }
 
-// handleCreateAITool creates an ai tool. The request body carries the same
-// shape as before the Unified Executor Framework batch — including
-// implementation:{code,language,packages} — but storage is now split: the
-// code lands in a functions row (domain='ai_tool', name=slug) and the
-// ai_tools row links to it via function_id. The split is invisible to the
-// frontend.
+// handleCreateAITool creates an ai tool. Storage is split: the code lands in
+// a functions row (domain='ai_tool', name=slug) and the ai_tools row links to
+// it via function_id. The split is invisible to the frontend, which still
+// sends implementation:{code,language,packages}.
 func handleCreateAITool(r *fastglue.Request) error {
 	var (
 		app  = r.Context.(*App)
@@ -174,13 +172,9 @@ func handleDeleteAITool(r *fastglue.Request) error {
 }
 
 // invokeAIToolReq is the request body for POST /api/v1/ai/tools/{slug}/invoke.
-//
-// Manual invocation: the caller fills `parameters` directly. `conversation_id`
-// is plumbed to the runner / runtime context so SDK callbacks and capabilities
-// reading conversation scope get default-scoping. `verification_level` is a
-// manual-test affordance for internal capabilities that shape PII by
-// conversation verification state. `kind` defaults to "custom" for back-compat
-// with F9 callers.
+// conversation_id default-scopes capabilities that read conversation scope;
+// verification_level lets manual tests exercise internal capabilities that
+// shape PII by verification state; kind defaults to "custom".
 type invokeAIToolReq struct {
 	Kind              string         `json:"kind"`
 	Parameters        map[string]any `json:"parameters"`
@@ -188,24 +182,11 @@ type invokeAIToolReq struct {
 	VerificationLevel int            `json:"verification_level"`
 }
 
-// handleInvokeAITool dispatches a python_script tool through the F6
-// sandbox. The request body is the parameter map; the response on success
-// is the runner's Result (kind / data / message / telemetry).
-//
-// HTTP status mapping:
-//   - 200: tool ran (kind in body distinguishes success/failure/noop/error)
-//   - 400: parameter validation failed, malformed body, malformed tool impl
-//   - 403: tool disabled, wrong type (go_builtin), agent verification insufficient
-//   - 404: tool slug not found
-//   - 422: script raised an uncaught exception (sandbox returned KindError)
-//   - 503: sandbox circuit breaker open
-//
-// HTTP 422 vs 200-with-kind=error: maps Python
-// exceptions to 422 specifically. The runner returns Result.Kind=error
-// for both Python exceptions AND infrastructure errors; we use Result.Code
-// to distinguish: codes prefixed with "PY_" come from script-raised
-// exceptions and map to 422; everything else stays 200 (the script
-// emitted noop/failure deliberately) or 503 (infra).
+// handleInvokeAITool dispatches a tool through the sandbox; the success
+// response is the runner's Result. Status mapping: dispatch errors go through
+// MapDispatchErrorToHTTP (400 bad params/body/impl, 403 disabled/wrong-type/
+// verification, 404 slug not found, 503 breaker open); a runner result maps
+// per the switch below (200 ran, else by Result.Code).
 func handleInvokeAITool(r *fastglue.Request) error {
 	app := r.Context.(*App)
 
@@ -225,9 +206,8 @@ func handleInvokeAITool(r *fastglue.Request) error {
 	// Caller identity from session/API-key auth (set by perm middleware).
 	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
 
-	// kind defaults to "custom" for back-compat. The dispatcher does the
-	// same defaulting; we set it here so the request shape that hits the
-	// runtime context is explicit.
+	// kind defaults to "custom"; set it here (the dispatcher also defaults)
+	// so the request shape reaching the runtime context is explicit.
 	kind := agentmodels.ToolRefKind(body.Kind)
 	if kind == "" {
 		kind = agentmodels.ToolRefKindCustom
@@ -271,13 +251,11 @@ func handleInvokeAITool(r *fastglue.Request) error {
 			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	// Map runner result kind to HTTP status using the EXECUTION_* enum
-	// the runner now emits (see internal/exec/runner/models/models.go):
-	//   success/failure/noop      → 200 (kind in body distinguishes)
-	//   error + EXECUTION_TIMEOUT → 408 (script ran past its declared timeout)
-	//   error + EXECUTION_EXCEPTION → 422 (Python exception; stderr has the traceback)
-	//   error + EXECUTION_FAILED  → 500 (script crashed for a non-traceback reason)
-	//   error + anything else     → 500 (forward-compat for new codes)
+	// Map result.Code (EXECUTION_* enum) to HTTP status; non-error kinds
+	// (success/failure/noop) stay 200 and let the body distinguish them.
+	//   EXECUTION_TIMEOUT   → 408 (ran past declared timeout)
+	//   EXECUTION_EXCEPTION → 422 (script exception; traceback in stderr)
+	//   anything else       → 500
 	if result != nil && result.Kind == "error" {
 		switch result.Code {
 		case execModels.CodeExecutionTimeout:
@@ -290,11 +268,9 @@ func handleInvokeAITool(r *fastglue.Request) error {
 	return r.SendEnvelope(result)
 }
 
-// validateAITool enforces validation rules for ai_tools rows after the
-// F5 schema cleanup: name required, slug auto-generated or shape-checked,
-// implementation JSONB is a valid PythonScriptImpl, and category is one
-// of read/write. ai_tools holds only custom tools; internal capabilities
-// live in code under internal/ai/tools/builtin/.
+// validateAITool validates and normalizes a custom-tool row in place (slug,
+// timeout, category, implementation). Internal capabilities are not stored
+// here; they live in internal/ai/tools/builtin/.
 func validateAITool(t *toolmodels.Tool) error {
 	t.Name = strings.TrimSpace(t.Name)
 	if t.Name == "" {
@@ -324,13 +300,9 @@ func validateAITool(t *toolmodels.Tool) error {
 	if t.Category != "read" && t.Category != "write" {
 		return envelope.NewError(envelope.InputError, "category must be 'read' or 'write'", nil)
 	}
-	// Implementation JSONB: custom tools dispatch to the F6 exec runner,
-	// which supports python + javascript (the JS lane runs without the
-	// SDK in v1 — admins compose stateless transforms there). Validate
-	// the shape, require non-empty code, and lock the language to the
-	// two values the runner whitelists at dispatch time (runner.go:269)
-	// so a bad save can't get past the CRUD into a "saves fine, fails
-	// at run time" loop.
+	// Validate the implementation JSONB: require non-empty code and lock
+	// language to python/javascript — the values the runner whitelists at
+	// dispatch — so a tool that saves fine can't fail at run time.
 	if len(t.Implementation) > 0 && string(t.Implementation) != "{}" && string(t.Implementation) != "null" {
 		var impl toolmodels.PythonScriptImpl
 		if err := json.Unmarshal(t.Implementation, &impl); err != nil {
@@ -359,11 +331,9 @@ func validateAITool(t *toolmodels.Tool) error {
 	return nil
 }
 
-// splitImplementation parses the implementation JSONB ({code,language,
-// packages}) into its parts for the linked functions row. validateAITool
-// has already normalized language to "python"/"javascript" when an
-// implementation is present; an absent implementation yields empty code
-// with the default language so the functions language CHECK is satisfied.
+// splitImplementation parses the implementation JSONB into parts for the
+// linked functions row. An absent implementation yields empty code with the
+// default language ("python") so the functions language CHECK still passes.
 func splitImplementation(raw json.RawMessage) (code, language, packages string) {
 	language = "python"
 	if len(raw) == 0 || string(raw) == "{}" || string(raw) == "null" {

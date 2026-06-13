@@ -27,8 +27,8 @@ type ContractHydrator func(ctx context.Context, contractIDs []string) error
 type ContractLister func(customerID string) ([]contractmodels.Contract, error)
 
 // LoadCustomerWithContracts fetches a fresh customer, hydrates its
-// contracts, and serializes the combined Zone 1 + Zone 2 shape via
-// CustomerToAPIResponse. It is the single source of truth behind the
+// contracts, and serializes the combined flat shape (typed columns + custom
+// pass-through fields) via CustomerToAPIResponse. It is the single source of truth behind the
 // GET /conversations/{uuid}/customer endpoint and the get_customer_data
 // agent tool, so both return byte-identical data. The fetch/hydrate/list
 // adapters let callers bind their own FreshOptions without this package

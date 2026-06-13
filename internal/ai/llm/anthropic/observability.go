@@ -10,9 +10,8 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
-// callLog captures a single completion call's structured log fields.
-// Materialized once so emit() can write a single line on success and on
-// failure paths.
+// callLog holds a single completion call's structured log fields, shared by
+// the success and failure emit paths.
 type callLog struct {
 	startedAt    time.Time
 	traceID      string

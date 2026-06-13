@@ -9,6 +9,7 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
+// Anthropic prompt-caching and extended-thinking tuning constants.
 const (
 	// MaxCacheMarkers is the per-request cache_control breakpoint cap
 	// enforced by Anthropic-compatible Messages APIs.

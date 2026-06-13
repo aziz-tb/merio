@@ -1,9 +1,6 @@
-// Package function manages the functions table — the single, unified home
-// for every named, sandbox-runnable code blob across the platform (custom
-// AI tools, customer-identification executors, and future domains). It
-// loads a function by name and runs it through the F6 exec runner; callers
-// (the AI tool dispatcher, the customer-identification workflow activities,
-// the admin preview endpoint) never talk to the sandbox directly.
+// Package function manages the functions table — the unified home for named,
+// sandbox-runnable code (custom AI tools, customer-identification executors). It loads a
+// function by name and runs it through the exec runner.
 package function
 
 import (
@@ -28,10 +25,14 @@ var (
 	//go:embed queries.sql
 	efs embed.FS
 
-	// Typed errors so callers (dispatcher, HTTP handlers, workflow
-	// activities) can branch on the failure without string matching.
-	ErrFunctionNotFound  = errors.New("function: not found")
+	// Sentinel errors matched with errors.Is. Any other error from this package is an
+	// opaque, already-logged envelope error.
+
+	// ErrFunctionNotFound is returned by lookups and by Update/Delete when no row matches the name or id.
+	ErrFunctionNotFound = errors.New("function: not found")
+	// ErrFunctionCodeEmpty is returned by Run when the function's code is blank; the runner is not invoked.
 	ErrFunctionCodeEmpty = errors.New("function: code is empty")
+	// ErrFunctionProtected is returned by Delete when the target is not an ai_tool function (only those are deletable).
 	ErrFunctionProtected = errors.New("function: row is protected and cannot be deleted")
 )
 
@@ -41,6 +42,8 @@ type Runner interface {
 	Execute(ctx context.Context, req execModels.Request) (*execModels.Result, error)
 }
 
+// ConversationStore resolves a RunRequest.ConversationID to its UUID for the sandbox payload.
+// Optional — when unset, runs carry no conversation context.
 type ConversationStore interface {
 	GetConversation(id int, uuid, refNum string) (convmodels.Conversation, error)
 }
@@ -85,6 +88,7 @@ func New(opts Opts) (*Manager, error) {
 	}, nil
 }
 
+// SetConversationStore wires the optional conversation store after construction (New leaves it nil).
 func (m *Manager) SetConversationStore(conversation ConversationStore) {
 	m.conversation = conversation
 }

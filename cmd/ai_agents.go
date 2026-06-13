@@ -56,10 +56,7 @@ func handleGetAIAgent(r *fastglue.Request) error {
 	return r.SendEnvelope(out)
 }
 
-// handleCreateAIAgent creates an ai agent. Runs the full validation pass
-// (slug shape, prompt-required-when-enabled, kb_scope folder/article refs
-// and tool refs exist, autonomy keys, tools[] shape, min_verification
-// non-negative).
+// handleCreateAIAgent creates an ai agent after validateAIAgent passes.
 func handleCreateAIAgent(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -91,9 +88,8 @@ func handleUpdateAIAgent(r *fastglue.Request) error {
 	if err := r.Decode(&agent, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
-	// Reject slug mutations: slugs are permanent code references. Fetch
-	// the existing row, compare body's slug if non-empty, force the
-	// row's canonical slug onto the update payload either way.
+	// Slugs are immutable code references: reject a differing non-empty
+	// slug, then force the existing slug onto the payload regardless.
 	existing, fetchErr := app.aiAgents.Get(id)
 	if fetchErr != nil {
 		return sendErrorEnvelope(r, fetchErr)
@@ -127,8 +123,8 @@ func handleDeleteAIAgent(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
-// validateAIAgent enforces the validation rules.
-// Mutates the agent in place where appropriate (slug auto-generation when empty).
+// validateAIAgent validates an agent, mutating it in place (trims fields,
+// auto-generates slug from name when empty). Returns a 400 InputError.
 func validateAIAgent(app *App, a *agentmodels.Agent) error {
 	// Name required.
 	a.Name = strings.TrimSpace(a.Name)
@@ -163,10 +159,9 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 		return envelope.NewError(envelope.InputError, "max_iterations must be between 1 and 50", nil)
 	}
 
-	// Tools JSONB shape: array of {kind, id, config_override?}.
-	//   kind="internal" → id is a string matching a registered builtin
-	//                     capability (kb_search, get_customer_data, ...).
-	//   kind="custom"   → id is an integer matching an ai_tools row.
+	// Tools JSONB: array of {kind, id, config_override?}. kind="internal"
+	// → id is a registered builtin capability slug; kind="custom" → id is
+	// an ai_tools row integer.
 	if len(a.Tools) > 0 && string(a.Tools) != "null" && string(a.Tools) != "[]" {
 		var toolRefs []agentmodels.ToolRef
 		if err := json.Unmarshal(a.Tools, &toolRefs); err != nil {
@@ -220,11 +215,9 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 		}
 	}
 
-	// kb_scope: {"folder_ids":[…], "article_ids":[…]}. Each id must be a
-	// positive integer and reference an existing kb_folders / kb_articles
-	// row. Empty arrays are valid (agent has no KB access). The DB column
-	// default sets the empty shape; an explicitly omitted field decodes
-	// as nil here and we treat that identically.
+	// kb_scope: {"folder_ids":[…], "article_ids":[…]}. Each id must be
+	// positive and reference an existing row. Empty/omitted means no KB
+	// access and is valid.
 	if len(a.KBScope) > 0 && string(a.KBScope) != "null" {
 		var scope agentmodels.KBScope
 		if err := json.Unmarshal(a.KBScope, &scope); err != nil {
@@ -257,8 +250,7 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 
 	// Autonomy: validate keys when non-empty (anything other than {} or null).
 	if len(a.Autonomy) > 0 && string(a.Autonomy) != "{}" && string(a.Autonomy) != "null" {
-		// Use a permissive struct decode, then a strict known-keys check
-		// against the raw map so unknown keys are rejected.
+		// Reject unknown keys via a raw-map check, then type-check values.
 		var raw map[string]json.RawMessage
 		if err := json.Unmarshal(a.Autonomy, &raw); err != nil {
 			return envelope.NewError(envelope.InputError, "autonomy must be a JSON object", nil)
@@ -280,12 +272,9 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 		}
 	}
 
-	// preset_overrides: must be a JSON object of purpose → preset slug.
-	// Empty object {} means "use platform defaults from
-	// config/ai_presets.json's purpose_mappings." Both shape (string→string,
-	// non-empty values) and semantics (purpose is one of llm.KnownPurposes,
-	// slug exists in the loaded preset registry) are checked here so a 400
-	// fires at save time rather than the agent runner failing at run time.
+	// preset_overrides: JSON object of purpose → preset slug; empty {} uses
+	// platform defaults. Purpose must be in llm.KnownPurposes and slug must
+	// exist in the registry, checked here so saving fails fast.
 	if len(a.PresetOverrides) > 0 && string(a.PresetOverrides) != "{}" && string(a.PresetOverrides) != "null" {
 		var typed map[string]string
 		if err := json.Unmarshal(a.PresetOverrides, &typed); err != nil {

@@ -16,6 +16,7 @@ const (
 	EncryptedPrefix = "enc:"
 )
 
+// Sentinel errors for encryption and decryption.
 var (
 	ErrInvalidKey        = errors.New("encryption key must be 32 bytes")
 	ErrInvalidCiphertext = errors.New("invalid ciphertext format")

@@ -1,3 +1,4 @@
+// Package models defines the macro type.
 package models
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/lib/pq"
 )
 
+// Macro is a reusable set of actions and a canned message, scoped by visibility to a user or team.
 type Macro struct {
 	ID             int             `db:"id" json:"id"`
 	CreatedAt      time.Time       `db:"created_at" json:"created_at"`

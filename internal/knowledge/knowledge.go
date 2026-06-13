@@ -1,10 +1,8 @@
 // Package knowledge provides folder + article management for the help-center
 // knowledge base. Folders nest arbitrarily (no sentinel root); articles live
 // in exactly one folder. Bodies are stored in three formats (HTML, TipTap
-// JSON, Markdown) so downstream RAG embedding can consume Markdown without
-// a follow-up migration.
+// JSON, Markdown) so downstream RAG embedding can consume Markdown directly.
 //
-// Manager mirrors internal/macro shape with one structural deviation:
 // Manager retains *sqlx.DB after construction so MoveFolder can run its
 // cycle-check + UPDATE inside a single transaction.
 package knowledge
@@ -111,9 +109,7 @@ func (m *Manager) UpdateFolder(id int, name string) (models.Folder, error) {
 
 // MoveFolder reparents a folder. Runs the descendant-cycle check + UPDATE
 // inside a single transaction so concurrent moves can't slip a cycle past
-// the check. No SELECT FOR UPDATE — concurrent moves of the same folder
-// are rare; tx read-stability is sufficient, and FK / unique-index will
-// catch the impossible cases on commit.
+// the check; no SELECT FOR UPDATE, FK and unique-index catch the rest on commit.
 func (m *Manager) MoveFolder(id int, newParentID null.Int) (models.Folder, error) {
 	tx, err := m.db.Beginx()
 	if err != nil {
@@ -161,10 +157,9 @@ func (m *Manager) MoveFolder(id int, newParentID null.Int) (models.Folder, error
 	return folder, nil
 }
 
-// DeleteFolder removes a folder. The schema's ON DELETE RESTRICT on both
-// parent_id (sub-folders) and kb_articles.folder_id surfaces as a 23503
-// foreign-key violation when the folder still has children — translated
-// here to a clear "folder is not empty" envelope.
+// DeleteFolder removes a folder. ON DELETE RESTRICT on sub-folders and
+// kb_articles.folder_id surfaces as an FK violation when the folder is
+// non-empty, translated here to a "folder is not empty" envelope.
 func (m *Manager) DeleteFolder(id int) error {
 	result, err := m.q.DeleteFolder.Exec(id)
 	if err != nil {
@@ -203,9 +198,8 @@ func (m *Manager) ListFolders(parentID null.Int) ([]models.Folder, error) {
 	return folders, nil
 }
 
-// ListAllFolders returns every folder. The frontend builds the tree
-// client-side from this flat list — fewer round-trips than per-level
-// fetches and simpler reactive state.
+// ListAllFolders returns every folder as a flat list; the frontend builds
+// the tree client-side.
 func (m *Manager) ListAllFolders() ([]models.Folder, error) {
 	folders := make([]models.Folder, 0)
 	if err := m.q.ListAllFolders.Select(&folders); err != nil {
@@ -417,11 +411,8 @@ func (m *Manager) ListArticles(opts models.ListArticlesOpts) ([]models.Article, 
 	return articles, nil
 }
 
-// nullableJSON returns NULL for an empty/nil json.RawMessage so PostgreSQL
-// receives an explicit NULL rather than the literal `null` JSON value or
-// an invalid empty payload. Used for body_tiptap_json which is JSONB
-// NOT NULL — empty payloads are coerced to '{}'::jsonb at the DB layer
-// via DEFAULT, but on inserts we send the explicit value.
+// nullableJSON coerces an empty/nil payload to "{}" so PostgreSQL gets valid
+// JSON, not an empty string. Used for body_tiptap_json (JSONB NOT NULL).
 func nullableJSON(j []byte) interface{} {
 	if len(j) == 0 {
 		return []byte("{}")

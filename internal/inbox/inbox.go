@@ -25,6 +25,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// Channel types persisted in an inbox's channel column and switched on when
+// creating, updating, and initializing inboxes.
 const (
 	ChannelEmail    = "email"
 	ChannelLiveChat = "livechat"
@@ -91,6 +93,10 @@ type receiverState struct {
 	done   chan struct{} // closed when the goroutine exits
 }
 
+// Manager owns the in-memory registry of live inbox instances and their receiver
+// goroutines, and backs CRUD on inbox records in the DB. It is safe for concurrent
+// use; sensitive config fields (SMTP/IMAP passwords, OAuth secrets, livechat secret)
+// are encrypted at rest with encryptionKey and decrypted on read.
 type Manager struct {
 	mu            sync.RWMutex
 	queries       queries

@@ -4,13 +4,16 @@ import (
 	"github.com/knadh/koanf/v2"
 )
 
+// DefaultMinRerankerScore is the reranker-score floor when embeddings.min_reranker_score is unset.
 const DefaultMinRerankerScore = 0.3
 
+// SearcherConfig holds the two retrieval thresholds; a zero MinSemanticSimilarity disables the semantic filter.
 type SearcherConfig struct {
 	MinSemanticSimilarity float64
 	MinRerankerScore      float64
 }
 
+// SearcherConfigFromKoanf reads the thresholds; a nil koanf yields defaults (no semantic filter).
 func SearcherConfigFromKoanf(ko *koanf.Koanf) SearcherConfig {
 	cfg := SearcherConfig{
 		MinRerankerScore: DefaultMinRerankerScore,
@@ -25,6 +28,8 @@ func SearcherConfigFromKoanf(ko *koanf.Koanf) SearcherConfig {
 	return cfg
 }
 
+// NewConfiguredSearcher builds a Searcher with config thresholds. When opt.Embed is nil it
+// returns (nil, nil) — search disabled, not an error — so callers must nil-check the result.
 func NewConfiguredSearcher(ko *koanf.Koanf, opt SearcherOpts) (*Searcher, error) {
 	if opt.Embed == nil {
 		return nil, nil

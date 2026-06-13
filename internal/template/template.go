@@ -17,6 +17,11 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// Package-level state and constants. ErrTemplateNotFound is the sentinel
+// returned by name/default lookups when no matching row exists:
+// RenderStoredTemplate surfaces it unchanged, while RenderStoredEmailTemplate
+// replaces it with a wrapped "template <name> not found" error. TypeEmailOutgoing
+// and TypeEmailNotification are the persisted template-type discriminators.
 var (
 	//go:embed queries.sql
 	efs                   embed.FS

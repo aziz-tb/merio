@@ -1,3 +1,8 @@
+// Package fs provides a local-filesystem implementation of the media.Store
+// interface, storing uploads as files under a configured directory. When a
+// signing key is configured it also satisfies media.SignedURLStore, serving
+// access through HMAC-SHA256 signed URLs with an expiry (the application must
+// validate these itself, unlike S3 which signs and validates server-side).
 package fs
 
 import (

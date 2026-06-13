@@ -26,17 +26,13 @@ type BulkReindexOutput struct {
 	Failed    int
 }
 
-// BulkReindexWorkflow pages through all published articles and runs a
-// per-article EmbedArticleWorkflow as a child. Parallelism is bounded
-// by a token-channel pattern so we never have more than `Parallelism`
-// children executing concurrently.
+// BulkReindexWorkflow pages through all published articles, running a
+// per-article EmbedArticleWorkflow as a child. A token channel bounds
+// concurrency to in.Parallelism children at once.
 //
-// Resumability: workflow id is deterministic
-// ("bulk-reindex:<content_type>:<model-tag>"). If the workflow is
-// terminated mid-run and restarted with the same id under
-// ALLOW_DUPLICATE_FAILED_ONLY policy, the per-article child workflow
-// ids are themselves deterministic, so already-embedded articles hit
-// the ON CONFLICT DO NOTHING path and complete quickly.
+// Resumability: child workflow ids are deterministic, so restarting a
+// terminated run re-embeds nothing new (already-embedded articles hit
+// ON CONFLICT DO NOTHING and return fast).
 func BulkReindexWorkflow(ctx workflow.Context, in BulkReindexInput) (*BulkReindexOutput, error) {
 	logger := workflow.GetLogger(ctx)
 	if in.BatchSize <= 0 {

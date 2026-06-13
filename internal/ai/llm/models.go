@@ -9,17 +9,13 @@ import (
 // translate these to/from their wire format; nothing in this file imports
 // from any provider SDK.
 
-// Role is the speaker of a Message. Mirrors Anthropic's role taxonomy:
-// system at the top of the conversation, then user/assistant pairs, with
-// tool results embedded as ContentBlockToolResult inside user messages.
-//
-// Why "system" is a role here even though Anthropic carries the system
-// prompt as a top-level field: callers build a single []Message slice;
-// the Anthropic translator hoists Role=="system" into the SDK's system
-// field. Other providers that accept a system role inline (OpenAI) can
-// pass it through unchanged.
+// Role is the speaker of a Message. "system" is a role here (not a separate
+// field) so callers build one []Message slice; the Anthropic translator
+// hoists Role=="system" into the SDK's top-level system field, while
+// providers that accept an inline system role (OpenAI) pass it through.
 type Role string
 
+// Recognized Role values.
 const (
 	RoleSystem    Role = "system"
 	RoleUser      Role = "user"
@@ -27,11 +23,9 @@ const (
 )
 
 // ContentBlockType identifies which variant of ContentBlock a block holds.
-// Mirroring Anthropic's content-block taxonomy keeps the translator
-// straightforward; other providers either accept the same shape or get
-// flattened in their own translator.
 type ContentBlockType string
 
+// Recognized ContentBlockType values.
 const (
 	ContentBlockTypeText             ContentBlockType = "text"
 	ContentBlockTypeThinking         ContentBlockType = "thinking"
@@ -58,17 +52,15 @@ type ContentBlock struct {
 	Data      string `json:"data,omitempty"`
 
 	// Tool use (assistant invoking a tool) — populated when Type == "tool_use".
-	// ToolUseID is the provider-supplied id used to correlate the eventual
-	// tool_result back to this call.
+	// ToolUseID correlates the eventual tool_result back to this call.
 	ToolUseID string         `json:"tool_use_id,omitempty"`
 	ToolName  string         `json:"tool_name,omitempty"`
 	ToolInput map[string]any `json:"tool_input,omitempty"`
 
-	// Tool result (caller returning a tool's output) — populated when
-	// Type == "tool_result". ToolUseID matches the assistant's earlier
-	// tool_use block. Content is the tool's output as a string (callers
-	// JSON-encode structured payloads). IsError signals the tool failed
-	// so the model can surface the error or retry.
+	// Tool result — populated when Type == "tool_result". ResultToolUseID
+	// matches the assistant's earlier tool_use block. ResultContent is the
+	// tool's output (callers JSON-encode structured payloads). ResultIsError
+	// signals failure so the model can surface or retry.
 	ResultToolUseID string `json:"result_tool_use_id,omitempty"`
 	ResultContent   string `json:"result_content,omitempty"`
 	ResultIsError   bool   `json:"result_is_error,omitempty"`
@@ -110,35 +102,23 @@ type ToolChoice struct {
 	Name string `json:"name,omitempty"` // required when Type == "tool"
 }
 
-// CachedBlockMarker records a position in the messages slice up to and
-// including which the conversation prefix is "stable" and worth caching.
-// AfterMessageIndex is the index of the last message that should be
-// inside the cached span (so 0 means "cache the system prompt").
-//
-// The Anthropic translator places a cache_control marker on the last
-// content block of the message at AfterMessageIndex. Up to 4 markers per
-// request (Anthropic's cap); the cache manager in the agent runner
-// enforces that.
+// CachedBlockMarker marks the stable conversation prefix worth caching.
+// AfterMessageIndex is the index of the last message inside the cached span
+// (0 means "cache the system prompt"). The Anthropic translator places a
+// cache_control marker on that message's last content block. Anthropic caps
+// markers at 4 per request; the agent runner's cache manager enforces it.
 type CachedBlockMarker struct {
 	AfterMessageIndex int `json:"after_message_index"`
 }
 
 // CompletionRequest is the input to LLMProvider.Complete.
 //
-// PresetSlug is the resolved preset slug (caller resolves Purpose +
-// agent overrides via the preset registry before calling). The provider
-// uses it for logging and to look up model/temp/max_tokens from the
-// in-memory preset map.
-//
-// CachedBlocks is optional. When present and the resolved preset has
-// caching enabled, the provider adds cache_control markers; when absent
-// or caching is disabled, no markers are added.
-//
-// TraceID flows through Redis Streams jobs, sandbox callbacks, and
-// ai_usage rows so all LLM calls for a single ticket can be joined.
-//
-// AgentID and ResolutionAttemptID are zero outside their respective
-// contexts; the rewrite UI, ad-hoc test programs, etc. pass zeros.
+// PresetSlug is pre-resolved by the caller (Purpose + agent overrides via
+// the preset registry); the provider uses it for logging and to look up
+// model/temp/max_tokens. CachedBlocks adds cache_control markers only when
+// the resolved preset has caching enabled. TraceID is the join key across
+// Redis Streams jobs, sandbox callbacks, and ai_usage rows. AgentID and
+// ResolutionAttemptID are zero outside their respective contexts.
 type CompletionRequest struct {
 	Purpose    Purpose   `json:"purpose"`
 	PresetSlug string    `json:"preset_slug"`
@@ -187,14 +167,9 @@ const (
 	StopReasonPauseTurn StopReason = "pause_turn"
 )
 
-// Usage tracks token consumption for one completion call.
-//
-// CachedTokens is broken out from InputTokens to make cache hit rate a
-// direct query (Anthropic returns prompt-cache hit/miss counts as
-// separate fields; we pre-aggregate into a single CachedTokens count).
-//
-// cached_tokens hits cost ~10% of regular input tokens —
-// keeping the breakout makes the savings calculable downstream.
+// Usage tracks token consumption for one completion call. CachedTokens is
+// broken out from InputTokens (aggregating the provider's prompt-cache
+// hit/miss counts) so cache hit rate and savings are a direct query.
 type Usage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
@@ -202,21 +177,17 @@ type Usage struct {
 }
 
 // CacheMetrics surfaces caching activity for one completion call. HitTokens
-// echoes Usage.CachedTokens for readability at call sites that don't care
-// about the rest of Usage. Markers is the count of cache_control markers
-// the provider actually placed (may be less than the request's
-// CachedBlocks count if the preset disabled caching or the provider
-// capped at 4 markers).
+// echoes Usage.CachedTokens. Markers is the count of cache_control markers
+// the provider actually placed — may be less than the request's CachedBlocks
+// count if the preset disabled caching or the provider capped at 4 markers.
 type CacheMetrics struct {
 	HitTokens int `json:"hit_tokens"`
 	Markers   int `json:"markers"`
 }
 
-// CompletionResponse is the output of LLMProvider.Complete.
-//
-// PresetUsed and Model are echoed back so the caller can write a complete
-// ai_usage row without re-resolving the preset. The agent runner writes
-// these into TurnTrace; ai_usage instrumentation reads them when F4 lands.
+// CompletionResponse is the output of LLMProvider.Complete. PresetUsed and
+// Model are echoed back so the caller can write a complete ai_usage row
+// without re-resolving the preset.
 type CompletionResponse struct {
 	StopReason    StopReason            `json:"stop_reason"`
 	Content       []ContentBlock        `json:"content"`
@@ -228,26 +199,18 @@ type CompletionResponse struct {
 	Observability ResponseObservability `json:"observability"`
 }
 
-// ResponseObservability carries provider-side metrics the runner can't
-// derive on its own — request IDs, retry counts, server-side timing,
-// provider-specific cache-creation-vs-cache-read splits — and any
-// other "squishy" provider data that doesn't deserve a typed column
-// in CompletionResponse but does deserve to land in ai_usage.
-//
-// Every provider populates this on every return. Empty/zero values
-// when the provider can't supply (fake provider in tests, etc.).
+// ResponseObservability carries provider-side metrics that don't deserve a
+// typed CompletionResponse column but do land in ai_usage. Every provider
+// populates it on every return; fields are zero when unavailable.
 //
 //   - ProviderRequestID — Anthropic msg.ID, OpenAI completion id, etc.
-//     Persisted to ai_usage.provider_request_id for cross-system
-//     debugging.
-//   - RetryCount — number of attempts made before success/terminal
-//     failure. 1 = no retries; 2+ = transient errors absorbed.
+//     Persisted to ai_usage.provider_request_id.
+//   - RetryCount — attempts before success/terminal failure (1 = no retries).
 //     Persisted to ai_usage.retry_count.
-//   - ProviderMetadata — JSON blob the provider can fill with anything
-//     it judges useful. Anthropic uses this for the cache_creation /
-//     cache_read split that doesn't fit in CacheMetrics. Persisted
-//     verbatim to ai_usage.provider_metadata (no redaction — these
-//     are operational metrics, not user content).
+//   - ProviderMetadata — free-form provider blob (Anthropic uses it for the
+//     cache_creation/cache_read split). Persisted verbatim to
+//     ai_usage.provider_metadata, no redaction — operational metrics, not
+//     user content.
 type ResponseObservability struct {
 	Provider          string          `json:"provider,omitempty"`
 	ProviderRequestID string          `json:"provider_request_id,omitempty"`

@@ -1,3 +1,4 @@
+// Package anthropic implements the llm provider for the direct Anthropic Messages API.
 package anthropic
 
 import (
@@ -8,33 +9,25 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm/preset"
 )
 
-// applyCacheMarkers places cache_control breakpoints on the SDK params
-// according to the request's CachedBlockMarker positions. Returns the
-// number of markers actually placed (≤ shared.MaxCacheMarkers; clamped by caching
-// support on the preset and by the markers' alignment with real content
-// blocks).
+// applyCacheMarkers places cache_control breakpoints on the SDK params per
+// the request's CachedBlock positions. Returns the number of markers placed
+// (≤ shared.MaxCacheMarkers; clamped by preset caching support and by
+// alignment with real content blocks). Returns 0 without mutating params when
+// the preset disables caching.
 //
-// Marker semantics (mirroring the runtime contract documented in the F7
-// plan): an AfterMessageIndex of N means "everything up to and including
-// the message at request index N is stable and worth caching." We index
-// into the original request.Messages (which mixes system + turn messages);
-// after reqToSDKParams hoisted system messages out, we map the request
-// index to the SDK's combined position (system blocks first, then turn
-// messages). Index 0 typically points at the system prompt — its marker
-// lands on the last system text block.
-//
-// When the preset disables caching, we return 0 without mutating params
-// (the call goes through with no cache_control headers).
+// A marker at request index N caches everything up to and including that
+// message. Request indices span the original request.Messages (system + turn
+// mixed); we map them to the SDK's combined position (system blocks first,
+// then turn messages), so index 0 lands on the last system text block.
 func applyCacheMarkers(params *sdk.MessageNewParams, req llm.CompletionRequest, p preset.Preset) int {
 	targets := anthropicshared.CacheMarkerTargets(req, p.CachingEnabled)
 	if len(targets) == 0 {
 		return 0
 	}
 
-	// Construct via the SDK's helper so the Type field is set explicitly.
-	// A zero-valued CacheControlEphemeralParam is treated as omitted by
-	// the SDK's reflection-based IsOmitted, which would silently drop our
-	// markers from the wire request.
+	// Use the SDK helper so Type is set explicitly: a zero-valued
+	// CacheControlEphemeralParam is treated as omitted by the SDK's
+	// reflection-based IsOmitted, silently dropping markers from the request.
 	cc := sdk.NewCacheControlEphemeralParam()
 	if p.CachingExtendedTTL {
 		cc.TTL = sdk.CacheControlEphemeralTTLTTL1h

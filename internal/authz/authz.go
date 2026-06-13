@@ -1,4 +1,4 @@
-// package authz provides Casbin-based authorization.
+// Package authz provides Casbin-based authorization.
 package authz
 
 import (

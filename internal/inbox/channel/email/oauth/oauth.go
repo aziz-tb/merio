@@ -14,6 +14,7 @@ import (
 // Provider represents an OAuth provider.
 type Provider string
 
+// Supported OAuth providers; any other value is rejected by GetOAuth2Config.
 const (
 	ProviderMicrosoft Provider = "microsoft"
 	ProviderGoogle    Provider = "google"

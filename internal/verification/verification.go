@@ -1,14 +1,11 @@
-// Package verification is the pure-logic engine that decides whether a
-// recognized customer is "verified" against a conversation's message
-// context. Given a prepared message, a resolved
-// customer/contract, the channel's rules, and extracted attributes,
-// Evaluate runs the group/min_count rules and returns a level (0/1/2)
-// plus a human-readable reason plus a per-criterion trace.
+// Package verification decides whether a recognized customer is "verified"
+// against a conversation's message context. Evaluate runs the group/min_count
+// rules and returns a level (0/1/2), a human-readable reason, and a
+// per-criterion trace.
 //
-// The engine has NO settings, DB, Temporal, or HTTP dependency: the caller
-// pre-loads the rules (from the customer_identification.verification_rules_async
-// setting) and passes them in via EvalInput, so the data dependency is
-// visible at the call site and Evaluate stays a deterministic pure function.
+// Evaluate is a deterministic pure function with no settings, DB, Temporal, or
+// HTTP dependency: the caller pre-loads the rules and passes them in via
+// EvalInput.
 package verification
 
 import (
@@ -35,10 +32,8 @@ func New(opts Opts) *Manager {
 	return &Manager{lo: opts.Lo}
 }
 
-// Evaluate runs the channel's verification rules against the input and
-// returns the level, message, and trace. It never returns
-// level 3 — that is operator-set only. It performs no I/O; rules and custom
-// criteria come from the input.
+// Evaluate runs the channel's verification rules against the input and returns
+// the level, message, and trace. It never returns level 3 (operator-set only).
 func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalOutput, error) {
 	out := models.EvalOutput{Level: models.VerificationLevelUnverified, Source: "rules"}
 
@@ -125,9 +120,7 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 		out.Level = models.VerificationLevelUnverified
 	}
 
-	// level 2 (full) carry no message.
-	// level 1 (partial) carries an operator-facing Markdown explanation.
-	// level 0 ("nothing matched")
+	// Only partial carries a message: an operator-facing Markdown explanation.
 	if out.Level == models.VerificationLevelPartial {
 		out.Message = buildPartialVerificationMessage(partialGroups, cctx)
 	}
@@ -135,7 +128,7 @@ func (m *Manager) Evaluate(_ context.Context, in models.EvalInput) (models.EvalO
 }
 
 // renderReason substitutes {value} in a custom criterion's reason with the
-// value resolved at its key . Missing value → empty substitution.
+// value resolved at its key. Missing value → empty substitution.
 func renderReason(cc models.CustomCriterion, ctx models.CriterionContext) string {
 	if cc.Reason == "" {
 		return ""

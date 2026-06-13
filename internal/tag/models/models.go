@@ -1,3 +1,4 @@
+// Package models defines the tag type and its type, visibility, and applied-by constants.
 package models
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// Tag classifications: tag types, visibility levels, and how a tag came to be applied.
 const (
 	TypeSkill   = "skill"
 	TypeTopic   = "topic"
@@ -40,6 +42,7 @@ type Tag struct {
 	UpdatedByName string              `db:"updated_by_name" json:"updated_by_name,omitempty"`
 }
 
+// SetDefaults fills empty Type, Color, Visibility, and Detection.Mode with sane defaults.
 func (t *Tag) SetDefaults() {
 	if t.Type == "" {
 		t.Type = TypeSkill

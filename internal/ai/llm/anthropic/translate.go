@@ -13,14 +13,11 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm/preset"
 )
 
-// reqToSDKParams turns our provider-agnostic CompletionRequest +
-// resolved preset into the SDK's MessageNewParams. Cache markers are
-// applied as a separate pass (cache.go) because they need to mutate
-// individual content blocks after the params are built.
-//
-// llm.RoleSystem messages are hoisted into MessageNewParams.System rather
-// than stay in Messages — the SDK rejects "system" as a message role.
-// Adjacent system messages are concatenated; we preserve order.
+// reqToSDKParams turns a CompletionRequest + resolved preset into the SDK's
+// MessageNewParams. Cache markers are a separate pass (cache.go) since they
+// mutate content blocks after the params are built. RoleSystem messages are
+// hoisted into MessageNewParams.System (the SDK rejects "system" as a message
+// role), concatenated in order.
 func reqToSDKParams(req llm.CompletionRequest, p preset.Preset) (sdk.MessageNewParams, error) {
 	if len(req.Messages) == 0 {
 		return sdk.MessageNewParams{}, llm.ErrEmptyMessages
@@ -193,9 +190,8 @@ func toolDefToSDK(t llm.ToolDef) (sdk.ToolParam, error) {
 	}, nil
 }
 
-// stringSlice converts a JSON-decoded "required" field to []string.
-// Handles []any (most common after json.Unmarshal into map[string]any)
-// and []string (callers who already typed it).
+// stringSlice converts a JSON-decoded "required" field to []string, accepting
+// both []any (post-json.Unmarshal) and an already-typed []string.
 func stringSlice(v any) []string {
 	switch typed := v.(type) {
 	case []string:
@@ -214,21 +210,12 @@ func stringSlice(v any) []string {
 	return nil
 }
 
-// sdkToCompletionResponse turns the SDK's Message response into our
-// provider-agnostic CompletionResponse.
+// sdkToCompletionResponse turns the SDK's Message into a CompletionResponse.
 //
-// Note on cache token bookkeeping: Anthropic returns separate counts for
-// "cache write" (CacheCreationInputTokens — tokens billed at +25% to
-// build a cache entry) and "cache read" (CacheReadInputTokens — tokens
-// billed at -90% on subsequent calls). We surface CacheReadInputTokens
-// as Usage.CachedTokens (the dimension that drives downstream cost
-// dashboards). Cache-creation tokens are absorbed into InputTokens — the
-// +25% creation premium is captured in provider_metadata for later
-// reporting without changing the core Usage shape.
-//
-// attempts is the call count from withRetry (1 = no retries; 2+ =
-// transient errors absorbed). Threaded into Observability so the
-// ai_usage row records retry_count without re-reading callLog.
+// Cache-token bookkeeping: cache reads (billed -90%) surface as
+// Usage.CachedTokens; cache-creation tokens (billed +25%) fold into
+// InputTokens, with the raw split kept in provider_metadata. attempts (the
+// withRetry call count) is threaded into Observability as retry_count.
 func sdkToCompletionResponse(msg *sdk.Message, p preset.Preset, markers int, attempts int) llm.CompletionResponse {
 	inputTokens := int(msg.Usage.InputTokens) + int(msg.Usage.CacheCreationInputTokens)
 

@@ -11,8 +11,11 @@ import (
 	"os"
 )
 
+// KEKEnvVar is the env var LoadKEK reads the base64 key-encryption key from.
 const KEKEnvVar = "MERIO_SECRETS_KEK"
 
+// Sentinel errors for KEK loading: ErrKEKMissing when the env var is unset; ErrKEKInvalid when
+// the value is not a base64-encoded 32-byte AES key.
 var (
 	ErrKEKMissing = errors.New("MERIO_SECRETS_KEK env var is not set")
 	ErrKEKInvalid = errors.New("MERIO_SECRETS_KEK is not a valid base64-encoded 32-byte key")

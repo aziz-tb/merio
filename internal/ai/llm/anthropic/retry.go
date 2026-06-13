@@ -11,22 +11,13 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm"
 )
 
-// retryDelays defines the exponential backoff schedule used for transient
-// errors. Two retries (three attempts total: 0, 1s, 3s). v1 keeps it
-// simple; if production data shows tail-latency issues we'll move to
-// jittered backoff.
+// retryDelays is the backoff schedule for transient errors: two retries,
+// three attempts total (0, 1s, 3s).
 var retryDelays = []time.Duration{1 * time.Second, 3 * time.Second}
 
-// classifyError sorts an SDK error into one of:
-//   - retryable (transient): caller retries up to len(retryDelays) times.
-//   - terminal: caller stops immediately.
-//
-// Retryable: network errors (ctx cancellation due to upstream timeout),
-// 5xx server errors, 429 rate limited.
-// Terminal: 4xx other than 429 (auth, bad request).
-//
-// Returns the canonical sentinel for terminal errors so callers can
-// errors.Is them rather than parsing strings.
+// classifyError reports whether an SDK error is retryable and returns the
+// canonical sentinel (so callers errors.Is rather than parse strings).
+// Retryable: network errors, 5xx, and 429. Terminal: 4xx other than 429.
 func classifyError(err error) (retryable bool, sentinel error) {
 	if err == nil {
 		return false, nil
@@ -55,13 +46,10 @@ func classifyError(err error) (retryable bool, sentinel error) {
 	return true, err
 }
 
-// withRetry calls fn up to len(retryDelays)+1 times with backoff between
-// attempts on retryable errors. Stops early if ctx is canceled or the
-// error is terminal.
-//
-// Final error: if the last attempt's error was rate-limit-classified
-// (ErrRateLimited), wraps it for caller distinction; otherwise returns
-// the underlying error.
+// withRetry calls fn up to len(retryDelays)+1 times, backing off between
+// retryable failures and stopping early on ctx cancellation or a terminal
+// error. The third return is the attempt count; a final ErrRateLimited is
+// surfaced as the sentinel.
 func withRetry(ctx context.Context, fn func(ctx context.Context) (*sdk.Message, error)) (*sdk.Message, error, int) {
 	var (
 		msg     *sdk.Message

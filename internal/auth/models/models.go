@@ -1,3 +1,4 @@
+// Package models defines the authenticated-user type for the auth layer.
 package models
 
 // User represents an authenticated user.

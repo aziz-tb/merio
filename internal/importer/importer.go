@@ -1,3 +1,6 @@
+// Package importer runs long-lived bulk-import jobs (e.g. CSV uploads of tags or agents) in the
+// background, keyed by a caller-chosen namespace. Progress is kept in memory so handlers can
+// poll status; jobs do not survive a restart.
 package importer
 
 import (
@@ -11,7 +14,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// Job represents the status of an import job.
+// Job is the in-memory progress record for one namespace's import. Running is false once the
+// job has finished (success, error, or panic).
 type Job struct {
 	Running   bool      `json:"running"`
 	Logs      []string  `json:"logs"`

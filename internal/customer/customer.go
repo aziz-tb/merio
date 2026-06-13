@@ -1,8 +1,6 @@
-// Package customer manages the customers cache table — ERP-resolved
-// customer records persisted by the identification workflow and read back
-// by the sidebar, verification engine, and agent-run hydration. The table
-// is a cache, not a system of record: last_synced_at drives the TTL and
-// callers refetch from the ERP when a row goes stale.
+// Package customer manages the customers cache table — ERP-resolved records persisted by the
+// identification workflow. It is a cache, not a system of record: last_synced_at drives the TTL,
+// and callers refetch from the ERP when a row goes stale.
 package customer
 
 import (
@@ -216,6 +214,7 @@ func (m *Manager) refreshFromERP(ctx context.Context, customerID string, opts Fr
 	return &out, true, nil
 }
 
+// Upsert creates or updates a customer by CustomerID, applying defaults first.
 func (m *Manager) Upsert(c models.Customer) (models.Customer, error) {
 	defaults(&c)
 	var out models.Customer

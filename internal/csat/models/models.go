@@ -1,4 +1,4 @@
-// package models has the models for the customer satisfaction survey responses.
+// Package models defines the customer-satisfaction (CSAT) survey response type.
 package models
 
 import (

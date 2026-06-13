@@ -9,8 +9,8 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
-// CustomerToAPIResponse serializes the flat Zone 1 + Zone 2 customer shape used
-// by public APIs and detection variables. Zone 2 fields are appended in their
+// CustomerToAPIResponse serializes the flat customer shape (typed columns + custom pass-through
+// fields) used by public APIs and detection variables. Pass-through fields are appended in their
 // original ERP-authored order.
 func CustomerToAPIResponse(c customermodels.Customer, contracts []contractmodels.Contract) json.RawMessage {
 	var out bytes.Buffer
@@ -44,8 +44,8 @@ func CustomerToAPIResponse(c customermodels.Customer, contracts []contractmodels
 	return out.Bytes()
 }
 
-// ContractToAPIResponse serializes the flat Zone 1 + Zone 2 contract shape used
-// by public APIs and detection variables.
+// ContractToAPIResponse serializes the flat contract shape (typed columns + custom pass-through
+// fields) used by public APIs and detection variables.
 func ContractToAPIResponse(c contractmodels.Contract) json.RawMessage {
 	var out bytes.Buffer
 	out.WriteByte('{')
@@ -70,8 +70,8 @@ func ContractToAPIResponse(c contractmodels.Contract) json.RawMessage {
 	return out.Bytes()
 }
 
-// CustomerToMap returns CustomerToAPIResponse (Zone 1 + Zone 2 fields, plus contracts)
-// decoded into a map, for use as detection/template variables.
+// CustomerToMap returns CustomerToAPIResponse (typed columns + custom pass-through fields, plus
+// contracts) decoded into a map, for use as detection/template variables.
 func CustomerToMap(c customermodels.Customer, contracts []contractmodels.Contract) (map[string]any, error) {
 	var out map[string]any
 	if err := json.Unmarshal(CustomerToAPIResponse(c, contracts), &out); err != nil {

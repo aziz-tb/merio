@@ -1,13 +1,8 @@
-// Package embeddings holds the Temporal activities driving KB
-// embedding indexing. The workflow side (pure orchestration) lives at
-// internal/workflows/embeddings; this package does the actual DB +
-// provider work each activity needs.
-//
-// Activities are methods on the Activities struct so dependencies are
-// injected once at worker boot and the worker can register every
-// activity via a single RegisterActivity call. Each method follows the
-// project's typed pointer-to-struct input/output convention (see
-// internal/temporal/CONVENTIONS.md).
+// Package embeddings holds the Temporal activities driving KB embedding
+// indexing — the DB + provider work behind the orchestration in
+// internal/workflows/embeddings. Activities are methods on Activities so
+// deps are injected once at worker boot; each uses the typed
+// pointer-to-struct input/output convention (internal/temporal/CONVENTIONS.md).
 package embeddings
 
 import (
@@ -27,9 +22,8 @@ import (
 	"github.com/aziz-tb/merio/internal/knowledge"
 )
 
-// Activities groups every embedding-related activity. One instance is
-// constructed in the worker binary and registered against the embeddings
-// task queue.
+// Activities groups every embedding-related activity, registered against
+// the embeddings task queue at worker boot.
 type Activities struct {
 	Store     *embeddings.Store
 	Provider  embeddings.Provider
@@ -39,9 +33,8 @@ type Activities struct {
 	Lo        *logf.Logger
 }
 
-// New validates dependencies and returns an Activities. The worker
-// boots fatally if any required field is nil — better than failing
-// every workflow at runtime.
+// New validates dependencies and returns an Activities. Erroring here
+// fails worker boot rather than every workflow at runtime.
 func New(a *Activities) (*Activities, error) {
 	if a == nil {
 		return nil, errors.New("embedding activities: nil receiver")
@@ -120,10 +113,8 @@ type ChunkOutput struct {
 	Chunks []chunking.Chunk
 }
 
-// ChunkContent applies the locked F12 chunking strategy. As an activity
-// (rather than inline workflow code) it inherits retry + timeout; even
-// though it's pure CPU, the activity boundary keeps the workflow
-// purely orchestration-shaped.
+// ChunkContent applies the locked F12 chunking strategy. Pure CPU, but
+// kept an activity so the workflow stays orchestration-only.
 func (a *Activities) ChunkContent(_ context.Context, in *ChunkInput) (*ChunkOutput, error) {
 	if in == nil {
 		return nil, errors.New("ChunkContent: nil input")
@@ -149,9 +140,8 @@ type RedactOutput struct {
 	Text string
 }
 
-// RedactText scrubs PII before the chunk's text is sent to the
-// embedding provider. Embedding raw PII would persist a vector that
-// can leak it; redaction is non-negotiable.
+// RedactText scrubs PII before the chunk reaches the embedding provider:
+// a vector built from raw PII can leak it.
 func (a *Activities) RedactText(_ context.Context, in *RedactInput) (*RedactOutput, error) {
 	if in == nil {
 		return nil, errors.New("RedactText: nil input")
@@ -172,9 +162,8 @@ type GenerateEmbeddingsOutput struct {
 }
 
 // GenerateEmbeddings calls Provider.Embed and records the spend in
-// ai_usage. Failures surface to Temporal as activity errors; the
-// retry policy on the workflow decides whether to retry. ai_usage row
-// is written on success AND failure so cost analysis sees both.
+// ai_usage. The usage row is written on success AND failure so cost
+// analysis sees both.
 func (a *Activities) GenerateEmbeddings(ctx context.Context, in *GenerateEmbeddingsInput) (*GenerateEmbeddingsOutput, error) {
 	if in == nil {
 		return nil, errors.New("GenerateEmbeddings: nil input")

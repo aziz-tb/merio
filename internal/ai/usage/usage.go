@@ -1,25 +1,18 @@
 // Package usage is the write surface for the ai_usage table — one row
-// per LLM provider call. The runner (and any future call site) builds
-// a Row and calls Manager.Record(). Cost calculation happens inside
-// Record(): the model id is looked up in the catalog, per-million-
-// token rates are applied to the captured token counts, and the four
-// cost fields land on the row before insert.
+// per LLM provider call. Callers build a Row and call Manager.Record(),
+// which computes the cost columns before insert.
 //
-// Two non-obvious design choices:
+// Two non-obvious choices:
 //
-//  1. Synchronous write. ~5ms on a healthy DB. We treat ai_usage
-//     writes as load-bearing for audit + cost analysis and would
-//     rather block the run for 5ms than risk losing rows in a queue
-//     under back-pressure. If volume outgrows this assumption, swap
-//     to a buffered async writer; the Manager interface stays stable.
+//  1. Writes are synchronous (~5ms). ai_usage is load-bearing for audit
+//     and cost analysis, so we block the run rather than risk losing rows
+//     in a queue under back-pressure. The Manager interface stays stable
+//     if a buffered async writer is ever needed.
 //
 //  2. Idempotency leans on the partial unique index
-//     (trace_id, call_sequence_in_trace, created_at). The caller
-//     stamps created_at ONCE per LLM call so a retry of the insert
-//     uses the same value and trips the unique constraint cleanly.
-//     Cross-partition collisions are not possible because no caller
-//     generates two rows with the same (trace_id, seq) and different
-//     created_at.
+//     (trace_id, call_sequence_in_trace, created_at). The caller must
+//     stamp created_at ONCE per LLM call so an insert retry reuses the
+//     value and trips the constraint cleanly.
 package usage
 
 import (
@@ -88,14 +81,13 @@ func New(opt Opts) (*Manager, error) {
 	return &Manager{db: opt.DB, catalog: opt.Catalog, lo: opt.Lo, q: q}, nil
 }
 
-// Row is the input to Manager.Record. The runner / handler populates
-// every field they have access to. Cost columns are computed by Record
-// — the caller doesn't need to pre-populate them.
+// Row is the input to Manager.Record. Cost columns are computed by
+// Record; callers leave them unset.
 //
-// CreatedAt drives the partition target. Callers MUST set it once at
-// build time (right after the LLM call returns) and reuse the same
-// value on retries. Leaving it zero means "use time.Now()" — fine for
-// the runner's normal path but not for idempotency-conscious paths.
+// CreatedAt drives the partition target and the idempotency key. Callers
+// MUST set it once (right after the LLM call returns) and reuse it on
+// retries; zero means time.Now(), which is fine only when idempotency
+// doesn't matter.
 type Row struct {
 	CreatedAt time.Time
 
@@ -137,20 +129,14 @@ type Row struct {
 	StructuredOutput json.RawMessage
 }
 
-// Record writes one ai_usage row. Synchronous. Idempotent — a retry
-// with the same (trace_id, call_sequence, created_at) returns nil with
-// the duplicate logged at INFO.
+// Record writes one ai_usage row. Synchronous and idempotent — a retry
+// with the same (trace_id, call_sequence, created_at) returns nil and
+// logs the duplicate at INFO.
 //
-// Cost calculation:
-//   - Resolves the model in the catalog
-//   - input_cost  = (input_tokens / 1e6)         * input_per_million_usd
-//   - output_cost = (output_tokens / 1e6)        * output_per_million_usd
-//   - cached_cost = (cached_input_tokens / 1e6)  * cached_input_per_million_usd
-//   - total       = input + output + cached
-//
-// If the model isn't in the catalog (shouldn't happen given the
-// startup validator) costs are all zero and a WARN is logged. The row
-// still lands — losing cost detail is preferable to dropping audit.
+// Cost columns are filled from the catalog via ComputeCost. If the model
+// isn't in the catalog (shouldn't happen given the startup validator)
+// costs are zero and a WARN is logged; the row still lands, since losing
+// cost detail beats dropping audit.
 func (m *Manager) Record(ctx context.Context, row Row) error {
 	if row.TraceID == "" {
 		return errors.New("usage: trace_id is required")
@@ -183,9 +169,8 @@ func (m *Manager) Record(ctx context.Context, row Row) error {
 	}
 	totalCost := inputCost + outputCost + cachedCost
 
-	// Normalize JSONB nullables — Postgres distinguishes NULL from
-	// 'null'::jsonb, and our schema doesn't NOT NULL them, so unset
-	// fields should land as NULL (not the literal string 'null').
+	// Normalize JSONB nullables: Postgres distinguishes NULL from
+	// 'null'::jsonb, so unset fields must land as NULL, not 'null'.
 	var providerMetadata interface{}
 	if len(row.ProviderMetadata) > 0 {
 		providerMetadata = []byte(row.ProviderMetadata)
@@ -239,28 +224,22 @@ func (m *Manager) Record(ctx context.Context, row Row) error {
 		structuredOutput,
 	)
 	if err != nil {
-		// Postgres unique violation (23505) on the partial unique
-		// index → idempotent retry of the same logical write.
+		// Unique violation (23505) on the partial index → idempotent
+		// retry of the same logical write.
 		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 			m.lo.Info("usage: duplicate row swallowed (idempotency)",
 				"trace_id", row.TraceID, "seq", row.CallSequenceInTrace)
 			return nil
 		}
-		// Don't return the raw error to the caller — wrapping keeps the
-		// runner's error path predictable.
 		return fmt.Errorf("usage: insert: %w", err)
 	}
 	return nil
 }
 
-// ComputeCost is the pure-math cost calculator extracted so tests can
-// exercise it without a DB. Looks up the model in the catalog, applies
-// per-million-token rates to the captured counts, returns (input,
-// output, cached) costs in USD plus a found flag. When the model
-// isn't in the catalog every cost is zero and ok=false; callers
-// decide whether to log or fail.
-//
-// Convention: rates are per-million tokens. (tokens / 1e6) * rate.
+// ComputeCost returns the (input, output, cached) costs in USD for a
+// call, plus ok=false when the model isn't in the catalog (all costs
+// zero — callers decide whether to log or fail). Pure math, no DB.
+// Catalog rates are per-million tokens: cost = (tokens / 1e6) * rate.
 func ComputeCost(cat *catalog.Catalog, provider, modelID string, inputTokens, outputTokens, cachedInputTokens int) (input, output, cached float64, ok bool) {
 	if cat == nil {
 		return 0, 0, 0, false
@@ -276,8 +255,8 @@ func ComputeCost(cat *catalog.Catalog, provider, modelID string, inputTokens, ou
 	return input, output, cached, true
 }
 
-// Helper functions to convert nullable Go pointers into interface{}
-// values that sqlx will pass as SQL NULL rather than the zero value.
+// nil pointers become a nil interface{} so sqlx passes SQL NULL rather
+// than the zero value.
 
 func nilOrInt(p *int) interface{} {
 	if p == nil {

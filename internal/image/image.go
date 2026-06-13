@@ -10,16 +10,17 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 )
 
+// Defaults for image thumbnailing: Exts is the thumbnail-candidate extension allow-list
+// (lowercase, no dot), DefThumbSize is CreateThumb's default max dimension, and ThumbPrefix is
+// prepended to a thumbnail's storage name.
 var (
 	Exts         = []string{"gif", "png", "jpg", "jpeg"}
 	DefThumbSize = 150
 	ThumbPrefix  = "thumb_"
 )
 
-// IsImageByContent returns true when the file's magic bytes identify it as one
-// of the raster formats this package can decode. Used as a fallback when the
-// filename has no extension or an unreliable one (e.g. attachments arriving
-// through email without proper file extensions).
+// IsImageByContent reports whether the file's magic bytes identify a supported raster format.
+// Used as a fallback when the filename extension is missing or unreliable (e.g. email attachments).
 func IsImageByContent(r io.ReadSeeker) bool {
 	if _, err := r.Seek(0, io.SeekStart); err != nil {
 		return false

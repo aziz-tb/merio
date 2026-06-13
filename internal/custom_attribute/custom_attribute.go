@@ -17,6 +17,7 @@ import (
 //go:embed queries.sql
 var efs embed.FS
 
+// Manager handles custom-attribute definitions.
 type Manager struct {
 	q    queries
 	lo   *logf.Logger

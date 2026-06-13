@@ -1,7 +1,5 @@
-// Package hello holds the smoke-test activity used to verify a
-// Temporal worker is wired up end-to-end. Not for production
-// workflow logic — F12 (embeddings) and later F-pieces build domain
-// activities under sibling packages.
+// Package hello holds the smoke-test activity that verifies a Temporal
+// worker is wired up end-to-end. Not for production workflow logic.
 package hello
 
 import (
@@ -12,8 +10,7 @@ import (
 )
 
 // SayHelloInput is the activity input. Pointer-to-struct is the
-// convention for all activities in the project — see
-// internal/temporal/CONVENTIONS.md.
+// project-wide activity convention; see internal/temporal/CONVENTIONS.md.
 type SayHelloInput struct {
 	Name string
 }
@@ -23,10 +20,8 @@ type SayHelloOutput struct {
 	Greeting string
 }
 
-// Activities groups the smoke-test activities for dependency
-// injection. Currently no dependencies (the smoke test is
-// intentionally minimal) — left in place so future smoke activities
-// inherit the same shape.
+// Activities groups the smoke-test activities for dependency injection.
+// Currently no dependencies.
 type Activities struct{}
 
 // New returns an Activities ready to be registered with a worker.
@@ -39,9 +34,9 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 	return New(), nil
 }
 
-// SayHello is the canonical smoke activity. Used by the hello-world
-// workflow + tests to verify the worker actually picks up and runs
-// activity tasks.
+// SayHello is the canonical smoke activity, used by the hello-world
+// workflow and tests to verify the worker runs activity tasks. Returns
+// an error if Name is empty.
 func (a *Activities) SayHello(_ context.Context, in *SayHelloInput) (*SayHelloOutput, error) {
 	if in == nil || in.Name == "" {
 		return nil, fmt.Errorf("hello: Name is required")

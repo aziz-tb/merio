@@ -1,5 +1,6 @@
-// Package automation automatically evaluates and applies rules to conversations based on events like new conversations, updates, and time triggers,
-// and performs some actions if they are true.
+// Package automation evaluates configured rules against conversations as events
+// occur (new conversation, conversation update, and hourly time triggers) and
+// applies each matching rule's actions.
 package automation
 
 import (
@@ -38,6 +39,8 @@ var (
 // TaskType represents the type of conversation task.
 type TaskType string
 
+// TaskType values route a queued ConversationTask to its handler — internal queue
+// discriminators, distinct from the persisted RuleType* values.
 const (
 	NewConversation    TaskType = "new"
 	UpdateConversation TaskType = "update"
@@ -51,6 +54,9 @@ type ConversationTask struct {
 	conversation cmodels.Conversation
 }
 
+// Engine evaluates automation rules against conversations off a bounded in-memory queue
+// drained by a worker pool (started via Run); Enqueue drops tasks silently when the queue
+// is full or after Close.
 type Engine struct {
 	rules             []models.Rule
 	rulesMu           sync.RWMutex
@@ -67,6 +73,7 @@ type Engine struct {
 	wg                sync.WaitGroup
 }
 
+// Opts configures New. DetectionMgr is required; Customer and Contract are optional.
 type Opts struct {
 	DB           *sqlx.DB
 	Lo           *logf.Logger

@@ -11,21 +11,15 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// toolRegistry is the minimal interface this handler needs to look up a
-// tool by name. The full registry is implemented in `internal/ai`
-//
-// Stub semantics for v1: until the AI registry exists, app.toolRegistry
-// is nil and every call to /api/v1/tools/:name/call returns 404. The
-// route is wired but inert.
+// toolRegistry looks up a tool by name. Until the AI registry exists,
+// app.toolRegistry is nil and every call to the route returns 404.
 type toolRegistry interface {
-	// LoadTool returns the runtime definition for a registered tool, or
-	// an error wrapping ErrToolNotFound if the name doesn't exist.
+	// LoadTool returns the tool's runtime definition, or an error wrapping
+	// errToolNotFound if the name doesn't exist.
 	LoadTool(name string) (*toolDefinition, error)
 }
 
-// toolDefinition is the minimal shape Tool execution needs from the
-// registry. The real type lives in `internal/ai/models` (TBD); the
-// handler doesn't care about extra fields the registry tracks.
+// toolDefinition is the shape tool execution needs from the registry.
 type toolDefinition struct {
 	Code           string
 	Language       string
@@ -36,22 +30,16 @@ type toolDefinition struct {
 }
 
 // errToolNotFound is the sentinel toolRegistry returns when a name isn't
-// in the registry. Defined here as a sentinel, but the actual registry
-// implementation will export its own version of this and we'll switch
-// to errors.Is when wired up.
+// in the registry.
 var errToolNotFound = errors.New("tool not found")
 
-// handleToolCall implements POST /api/v1/tools/{name}/call.
-//
-// This is the only endpoint reserved for script-only access. Session
-// callers are rejected — there's no user-facing reason to invoke a tool
-// by name outside of a running script.
+// handleToolCall implements POST /api/v1/tools/{name}/call. Script-only:
+// session and non-script callers are rejected.
 func handleToolCall(r *fastglue.Request) error {
 	app := r.Context.(*App)
 
-	// Reject non-script callers. The `perm` decorator already authenticated
-	// SOMETHING (script token, API key, or session), but we want to refuse
-	// non-script identities reaching this endpoint.
+	// The perm decorator authenticated some identity; refuse any that isn't
+	// a script token.
 	if r.RequestCtx.UserValue("auth_method") != "script_token" {
 		return r.SendErrorEnvelope(
 			http.StatusUnauthorized,
@@ -61,12 +49,10 @@ func handleToolCall(r *fastglue.Request) error {
 		)
 	}
 
-	// Pull execution metadata that the auth middleware stashed on the
-	// request context.
+	// Execution metadata stashed by the auth middleware.
 	tok, ok := r.RequestCtx.UserValue("script_token").(*execTokenModels.Token)
 	if !ok || tok == nil {
-		// Should never happen — auth_method=script_token implies the
-		// token is set. Defensive 500 if it isn't.
+		// auth_method=script_token implies the token is set; defensive 500.
 		app.lo.Error("script_token missing from context despite auth_method=script_token")
 		return r.SendErrorEnvelope(
 			http.StatusInternalServerError,
@@ -76,9 +62,8 @@ func handleToolCall(r *fastglue.Request) error {
 		)
 	}
 
-	// Server-side depth check. The SDK catches DepthLimitError locally
-	// before the HTTP call, but we double-check here in case a script
-	// tampered with the env var the SDK reads.
+	// Server-side depth check: the SDK also checks locally, but a script
+	// could tamper with the env var it reads.
 	if tok.ToolDepth >= execRunner.MaxToolDepth {
 		return r.SendErrorEnvelope(
 			http.StatusForbidden,
@@ -90,8 +75,7 @@ func handleToolCall(r *fastglue.Request) error {
 
 	toolName := r.RequestCtx.UserValue("name").(string)
 
-	// Look up the tool. With no registry wired in, this fails loudly and
-	// the script gets a 404 — the SDK surfaces it as NotFoundError.
+	// No registry wired in yet: 404, surfaced by the SDK as NotFoundError.
 	if app.toolRegistry == nil {
 		return r.SendErrorEnvelope(
 			http.StatusNotFound,
@@ -126,8 +110,8 @@ func handleToolCall(r *fastglue.Request) error {
 		)
 	}
 
-	// Dispatch. Inherit the caller's identity (invoker, conversation,
-	// trace_id) so child execution attribution chains correctly.
+	// Inherit the caller's identity (invoker, conversation, trace_id) so
+	// child execution attribution chains correctly.
 	result, err := app.execRunner.Execute(r.RequestCtx, execRunnerModels.Request{
 		InvokerUserID:  tok.InvokerUserID,
 		Code:           tool.Code,
@@ -162,10 +146,7 @@ func handleToolCall(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	// Return the result envelope to the calling script. HTTP 200 here
-	// regardless of result.Kind — the script's SDK reads .kind from the
-	// body and decides what to do (e.g., raise on "error" or use the
-	// data on "success"). HTTP errors are reserved for infrastructure
-	// failures.
+	// HTTP 200 regardless of result.Kind: the SDK reads .kind from the body
+	// to decide what to do. HTTP errors are reserved for infra failures.
 	return r.SendEnvelope(result)
 }

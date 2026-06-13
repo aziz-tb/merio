@@ -1,9 +1,5 @@
-// Package hello holds the smoke-test workflow used to verify a
-// Temporal worker is wired end-to-end.
-//
-// The workflow follows every convention from
-// internal/temporal/CONVENTIONS.md so it doubles as a reference
-// example for the first real workflow author.
+// Package hello holds the smoke-test workflow used to verify a Temporal
+// worker is wired end-to-end. It follows internal/temporal/CONVENTIONS.md.
 package hello
 
 import (
@@ -26,14 +22,6 @@ type SayHelloOutput struct {
 }
 
 // SayHelloWorkflow invokes one activity and returns its result.
-// Deliberately trivial; the goal is to prove the wiring, not to
-// demonstrate non-trivial orchestration.
-//
-// Conventions on display:
-//   - explicit ActivityOptions (timeouts + retry policy)
-//   - typed pointer-to-struct activity input/output
-//   - workflow.GetLogger is used (not logf directly) so log lines
-//     come from the SDK's replay-safe logger
 func SayHelloWorkflow(ctx workflow.Context, in SayHelloInput) (SayHelloOutput, error) {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("SayHelloWorkflow started", "name", in.Name)

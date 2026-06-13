@@ -1,3 +1,7 @@
+// Package notifier delivers agent notifications across channels: in-app
+// (UserNotificationManager), WebSocket pushes, and email. Dispatcher fans a Notification out
+// to all channels; Service is the buffered email sender that drops messages when its queue is
+// full or closed.
 package notifier
 
 import (
@@ -9,6 +13,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// ProviderEmail is the email Notifier's key — its registration key in Service, the
+// Message.Provider routing value, and the provider's Name.
 const (
 	ProviderEmail = "email"
 )

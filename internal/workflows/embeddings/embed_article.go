@@ -7,9 +7,8 @@
 //   - CleanupOldVectorsWorkflow → "cleanup-vectors:<id>:v<superseded>"
 //   - BulkReindexWorkflow → "bulk-reindex:<content_type>:<model>"
 //
-// The id includes revision so the same workflow id is replayable safely
-// (ON CONFLICT DO NOTHING on the embeddings table handles the
-// idempotency at the row level too).
+// IDs include the revision so re-runs are safe; ON CONFLICT DO NOTHING
+// on the embeddings table backstops idempotency at the row level.
 package embeddings
 
 import (
@@ -48,17 +47,13 @@ type EmbedArticleOutput struct {
 //  7. CleanupOldVectors (child workflow, ABANDON parent close policy)
 //     — schedules durable 7-day deletion of the superseded version.
 //
-// Idempotency: workflow id is deterministic ("embed-article:<id>:v<r>");
-// re-running succeeds (already-existing rows hit ON CONFLICT). Step 7
-// uses ALLOW_DUPLICATE_FAILED_ONLY to make the cleanup workflow
-// idempotent across restarts.
+// Re-running is safe: existing rows hit ON CONFLICT, and step 7's
+// ALLOW_DUPLICATE_FAILED_ONLY keeps the cleanup child idempotent.
 func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArticleOutput, error) {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("EmbedArticleWorkflow", "article_id", in.ArticleID, "revision", in.Revision)
 
-	// Activity retry policy: aggressive on transient errors (Voyage
-	// 5xx / 429, transient DB blips). Five attempts with capped
-	// exponential backoff.
+	// Retry policy tuned for transient Voyage (5xx / 429) and DB errors.
 	opts := workflow.ActivityOptions{
 		StartToCloseTimeout:    60 * time.Second,
 		ScheduleToCloseTimeout: 10 * time.Minute,
@@ -94,9 +89,9 @@ func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArt
 		return &EmbedArticleOutput{}, nil
 	}
 
-	// 3. Redact every chunk before embedding. Serial, not parallel —
-	// each redact call is microseconds (pure Go regex pass) and the
-	// activity boundary is here for testability + retry granularity.
+	// 3. Redact every chunk before embedding. Serial is fine: each call
+	// is a microsecond regex pass; the activity boundary exists for
+	// testability and retry granularity.
 	redacted := make([]string, len(chunks.Chunks))
 	for i, c := range chunks.Chunks {
 		var r actembeddings.RedactOutput
@@ -106,8 +101,7 @@ func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArt
 		redacted[i] = r.Text
 	}
 
-	// 4. Generate embeddings — one provider call (Voyage handles
-	// internal batching transparently when len > MaxBatchSize).
+	// 4. Generate embeddings. Voyage batches internally past MaxBatchSize.
 	var emb actembeddings.GenerateEmbeddingsOutput
 	if err := workflow.ExecuteActivity(ctx, acts.GenerateEmbeddings, &actembeddings.GenerateEmbeddingsInput{
 		Texts:   redacted,
@@ -138,10 +132,9 @@ func EmbedArticleWorkflow(ctx workflow.Context, in EmbedArticleInput) (*EmbedArt
 		return nil, fmt.Errorf("swap version: %w", err)
 	}
 
-	// 7. Schedule cleanup of the superseded version (revision-1).
-	// Skipped on the first-ever indexing of an article (revision=1
-	// has no predecessor). ABANDON close policy so the cleanup keeps
-	// running if EmbedArticleWorkflow itself is terminated.
+	// 7. Schedule cleanup of the superseded version (revision-1); skipped
+	// at revision=1, which has no predecessor. ABANDON close policy lets
+	// cleanup outlive a terminated EmbedArticleWorkflow.
 	if in.Revision > 1 {
 		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 			WorkflowID:            fmt.Sprintf("cleanup-vectors:%d:v%d", in.ArticleID, in.Revision-1),

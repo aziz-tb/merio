@@ -15,6 +15,7 @@ import (
 	xoauth2 "golang.org/x/oauth2"
 )
 
+// ChannelEmail is the channel name reported by Channel; it mirrors inbox.ChannelEmail.
 const (
 	ChannelEmail = "email"
 )

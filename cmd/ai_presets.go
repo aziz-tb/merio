@@ -6,11 +6,9 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// aiPresetView is the trimmed shape returned to the admin UI's preset picker.
-// API keys are resolved via secret.Resolver (env vars or the secrets table);
-// the full Preset struct also carries tuning knobs the agent edit form has no
-// business showing. The form needs enough metadata to filter by purpose,
-// provider, and enabled state without exposing raw tuning details.
+// aiPresetView is the trimmed Preset shape for the admin preset picker: enough
+// to filter by purpose/provider/enabled, without the tuning knobs or resolved
+// API keys (resolved elsewhere via secret.Resolver).
 type aiPresetView struct {
 	Slug        string   `json:"slug"`
 	Name        string   `json:"name"`
@@ -22,19 +20,9 @@ type aiPresetView struct {
 	Visibility  []string `json:"visibility"`
 }
 
-// handleListAIPresets returns presets from the in-memory registry. Read-only,
-// gated on ai_agents:manage (same gate as the internal-capabilities list — see
-// cmd/ai_internal_capabilities.go for the consolidation note: keep separate
-// handler files until this pattern hits 5+ similar GETs, then merge into
-// cmd/ai_registries.go).
-//
-// The registry is loaded once at boot from config/ai_presets.json;
-// edits require a restart, so the response is stable for the lifetime
-// of the process — no caching headers needed beyond fastglue's default.
-//
-// 503 fires when the registry isn't wired (no Anthropic key configured,
-// no presets file). The agent runner returns 503 in the same case, so
-// this is consistent with the rest of the AI surface.
+// handleListAIPresets lists presets from the in-memory registry (read-only, gated on
+// ai_agents:manage). The registry loads once at boot, so edits need a restart; returns 503 when
+// it isn't wired (no provider key or presets file).
 func handleListAIPresets(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	if app.aiPresets == nil {

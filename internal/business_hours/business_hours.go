@@ -18,10 +18,12 @@ import (
 
 var (
 	//go:embed queries.sql
-	efs                      embed.FS
+	efs embed.FS
+	// ErrBusinessHoursNotFound is returned by Get when no row matches the id.
 	ErrBusinessHoursNotFound = errors.New("business hours not found")
 )
 
+// Manager is the business hours manager, backed by the business_hours table.
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
@@ -57,7 +59,7 @@ func New(opts Opts) (*Manager, error) {
 	}, nil
 }
 
-// Get retrieves business hours.
+// Get retrieves business hours by ID, returning ErrBusinessHoursNotFound if none exists.
 func (m *Manager) Get(id int) (models.BusinessHours, error) {
 	var businessHours models.BusinessHours
 	if err := m.q.GetBusinessHours.Get(&businessHours, id); err != nil {

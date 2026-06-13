@@ -1,7 +1,6 @@
-// Package models holds DB-wire and domain types for the AI agent
-// configuration table (ai_agents). The detection JSONB column reuses the
-// universal detection AST so one condition language is maintained across
-// the platform.
+// Package models holds DB-wire and domain types for the ai_agents table.
+// The detection JSONB column reuses the universal detection AST so one
+// condition language is maintained platform-wide.
 package models
 
 import (
@@ -9,21 +8,17 @@ import (
 	"time"
 )
 
-// Agent is the DB-wire representation of an ai_agents row.
+// Agent is the DB-wire representation of an ai_agents row. The JSONB columns
+// are decoded at the handler/runtime layer into:
 //
-// Detection, Tools, PresetOverrides, and Autonomy are stored as raw JSONB
-// and unmarshalled at the handler/runtime layer where the structured shape
-// matters:
+//   - Detection: internal/detection.Detection. New agents get the
+//     DefaultDetection scaffold from internal/ai/agents so the visual
+//     builder has usable data.
+//   - Tools: []ToolRef
+//   - PresetOverrides: map[string]string (purpose → preset slug)
+//   - Autonomy: Autonomy
 //
-//   - Detection unmarshals into internal/detection.Detection by the validation
-//     runtime. New agents get the structured DefaultDetection scaffold from
-//     internal/ai/agents so the visual builder has usable data.
-//   - Tools unmarshals into []ToolRef
-//   - PresetOverrides unmarshals into map[string]string (purpose → preset slug)
-//   - Autonomy unmarshals into Autonomy
-//
-// Description allows NULL in the DB but the API and handlers always
-// pass a non-NULL string (matching the automation_rules precedent).
+// Description allows NULL in the DB but handlers always pass a non-NULL string.
 type Agent struct {
 	ID                      int             `db:"id" json:"id"`
 	CreatedAt               time.Time       `db:"created_at" json:"created_at"`
@@ -44,34 +39,29 @@ type Agent struct {
 	Enabled                 bool            `db:"enabled" json:"enabled"`
 }
 
-// KBScope is the structured shape of the `kb_scope` JSONB column on an
-// Agent. FolderIDs whitelists kb_folders.id values; ArticleIDs whitelists
-// kb_articles.id values that may live in folders outside the folder
-// whitelist (additive). Empty scope = no KB access for this agent —
-// kb_search returns empty results without consulting the index.
+// KBScope is the structured shape of the `kb_scope` JSONB column. FolderIDs
+// whitelists kb_folders.id; ArticleIDs additively whitelists kb_articles.id
+// outside those folders. Empty scope = no KB access: kb_search returns empty
+// without consulting the index.
 type KBScope struct {
 	FolderIDs  []int `json:"folder_ids"`
 	ArticleIDs []int `json:"article_ids"`
 }
 
-// ToolRefKind enumerates the two flavors of tool reference an agent
-// can carry. Internal capabilities live in code under
-// internal/ai/tools/builtin/; custom tools are ai_tools rows (Python
-// scripts after the F5 schema cleanup).
+// ToolRefKind distinguishes internal capabilities (code under
+// internal/ai/tools/builtin/) from custom tools (ai_tools rows).
 type ToolRefKind string
 
+// The recognized ToolRefKind values.
 const (
 	ToolRefKindInternal ToolRefKind = "internal"
 	ToolRefKindCustom   ToolRefKind = "custom"
 )
 
-// ToolRef is one entry in the agent's `tools` JSONB array. The `id`
-// field is decoded as raw JSON so we can carry both numeric ids (custom
-// tools, ai_tools.id) and string ids (internal capability IDs) without
-// fighting the type system.
-//
-// Use the typed accessors CustomID() / InternalID() rather than reading
-// ID directly — they handle the Kind→type mapping consistently.
+// ToolRef is one entry in the agent's `tools` JSONB array. ID is raw JSON to
+// carry both numeric ids (custom, ai_tools.id) and string ids (internal
+// capability IDs). Use the CustomID()/InternalID() accessors rather than
+// reading ID directly.
 type ToolRef struct {
 	Kind           ToolRefKind     `json:"kind"`
 	ID             json.RawMessage `json:"id"`
@@ -104,9 +94,8 @@ func (r ToolRef) InternalID() (string, bool) {
 	return id, true
 }
 
-// Autonomy is the structured shape of the `autonomy` JSONB on an Agent —
-// per-agent GATE policy thresholds. Empty/zero values are valid; the
-// runtime treats them as "use the system default for this preset."
+// Autonomy is the structured shape of the `autonomy` JSONB — per-agent GATE
+// policy thresholds. Zero values mean "use the system default for the preset."
 type Autonomy struct {
 	MinConfidenceSend      float64 `json:"min_confidence_send"`
 	MinConfidenceDraft     float64 `json:"min_confidence_draft"`

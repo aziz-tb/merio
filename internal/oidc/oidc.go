@@ -1,3 +1,6 @@
+// Package oidc manages the OpenID Connect SSO providers that back agent
+// login. Client IDs and secrets are encrypted at rest with the configured
+// encryption key and transparently decrypted on read.
 package oidc
 
 import (

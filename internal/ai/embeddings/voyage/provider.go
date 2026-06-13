@@ -1,13 +1,10 @@
 // Package voyage implements embeddings.Provider against the Voyage AI
-// embedding API. Mirrors the reliability primitives of the Anthropic LLM
-// provider (internal/ai/llm/anthropic): bounded concurrency via semaphore,
-// per-call total timeout, circuit breaker for cascading failures,
-// exponential-backoff retry on transient errors.
+// embedding API (https://docs.voyageai.com/docs/embeddings), with the same
+// reliability stack as internal/ai/llm/anthropic: bounded concurrency,
+// per-call timeout, circuit breaker, exponential-backoff retry.
 //
-// API reference: https://docs.voyageai.com/docs/embeddings
-//
-// Authentication: bearer token via Authorization header. Key and endpoint are
-// resolved through secret.Resolver when configured, falling back to static Opts.
+// Auth is a bearer token; key and endpoint resolve through secret.Resolver
+// when configured, falling back to static Opts.
 package voyage
 
 import (
@@ -29,15 +26,10 @@ import (
 )
 
 const (
-	// defaultEndpoint is the Voyage embeddings REST endpoint. Single
-	// region in v1; multi-region support is a future concern when Voyage
-	// adds it.
 	defaultEndpoint = "https://api.voyageai.com/v1/embeddings"
 
-	// modelVersionTag stamps the canonical Model() return value with a
-	// version date. New deployments use new tags; mixed-model
-	// coexistence is supported via the schema's unique index on
-	// (content_type, source_id, source_version, chunk_index, embedding_model).
+	// modelVersionTag stamps Model() with a version date so mixed-model
+	// rows coexist under the schema's unique index keyed on embedding_model.
 	modelVersionTag = "2025-01"
 
 	defaultModel        = "voyage-3-large"
@@ -46,14 +38,13 @@ const (
 	defaultConcurrency  = 10
 	defaultTotalTimeout = 30 * time.Second
 
-	// Circuit-breaker tuning. Five consecutive provider failures opens
-	// the breaker for 60s; while open, calls fail fast with a typed
-	// error so callers can stamp ai_usage.outcome='circuit_open'.
+	// 5 consecutive failures open the breaker for 60s; while open, calls
+	// fail fast with errCircuitOpen so callers can stamp
+	// ai_usage.outcome='circuit_open'.
 	breakerFailures = 5
 	breakerOpenFor  = 60 * time.Second
 
-	// Retry policy: 3 total attempts (initial + 2 retries), 1s and 3s
-	// backoff. Aligned with the Anthropic provider's policy.
+	// 3 total attempts (initial + 2 retries) with 1s then 3s backoff.
 	retryAttempts = 3
 	retryBackoff1 = 1 * time.Second
 	retryBackoff2 = 3 * time.Second
@@ -90,9 +81,7 @@ type Opts struct {
 	Lo           *logf.Logger
 }
 
-// New builds a Voyage provider. Returns an error when required fields
-// are missing — boot-time loud failure is preferred to silent
-// half-config.
+// New builds a Voyage provider, erroring when required fields are missing.
 func New(opt Opts) (*Provider, error) {
 	if opt.APIKey == "" && opt.Resolver == nil {
 		return nil, errors.New("voyage: APIKey is required")
@@ -170,10 +159,17 @@ func (p *Provider) Embed(ctx context.Context, texts []string) ([][]float32, erro
 }
 
 // Model returns the canonical project-namespaced model identifier.
-func (p *Provider) Model() string     { return "voyage/" + p.model + "@" + modelVersionTag }
-func (p *Provider) Dimensions() int   { return p.dimensions }
+func (p *Provider) Model() string { return "voyage/" + p.model + "@" + modelVersionTag }
+
+// Dimensions is the configured output vector size; it must equal the
+// embeddings column width (halfvec(1024)) or inserts fail.
+func (p *Provider) Dimensions() int { return p.dimensions }
+
+// MaxBatchSize returns the per-call input cap Embed batches against.
 func (p *Provider) MaxBatchSize() int { return p.maxBatch }
-func (p *Provider) Name() string      { return "voyage" }
+
+// Name is the provider tag ("voyage") stamped on logs and ai_usage rows.
+func (p *Provider) Name() string { return "voyage" }
 
 // embedBatch handles one batch through the full reliability stack:
 // total timeout → semaphore → circuit breaker → retry.

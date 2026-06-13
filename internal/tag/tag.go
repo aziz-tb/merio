@@ -18,6 +18,7 @@ import (
 //go:embed queries.sql
 var efs embed.FS
 
+// Manager handles tag persistence and the parent-nesting rules enforced on create/update.
 type Manager struct {
 	q    queries
 	lo   *logf.Logger

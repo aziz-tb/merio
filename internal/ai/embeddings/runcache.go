@@ -9,12 +9,9 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// SearchResultCache caches kb_search results within a single agent run.
-// Lifetime is one run; the cache is created by the runner and
-// garbage-collected when the run completes. Not safe for cross-run reuse.
-//
-// Goroutine-safe so parallel tool dispatch can reuse it without races.
-// In-flight duplicate misses are coalesced via singleflight.
+// SearchResultCache caches kb_search results for the lifetime of one
+// agent run; not safe for cross-run reuse. Goroutine-safe for parallel
+// tool dispatch, with duplicate in-flight misses coalesced via singleflight.
 type SearchResultCache struct {
 	mu      sync.Mutex
 	entries map[string][]SearchResult
@@ -40,9 +37,7 @@ func (c *SearchResultCache) Get(key string) ([]SearchResult, bool) {
 	return cloneSearchResults(r), true
 }
 
-// Set stores results under the given key. Last-write-wins on duplicate
-// keys (rare; would mean two identical SearchInputs returned different
-// results, which shouldn't happen with deterministic search).
+// Set stores results under the given key; last-write-wins on duplicates.
 func (c *SearchResultCache) Set(key string, results []SearchResult) {
 	if c == nil {
 		return
@@ -89,19 +84,10 @@ func (c *SearchResultCache) GetOrLoad(
 	return cloneSearchResults(results), nil
 }
 
-// RunCacheKey builds the canonical cache key for a SearchInput.
-//
-// Included in the key (these affect search results):
-//   - Query (trimmed; case preserved)
-//   - ContentType
-//   - FolderIDs (sorted for stability)
-//   - Locale
-//   - TopK
-//
-// NOT included (tuning knobs the model can't observe):
-//   - RerankCandidates
-//   - SemanticCandidates
-//   - KeywordCandidates
+// RunCacheKey builds the canonical cache key for a SearchInput from the
+// fields that change results — Query (trimmed, case-preserved), ContentType,
+// FolderIDs (sorted), Locale, TopK. The *Candidates tuning knobs are
+// excluded: the model can't observe them, so they must not split the cache.
 func RunCacheKey(in SearchInput) string {
 	ids := append([]int64(nil), in.FolderIDs...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })

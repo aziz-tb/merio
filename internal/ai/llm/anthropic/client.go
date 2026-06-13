@@ -32,18 +32,12 @@ const (
 
 // Provider implements llm.LLMProvider against Anthropic's Messages API.
 //
-// Concurrency: a weighted semaphore caps concurrent in-flight calls (v1
-// constant 30). Acquisition respects the request context — calls give up
-// if the context expires while waiting.
-//
-// Reliability: retries with exponential backoff on transient errors
-// (1s, 3s; 2 retries → 3 attempts max). A gobreaker wraps the inner
-// call so repeated upstream failures stop new traffic with ErrCircuitOpen
-// rather than retrying forever.
-//
-// Caching: applies cache_control markers per the request's CachedBlocks
-// when the resolved preset enables caching; respects Anthropic's 4-marker
-// per-request cap and the preset's caching_extended_ttl setting.
+//   - Concurrency: a weighted semaphore caps in-flight calls; acquisition
+//     respects the request context.
+//   - Reliability: exponential backoff on transient errors (1s, 3s) wrapped
+//     in a gobreaker that returns ErrCircuitOpen once upstream keeps failing.
+//   - Caching: applies cache_control markers per the request when the preset
+//     enables caching, within Anthropic's per-request marker cap.
 type Provider struct {
 	client   sdk.Client
 	catalog  *catalog.Catalog
@@ -184,8 +178,8 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 		cacheMarkers: markers,
 	}
 
-	// Wrap the entire call (acquire + retry + breaker) in the total timeout
-	// — the SDK's HTTP timeout is a separate, smaller window.
+	// Total timeout covers acquire + retry + breaker; the SDK's HTTP timeout
+	// is a separate, smaller per-attempt window.
 	callCtx, cancel := context.WithTimeout(ctx, p.totalTO)
 	defer cancel()
 
@@ -229,8 +223,8 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 	return out, nil
 }
 
-// StreamComplete is the streaming variant; v1 returns ErrStreamingNotImplemented.
-// L5 auto-send will populate this.
+// StreamComplete is the streaming variant; not yet implemented (returns
+// ErrStreamingNotImplemented).
 func (p *Provider) StreamComplete(_ context.Context, _ llm.CompletionRequest, _ func(string)) (llm.CompletionResponse, error) {
 	return llm.CompletionResponse{}, llm.ErrStreamingNotImplemented
 }

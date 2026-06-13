@@ -3,46 +3,36 @@ package llm
 import "errors"
 
 // Sentinel errors returned by LLMProvider implementations. Callers
-// distinguish behavior by errors.Is checks; they don't pattern-match on
-// strings. New conditions get a new sentinel rather than overloading an
-// existing one.
+// distinguish behavior via errors.Is, not string matching.
 var (
 	// ErrStreamingNotImplemented — StreamComplete called on a provider
-	// that doesn't yet support streaming. v1 returns this from every
-	// provider; revisit when L5 auto-send needs streaming.
+	// that doesn't support streaming. Returned by all v1 providers.
 	ErrStreamingNotImplemented = errors.New("llm: streaming not implemented in v1")
 
-	// ErrCircuitOpen — the provider's circuit breaker is open. Surfaced
-	// fast (no upstream call); typically the caller (agent runner) marks
-	// the resolution_attempt as failed and the operator handles it.
+	// ErrCircuitOpen — circuit breaker is open; surfaced without an
+	// upstream call.
 	ErrCircuitOpen = errors.New("llm: circuit breaker open")
 
-	// ErrTimeout — the call hit the provider's wall-clock cap (per-call
-	// timeout, distinct from the SDK's HTTP deadline). Wraps the
-	// underlying ctx error.
+	// ErrTimeout — call hit the provider's per-call wall-clock cap
+	// (distinct from the SDK's HTTP deadline). Wraps the underlying ctx error.
 	ErrTimeout = errors.New("llm: total call timeout exceeded")
 
-	// ErrRateLimited — provider returned 429 after retries exhausted.
-	// Distinct from generic transient errors so the caller can rate-limit
-	// downstream work or surface a dedicated message.
+	// ErrRateLimited — 429 after retries exhausted. Distinct from generic
+	// transient errors so callers can throttle downstream work.
 	ErrRateLimited = errors.New("llm: rate limited by provider")
 
-	// ErrAuth — provider rejected the API key (401/403). Terminal —
-	// retries do not help. Surface to ops via logs.
+	// ErrAuth — provider rejected the API key (401/403). Terminal; retries
+	// do not help.
 	ErrAuth = errors.New("llm: provider rejected credentials")
 
-	// ErrInvalidRequest — request shape was rejected by the provider
-	// (400). Caller bug, not a runtime issue. Caught by tests when the
-	// translator gets out of sync with the SDK.
+	// ErrInvalidRequest — request shape rejected by the provider (400).
+	// Caller/translator bug, not a runtime issue.
 	ErrInvalidRequest = errors.New("llm: provider rejected request shape")
 
-	// ErrPresetNotFound — caller passed a CompletionRequest whose
-	// PresetSlug doesn't exist in the loaded preset registry. Provider
-	// surfaces this as a fail-fast error rather than silently falling
-	// back to a default; defaults are the registry's responsibility.
+	// ErrPresetNotFound — request's PresetSlug isn't in the loaded registry.
+	// Fail-fast rather than falling back to a default.
 	ErrPresetNotFound = errors.New("llm: preset slug not found in registry")
 
-	// ErrEmptyMessages — request had no messages. Defensive; caught here
-	// rather than letting the SDK return a useless error.
+	// ErrEmptyMessages — request had no messages.
 	ErrEmptyMessages = errors.New("llm: messages must not be empty")
 )

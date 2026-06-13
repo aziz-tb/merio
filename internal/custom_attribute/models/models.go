@@ -1,3 +1,4 @@
+// Package models defines the custom-attribute definition type.
 package models
 
 import (
@@ -6,6 +7,8 @@ import (
 	"github.com/lib/pq"
 )
 
+// CustomAttribute is an admin-defined custom field; AppliesTo selects the entity it attaches
+// to, and DataType/Regex constrain its values.
 type CustomAttribute struct {
 	ID          int            `db:"id" json:"id"`
 	CreatedAt   time.Time      `db:"created_at" json:"created_at"`

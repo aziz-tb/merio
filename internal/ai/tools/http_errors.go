@@ -9,29 +9,21 @@ import (
 )
 
 // MapDispatchErrorToHTTP translates a dispatcher / runner error into the
-// triple every HTTP handler in the project hands to SendErrorEnvelope:
-// status code, human message, error type.
+// (status, message, error type) triple handlers hand to SendErrorEnvelope.
 //
 //	ErrToolNotFound                  → 404
 //	ErrToolDisabled                  → 403
 //	ErrAgentVerificationInsufficient → 409
 //	ErrParamsInvalid                 → 400
-//	ErrCapabilityFailed              → 422 (in-process Go error; analogous to a
-//	                                         Python exception surfaced from the sandbox)
+//	ErrCapabilityFailed              → 422
 //	ErrImplInvalid                   → 500
-//	ExecRunner sandbox-unavailable → 503
-//	ExecRunner invalid-request     → 400
-//	unrecognized                   → handled=false; caller logs + 500s
+//	ExecRunner sandbox-unavailable   → 503
+//	ExecRunner invalid-request       → 400
+//	unrecognized                     → handled=false; caller logs + 500s
 //
-// The bool return reports whether the error was a known dispatcher /
-// runner sentinel. Callers use it to decide whether to log the raw
-// error (unknown → log) vs. trust the typed mapping (known → no log,
-// the status code already tells the story).
-//
-// The agent runner is a second real consumer of this mapping (see
-// internal/ai/runner/runner.go) — keeping it next to the dispatcher
-// sentinels means a new sentinel and its HTTP mapping land in one PR
-// instead of drifting between handler and runtime.
+// handled reports whether err was a known sentinel; callers log the raw
+// error only when it isn't. The agent runner is a second consumer (see
+// internal/ai/runner/runner.go), so the mapping lives next to the sentinels.
 func MapDispatchErrorToHTTP(err error) (status int, message string, etype fastglue.ErrorType, handled bool) {
 	switch {
 	case errors.Is(err, ErrToolNotFound):

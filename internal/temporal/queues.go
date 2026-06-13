@@ -1,48 +1,30 @@
 package temporal
 
-// Task-queue names. Each queue gets its own worker pool. Constants
-// here are the single source of truth — workers register against
-// these names, workflow starters reference them.
+// Task-queue names — the single source of truth that workers register
+// against and workflow starters reference. Separate queues so concurrency
+// can differ per queue, failures stay isolated, and workers roll out
+// independently.
 //
-// Why separate queues:
-//   - Worker concurrency can differ per queue (embedding workers run
-//     hot — many API-bound activities; SLA workers run cold — long
-//     idle stretches between timer fires).
-//   - Failure isolation: if the embedding API is down, the pipeline
-//     queue keeps moving.
-//   - Independent rollout: a new embedding-worker binary can deploy
-//     without restarting pipeline workers.
-//   - Future: different namespaces / retention policies if needed.
-//
-// When adding a queue, also add a worker-config block in
-// [temporal.workers.<name>] in config.toml (defaults via
-// WorkerConfig.Resolved() apply when the block is absent).
+// When adding a queue, also add a [temporal.workers.<name>] block in
+// config.toml (WorkerConfig.Resolved() defaults apply when absent).
 const (
-	// QueueEmbeddings handles embedding indexing — KB articles,
-	// resolved tickets, bulk reindex jobs. High-volume, short-lived
-	// activities (Voyage API calls). F12 builds the workflows; F1
-	// only ships the queue name.
+	// QueueEmbeddings handles embedding indexing (KB articles, resolved
+	// tickets, bulk reindex). High-volume, short-lived Voyage API activities.
 	QueueEmbeddings = "embeddings"
 
-	// QueuePipeline handles inbound-pipeline workflows (when they
-	// ship). Per-ticket execution; activities span the full 11-stage
-	// processing.
+	// QueuePipeline handles per-ticket inbound-pipeline workflows.
 	QueuePipeline = "pipeline"
 
-	// QueueAIRuns handles ad-hoc agent runs — the Composer tab's
-	// background path and future pipeline-triggered runs. Currently
-	// the runner is in-process; it moves here when L2/L3 autonomy
-	// needs durable execution.
+	// QueueAIRuns handles ad-hoc agent runs (the Composer tab's background
+	// path and future pipeline-triggered runs).
 	QueueAIRuns = "ai-runs"
 
-	// QueueSLAs handles long-running SLA timer workflows (when they
-	// ship). Low call frequency, very long execution time (hours /
-	// days); workflows use ContinueAsNew to keep history small.
+	// QueueSLAs handles long-running SLA timer workflows: low frequency, very
+	// long execution (hours/days), ContinueAsNew to keep history small.
 	QueueSLAs = "sla-timers"
 
-	// QueueDefault is the fallback for one-off / experimental
-	// workflows not yet promoted to a dedicated queue. Useful for
-	// hello-world smoke tests and one-shot admin actions.
+	// QueueDefault is the fallback for one-off / experimental workflows not yet
+	// promoted to a dedicated queue (smoke tests, one-shot admin actions).
 	QueueDefault = "default"
 )
 

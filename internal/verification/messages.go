@@ -156,11 +156,10 @@ func renderCriterionTemplate(tpl string, ctx models.CriterionContext) string {
 	return out
 }
 
-// formatERPValuesForMessage deduplicates a list of ERP field values for
-// rendering in a message. Trim each value, normalize via `normalize` to
-// detect duplicates case/format-insensitively, and join distinct values with
-// " bzw. " (German for "or respectively") so messages stay readable when
-// contract and customer fields differ.
+// formatERPValuesForMessage renders ERP field values for a message, using
+// normalize to dedupe case/format-insensitively, and joins distinct values
+// with " bzw. " (German "or respectively") for when contract and customer
+// fields differ.
 func formatERPValuesForMessage(values []string, normalize func(string) string) string {
 	seen := make(map[string]bool, len(values))
 	unique := make([]string, 0, len(values))

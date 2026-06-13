@@ -8,14 +8,9 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
-// Contract is the DB-wire representation of a contracts row — a cache of an
-// ERP-resolved contract record belonging to a customer. The struct mirrors
-// the CREATE TABLE contracts block exactly.
-//
-// CustomerID is the ERP customer id FK to customers(customer_id). Email and
-// Phone can differ from the parent customer's (a holding at customer level,
-// subsidiaries at contract level). AgentPreview holds the sidebar tiles and
-// ErpURLs the quick-link buttons.
+// Contract is a contracts row: a cache of an ERP-resolved contract belonging to a customer.
+// CustomerID is the ERP FK to customers(customer_id); Email/Phone may differ from the parent
+// customer's. AgentPreview holds the sidebar tiles, ErpURLs the quick-link buttons.
 type Contract struct {
 	ID              int64           `db:"id" json:"-"`
 	CreatedAt       time.Time       `db:"created_at" json:"created_at"`

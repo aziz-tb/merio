@@ -14,12 +14,10 @@ import (
 
 const phoneMinDigits = 7
 
-// StandardCriterion evaluates one of the 11 built-in criteria against the
-// context, returning whether it matched.
+// StandardCriterion evaluates one of the built-in criteria against the context.
 type StandardCriterion func(ctx models.CriterionContext) bool
 
-// standardCriteria maps a criterion name to its evaluator. Adding a 12th is
-// a one-line addition here.
+// standardCriteria maps a criterion name to its evaluator.
 var standardCriteria = map[string]StandardCriterion{
 	"sender_email_matches_erp":           cSenderEmailMatchesERP,
 	"mentioned_email_matches_erp":        cMentionedEmailMatchesERP,

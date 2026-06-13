@@ -1,3 +1,4 @@
+// Command merio is the HTTP API server for the agent desk and widget.
 package main
 
 import (
@@ -45,11 +46,8 @@ import (
 	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
 	aiusagepartitions "github.com/aziz-tb/merio/internal/ai/usage/partitions"
 
-	// aicapabilities is imported by alias so cmd/main.go can call
-	// SetKBSearcher after the embeddings subsystem boots. The init()
-	// blocks under capabilities/ still fire on import and register
-	// kb_search / get_customer_data / get_conversation_history into
-	// builtin.Default().
+	// Aliased so main can call SetKBSearcher after embeddings boot; the
+	// init() blocks still fire on import and register into builtin.Default().
 	aicapabilities "github.com/aziz-tb/merio/internal/ai/tools/builtin/capabilities"
 	"github.com/aziz-tb/merio/internal/automation"
 	"github.com/aziz-tb/merio/internal/contract"
@@ -150,19 +148,12 @@ type App struct {
 	aiExecutions     *aiexecutions.Manager
 	aiOperations     *aioperations.Manager
 	aiUsage          *aiusage.Manager
-	// systemInboxID is the id of the seeded "System (Internal)" inbox
-	// (see migration v2_7_7 / SystemInboxUUID). Resolved once at boot
-	// by UUID; every ai_usage row that has no real conversation
-	// context FKs to this id. Zero if seeding failed — boot is
-	// expected to fail before that path.
+	// systemInboxID is the seeded "System (Internal)" inbox, resolved once at boot by UUID.
 	systemInboxID int
-	// AI runtime: model catalog (loaded from provider-specific catalog files)
-	// and preset registry (loaded from config/ai_presets.json). Both are
-	// read-only after startup; reload requires app restart in v1.
+	// AI model catalog and preset registry. Read-only after startup; reload requires restart.
 	aiCatalog *aicatalog.Catalog
 	aiPresets *aipreset.Registry
-	// LLM provider — nil when no provider API key is configured. Run
-	// endpoint returns 503 in that case.
+	// aiProvider is nil when no provider API key is configured; Run endpoint returns 503 then.
 	aiProvider llm.LLMProvider
 	// aiRunEvents publishes live progress for manual agent runs.
 	aiRunEvents      runner.EventPublisher
@@ -176,22 +167,17 @@ type App struct {
 	rateLimit        *ratelimit.Limiter
 	redis            *redis.Client
 	importer         *importer.Importer
-	// temporal is the workflow client used by handlers and managers
-	// to start async workflows. Nil when Temporal is disabled or the
-	// dial failed at startup; callers MUST check before use and fall
-	// back to sync or refuse loudly (see internal/temporal/CONVENTIONS.md).
+	// temporal is the workflow client for async workflows. Nil when Temporal is
+	// disabled or the dial failed; callers MUST check before use and fall back to
+	// sync or refuse loudly (see internal/temporal/CONVENTIONS.md).
 	temporal *temporal.Client
-	// F12 hybrid-search engine — used directly by the kb_search
-	// capability via aicapabilities.SetKBSearcher. Stored on App for
-	// future direct uses (e.g., admin "preview search" endpoints).
-	// Nil when Voyage key is unset.
+	// searcher is the hybrid-search engine, also wired into the kb_search
+	// capability via SetKBSearcher. Nil when the Voyage key is unset.
 	searcher *embeddings.Searcher
-	// embeddingsStore is the synchronous DB surface used by handlers
-	// (Unpublish / Delete) that need to drop vectors without spinning
-	// up a workflow. Always populated (no provider dependency).
+	// embeddingsStore is the synchronous DB surface for handlers (Unpublish/Delete)
+	// that drop vectors without a workflow. Always populated (no provider dependency).
 	embeddingsStore *embeddings.Store
-	// reranker is held so cmd/main.go can advertise its readiness in
-	// the boot log; the Searcher already holds its own reference.
+	// reranker is held only to advertise its readiness in the boot log.
 	reranker reranker.Provider
 
 	// Global state that stores data on an available app update.
@@ -226,8 +212,7 @@ func main() {
 	// Build string injected at build time.
 	colorlog.Green("Build: %s", buildString)
 
-	// version=<...> token mirrors the temporal-worker startup line so
-	// `make deploy-verify` can grep both services the same way.
+	// version=<...> token mirrors the temporal-worker startup line for deploy-verify grep.
 	appVersion := versionString
 	if appVersion == "" {
 		appVersion = "dev"
@@ -335,9 +320,8 @@ func main() {
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		worklogMgr                  = initWorklog(db, i18n)
 		rateLimiter                 = initRateLimit(rdb)
-		// Catalog and preset registry are loaded here so the registry's
-		// model-existence validation has the catalog available. Both fail
-		// fast on bad config — see initAIModelCatalog / initAIPresetRegistry.
+		// Catalog loads before the registry so preset model-existence validation
+		// has it. Both fail fast on bad config.
 		aiCatalogInst     = initAIModelCatalog()
 		aiPresetsInst     = initAIPresetRegistry(aiCatalogInst)
 		aiProviderInst    = initLLMProvider(secretResolver, aiPresetsInst, aiCatalogInst)
@@ -352,10 +336,8 @@ func main() {
 		automation        = initAutomationEngine(db, i18n, detectionMgrInst, customerMgr, contractMgr)
 		conversation      = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, worklogMgr, notifDispatcher, temporalClient)
 		autoassigner      = initAutoAssigner(team, user, conversation)
-		// F12: hybrid-search subsystem. Each piece is independently
-		// nil-safe — if Voyage key is absent or Redis is down, kb_search
-		// surfaces a clear error at first invocation rather than
-		// crashing the boot.
+		// Hybrid-search subsystem; each piece is nil-safe. Missing Voyage key or
+		// down Redis surfaces as a kb_search error at first call, not a boot crash.
 		embedProviderInst   = initEmbeddingProvider(secretResolver)
 		rerankProviderInst  = initRerankProvider(secretResolver)
 		embeddingsStoreInst = initEmbeddingsStore(db)
@@ -363,10 +345,8 @@ func main() {
 		searcherInst        = initSearcher(embeddingsStoreInst, embedProviderInst, rerankProviderInst, queryEmbedCacheInst)
 	)
 
-	// Log the registered built-in AI capabilities. The init() blocks in
-	// internal/ai/tools/builtin/capabilities/* fire on import (blank
-	// import in this file's import block); this line confirms the
-	// registry is populated before the agent runtime reads from it.
+	// Confirms the capabilities registry is populated (via import-time init())
+	// before the agent runtime reads from it.
 	colorlog.Green("AI built-in capabilities: %v", aibuiltin.Default().IDs())
 
 	functionMgr.SetConversationStore(conversation)
@@ -445,50 +425,40 @@ func main() {
 		aiCatalog:       aiCatalogInst,
 		aiPresets:       aiPresetsInst,
 		aiProvider:      aiProviderInst,
-		// Dispatcher bridges ai_tools to the F6 runner for manual
-		// invocation. Wired here (after the AI managers and execRunner
-		// are constructed) so handlers can reach it via app.aiToolDispatcher.
-		aiToolDispatcher: nil, // assigned below — see line just after this struct literal
+		// Bridges ai_tools to the runner for manual invocation; assigned below
+		// once the tools manager and execRunner exist.
+		aiToolDispatcher: nil,
 		importer:         initImporter(i18n),
 		webhook:          webhook,
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		userNotification: userNotification,
-		// Temporal client: nil when disabled or dial failed. The main
-		// API binary stays up either way; workflow-starting handlers
-		// branch on app.temporal == nil.
+		// Nil when disabled or dial failed; the API binary stays up either way.
 		temporal: temporalClient,
 		// Assigned below once the shared Redis-backed publisher is built.
-		aiRunEvents: nil,
-		// F12 hybrid-search engine. Nil when Voyage key unset; kb_search
-		// surfaces that as a clear error at invocation time.
+		aiRunEvents:     nil,
 		searcher:        searcherInst,
 		embeddingsStore: embeddingsStoreInst,
 		reranker:        rerankProviderInst,
 	}
-	// Wire the searcher into the kb_search capability. The capability
-	// is registered at package init() with nil; this assignment makes
-	// hybrid search live for every agent that lists kb_search in tools.
+	// Make hybrid search live: the kb_search capability was registered at init()
+	// with a nil searcher.
 	aicapabilities.SetKBSearcher(searcherInst)
 
-	// --reindex-embeddings: dispatch the bulk-reindex Temporal workflow
-	// and exit. Runs after all subsystems are wired so the Temporal
-	// client + searcher are available, but before the HTTP server
-	// starts.
+	// --reindex-embeddings: dispatch the bulk-reindex workflow and exit. Runs after
+	// subsystems are wired (Temporal client + searcher available) but before serving.
 	if ko.Bool("reindex-embeddings") {
 		runReindexEmbeddings(app.temporal)
 	}
 	app.consts.Store(constants)
 	app.aiRunEvents = initAgentRunEventPublisher(rdb)
 	startRealtimeBridge(ctx, rdb, wsHub, initLogger("realtime"))
-	// Wire the AI tool dispatcher now that App is built — it needs both
-	// the tools manager and the execRunner.
+	// Wire the AI tool dispatcher now that App is built (needs aiTools + execRunner).
 	app.aiToolDispatcher = aitools.NewDispatcher(app.aiTools, app.execRunner, app.function)
 
-	// Keep the ai_usage monthly partition runway extended. Boot-time
-	// EnsureRunway is a no-op when the migration's pre-created
-	// partitions are still in the future; the daily goroutine takes
-	// over as months roll. See internal/ai/usage/partitions.
+	// Keep the ai_usage monthly partition runway extended. Boot-time EnsureRunway is
+	// a no-op while pre-created partitions are still future; the daily goroutine takes
+	// over as months roll.
 	usagePartitions := aiusagepartitions.New(aiusagepartitions.Opts{
 		DB:      db,
 		Table:   "ai_usage",

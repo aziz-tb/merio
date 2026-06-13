@@ -1,3 +1,6 @@
+// Package models defines the conversation domain: conversations and messages,
+// their contacts and authors, and the many read projections (list, live-chat,
+// continuity, contact history, incoming) built from them.
 package models
 
 import (
@@ -12,6 +15,9 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// String enum values for conversations and messages — statuses, assignee/sender/
+// mention types, list access-list keys, message directions and delivery statuses,
+// activity kinds, and content types.
 var (
 	StatusOpen     = "Open"
 	StatusReplied  = "Replied"
@@ -59,6 +65,7 @@ var (
 	ContentTypeHTML = "html"
 )
 
+// ContinuityConversation is the projection used to compose continuity emails for a contact.
 type ContinuityConversation struct {
 	ID                        int         `db:"id"`
 	UUID                      string      `db:"uuid"`
@@ -74,6 +81,7 @@ type ContinuityConversation struct {
 	ContinuityEmailSubject    null.String `db:"continuity_email_subject"`
 }
 
+// ContinuityUnreadMessage is an unread Message with sender details, for continuity-email bodies.
 type ContinuityUnreadMessage struct {
 	Message
 	SenderFirstName null.String `db:"sender.first_name"`
@@ -82,12 +90,14 @@ type ContinuityUnreadMessage struct {
 	AttachmentNames string      `db:"attachment_names"`
 }
 
+// LastChatMessage is the last-message preview shown on a live-chat conversation.
 type LastChatMessage struct {
 	Content   string           `db:"content" json:"content"`
 	CreatedAt time.Time        `db:"created_at" json:"created_at"`
 	Author    umodels.ChatUser `db:"author" json:"author"`
 }
 
+// ChatConversation is a conversation as presented in the live-chat widget.
 type ChatConversation struct {
 	CreatedAt          time.Time         `db:"created_at" json:"created_at"`
 	UUID               string            `db:"uuid" json:"uuid"`
@@ -97,6 +107,7 @@ type ChatConversation struct {
 	Assignee           *umodels.ChatUser `db:"assignee" json:"assignee"`
 }
 
+// ChatMessage is a message as presented in the live-chat widget.
 type ChatMessage struct {
 	UUID             string                 `json:"uuid"`
 	Status           string                 `json:"status"`
@@ -180,6 +191,9 @@ type ConversationCustomer struct {
 	Company    null.String `db:"company" json:"company"`
 }
 
+// Conversation is the central conversation record: lifecycle (status, priority,
+// assignment), SLA deadlines, denormalized inbox/contact/customer fields, and
+// customer-identification state.
 type Conversation struct {
 	ID                        int                    `db:"id" json:"id"`
 	CreatedAt                 time.Time              `db:"created_at" json:"created_at"`
@@ -243,6 +257,8 @@ func (c *Conversation) TagSlugs() []string {
 	return tags
 }
 
+// ConversationContact is the contact (end user) on a conversation, including
+// customer-identity link state.
 type ConversationContact struct {
 	ID                     int             `db:"id" json:"id"`
 	CreatedAt              time.Time       `db:"created_at" json:"created_at"`
@@ -265,6 +281,7 @@ type ConversationContact struct {
 	LinkedCustomerIDAt     null.Time       `db:"linked_customer_id_at" json:"linked_customer_id_at"`
 }
 
+// FullName returns the contact's full display name.
 func (c *ConversationContact) FullName() string {
 	if c.LastName == "" {
 		return c.FirstName
@@ -272,6 +289,7 @@ func (c *ConversationContact) FullName() string {
 	return c.FirstName + " " + c.LastName
 }
 
+// PreviousConversation summarizes an earlier conversation with the same contact, shown for context.
 type PreviousConversation struct {
 	ID            int                         `db:"id" json:"id"`
 	CreatedAt     time.Time                   `db:"created_at" json:"created_at"`
@@ -283,6 +301,7 @@ type PreviousConversation struct {
 	LastMessageAt null.Time                   `db:"last_message_at" json:"last_message_at"`
 }
 
+// ContactConversationHistoryItem is one row of a contact's conversation history.
 type ContactConversationHistoryItem struct {
 	UUID               string      `db:"uuid" json:"uuid"`
 	Subject            null.String `db:"subject" json:"subject"`
@@ -296,11 +315,13 @@ type ContactConversationHistoryItem struct {
 	CreatedAt          time.Time   `db:"created_at" json:"created_at"`
 }
 
+// ContactConversationHistoryAssignee is the assignee shown on a history item.
 type ContactConversationHistoryAssignee struct {
 	Name      null.String `json:"name"`
 	AvatarURL null.String `json:"avatar_url"`
 }
 
+// MarshalJSON nests the assignee as an object, omitted when the item has none.
 func (i ContactConversationHistoryItem) MarshalJSON() ([]byte, error) {
 	type contactConversationHistoryItem struct {
 		UUID               string                              `json:"uuid"`
@@ -335,12 +356,14 @@ func (i ContactConversationHistoryItem) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// PreviousConversationContact is the contact summary on a PreviousConversation.
 type PreviousConversationContact struct {
 	FirstName string      `db:"first_name" json:"first_name"`
 	LastName  string      `db:"last_name" json:"last_name"`
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// ConversationParticipant is a participant added to a conversation.
 type ConversationParticipant struct {
 	ID        int         `db:"id" json:"id"`
 	FirstName string      `db:"first_name" json:"first_name"`
@@ -348,6 +371,7 @@ type ConversationParticipant struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// MessageAuthor is the agent or contact that authored a message.
 type MessageAuthor struct {
 	ID                 int         `db:"id" json:"id"`
 	FirstName          string      `db:"first_name" json:"first_name"`
@@ -359,6 +383,7 @@ type MessageAuthor struct {
 	LastActiveAt       null.Time   `db:"last_active_at" json:"last_active_at"`
 }
 
+// ConversationCounts holds summary conversation tallies for the dashboard.
 type ConversationCounts struct {
 	TotalAssigned         int `db:"total_assigned" json:"total_assigned"`
 	UnresolvedCount       int `db:"unresolved_count" json:"unresolved_count"`
@@ -366,6 +391,7 @@ type ConversationCounts struct {
 	CreatedTodayCount     int `db:"created_today_count" json:"created_today_count"`
 }
 
+// NewConversationsStats is a daily count of new conversations, for reporting.
 type NewConversationsStats struct {
 	Date             string `db:"date" json:"date"`
 	NewConversations int    `db:"new_conversations" json:"new_conversations"`
@@ -544,6 +570,7 @@ func (m *Message) ToOutbound() OutboundMessage {
 	}
 }
 
+// IncomingContact is the sender identity parsed from an inbound message.
 type IncomingContact struct {
 	ID        int
 	FirstName string
@@ -551,6 +578,8 @@ type IncomingContact struct {
 	Email     null.String
 }
 
+// IncomingMessage is a normalized inbound message from any channel, before it is
+// persisted as a Message.
 type IncomingMessage struct {
 	// Channel context
 	Channel string
@@ -593,6 +622,7 @@ func (in *IncomingMessage) ToMessage(senderID, conversationID int, conversationU
 	}
 }
 
+// Status is a conversation status with its display attributes (category, color, icon).
 type Status struct {
 	ID        int       `db:"id" json:"id"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
@@ -602,6 +632,7 @@ type Status struct {
 	Icon      string    `db:"icon" json:"icon"`
 }
 
+// Priority is a conversation priority level.
 type Priority struct {
 	ID        int       `db:"id" json:"id"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`

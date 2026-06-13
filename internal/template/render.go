@@ -9,19 +9,22 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// Built-in template identifiers, grouped by where the body comes from. The
+// first group is looked up by name from database rows (pass them to the
+// RenderStored* methods); TmplResetPassword and TmplWelcome are system-email
+// templates parsed from the embedded static directory (pass them to
+// RenderInMemoryTemplate); TmplBase and TmplContent are not stored templates
+// but the node names of the wrapper and body within a composed email tree.
 const (
-	// Built-in templates names stored in the database.
 	TmplConversationAssigned = "Conversation assigned"
 	TmplSLABreachWarning     = "SLA breach warning"
 	TmplSLABreached          = "SLA breached"
 	TmplMentioned            = "Mentioned in conversation"
 	TmplCSATRequest          = "CSAT request"
 
-	// Built-in templates fetched from memory stored in `static` directory.
 	TmplResetPassword = "reset-password"
 	TmplWelcome       = "welcome"
 
-	// Template names for rendering.
 	TmplBase    = "base"
 	TmplContent = "content"
 )

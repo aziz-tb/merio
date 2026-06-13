@@ -3,9 +3,6 @@
   click Run, and see the runner result (status code, kind, duration,
   output JSON, stderr on failure).
 
-  Visible only on the edit form (slug must exist). After the F5 schema
-  cleanup ai_tools holds Python custom tools only, so this panel always
-  invokes the F6 sandbox.
 
   Form fields are auto-generated from the tool's input_parameters JSONB:
     type=STRING/TEXT  → text input

@@ -19,6 +19,8 @@ import (
 //go:embed queries.sql
 var efs embed.FS
 
+// Manager serves read-only overview/dashboard analytics, querying aggregate
+// metrics through read-only transactions and returning them as JSON.
 type Manager struct {
 	q    queries
 	lo   *logf.Logger

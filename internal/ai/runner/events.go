@@ -7,13 +7,9 @@ import (
 	"time"
 )
 
-// EventPublisher is the runner's progress-event sink.
-//
-// Implementations MUST be goroutine-safe: parallel read-tool dispatch
-// may emit tool events concurrently within a single run.
-//
-// Publish failures are best-effort only. The runner logs them but never
-// fails the underlying run because of a live-progress transport error.
+// EventPublisher is the runner's progress-event sink. Implementations
+// MUST be goroutine-safe (parallel read-tool dispatch emits concurrently).
+// Publish failures are best-effort: logged, never fatal to the run.
 type EventPublisher interface {
 	Publish(ctx context.Context, traceID string, event RunEvent) error
 }

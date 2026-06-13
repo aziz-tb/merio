@@ -26,10 +26,9 @@ import (
 	"github.com/aziz-tb/merio/internal/user"
 )
 
-// AgentLoader is the slice of aiagents.Manager the runner needs.
-// Defined as an interface so tests can substitute a simple fake without
-// spinning up a Postgres connection. Production uses *aiagents.Manager
-// directly (it implements this).
+// AgentLoader is the slice of aiagents.Manager the runner needs, kept as
+// an interface so tests can substitute a fake. Production uses
+// *aiagents.Manager.
 type AgentLoader interface {
 	Get(id int) (agentmodels.Agent, error)
 }
@@ -51,23 +50,17 @@ var (
 	agentVerificationInsufficientReason = "agent requires a verified customer; conversation is not sufficiently verified"
 )
 
-// UsageRecorder is the runner's view of the ai_usage write surface.
-// Production wires *usage.Manager; tests can substitute a counting
-// fake. Defined as an interface (not an import of the usage package)
-// so the runner package doesn't pull a DB-touching dependency just
-// for the type assertion.
+// UsageRecorder is the runner's view of the ai_usage write surface, kept
+// as an interface (not an import of the usage package) so the runner
+// avoids a DB-touching dependency. Production wires *usage.Manager.
 type UsageRecorder interface {
 	Record(ctx context.Context, row UsageRow) error
 }
 
-// UsageRow is the runner's projection of usage.Row — the subset of
-// fields the runner can populate from inside its loop, before handing
-// off to the persistence layer. The handler layer fills in
-// ConversationID / AgentExecutionID / UserID via the same Row shape
-// when it calls Record() itself.
-//
-// Kept here so the runner doesn't import internal/ai/usage; the app
-// and worker adapters translate this to usage.Row at the boundary.
+// UsageRow is the runner's projection of usage.Row — the subset the
+// runner can populate from inside its loop. App/worker adapters translate
+// it to usage.Row at the boundary, keeping internal/ai/usage out of the
+// runner's imports.
 type UsageRow struct {
 	TraceID             string
 	CallSequenceInTrace int
@@ -148,10 +141,9 @@ func New(opts Opts) (*Runner, error) {
 	return &Runner{opts: opts}, nil
 }
 
-// Run executes one agent run. Always returns a populated RunResponse;
-// the second return is the terminal error (if any). Run never panics
-// — every panic source (LLM provider, tool dispatch, JSON encode) is
-// either recovered locally or wrapped at a deeper boundary.
+// Run executes one agent run. It always returns a populated RunResponse
+// alongside the terminal error (if any), and never panics — every panic
+// source is recovered locally or at a deeper boundary.
 func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	var err error
 	req, err = applyDefaults(req)
@@ -239,12 +231,9 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	systemCount := countSystemMessages(messages)
 	cacheMgr := newCacheMarkerManager(systemCount)
 
-	// Build the runtime context handed to internal capabilities. The KB
-	// scope is decoded once per run and threaded into every dispatch
-	// (kb_search reads rt.KBScope to enforce intersection semantics).
-	// A malformed kb_scope JSONB is treated as "no scope" — better to
-	// surface a noisy log and continue than to fail the whole run on a
-	// stored JSON shape we already validated at agent save time.
+	// Runtime context handed to internal capabilities. KBScope is decoded
+	// once per run and threaded into every dispatch (kb_search enforces
+	// intersection semantics over it).
 	kbCache := embeddings.NewSearchResultCache()
 	rt := &builtin.ToolRuntimeContext{
 		ConversationID:      req.ConversationID,
@@ -272,10 +261,8 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		iterations  int
 	)
 
-	// Per-agent iteration cap. The agent's max_iterations
-	// is one source; the request's MaxIterations override is another;
-	// we use the agent's value as the default when the request didn't
-	// explicitly override.
+	// Iteration cap: request override wins, else the agent's
+	// max_iterations, else the package default.
 	maxIters := req.MaxIterations
 	if maxIters == 0 {
 		maxIters = agent.MaxIterations
@@ -339,9 +326,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 
 		if err != nil {
 			// Provider already retried transients; this is terminal.
-			// Record a failure row anyway — ops needs to see the call
-			// happened even when it failed. Outcome maps from the
-			// error class.
+			// Record a failure row anyway so ops sees the call happened.
 			r.recordUsage(runCtx, req, compReq, agent, pres, iter+1, resp, turnLatencyMs, outcomeForError(err), err)
 			out := r.buildResponse(agent, nil, trace, toolCallLog, totalUsage, llmLatency, toolLatency, cacheHits, cacheMgr.Count(), iterations, drops)
 			out.Status = StatusFailed
@@ -350,13 +335,11 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 			return out, err
 		}
 
-		// Successful call — record one ai_usage row per turn. Best-
-		// effort: persistence failures are logged inside recordUsage
-		// and never abort the run.
+		// One ai_usage row per turn. Best-effort: persistence failures are
+		// logged inside recordUsage and never abort the run.
 		r.recordUsage(runCtx, req, compReq, agent, pres, iter+1, resp, turnLatencyMs, "success", nil)
 
-		// Update tracking. Anthropic returns CachedTokens separately
-		// from InputTokens (we surface both).
+		// CachedTokens arrives separate from InputTokens; surface both.
 		totalUsage.InputTokens += resp.Usage.InputTokens
 		totalUsage.OutputTokens += resp.Usage.OutputTokens
 		totalUsage.CachedTokens += resp.Usage.CachedTokens
@@ -536,13 +519,10 @@ func verifyAgentVerification(req RunRequest, agent agentmodels.Agent) error {
 	return nil
 }
 
-// applyDefaults fills zero-value knobs with their canonical defaults and
-// validates caller-owned invariants.
-//
-// TraceID is intentionally NOT synthesized here anymore. The caller
-// must generate it before invoking Run() so the same id can also anchor
-// workflow ids, Redis event streams, HTTP responses, and any
-// out-of-run observability recorded before the runner starts.
+// applyDefaults fills zero-value knobs with their defaults and validates
+// caller-owned invariants. TraceID is deliberately NOT synthesized here —
+// the caller must generate it so the same id can anchor workflow ids,
+// event streams, and observability recorded before the runner starts.
 func applyDefaults(req RunRequest) (RunRequest, error) {
 	if req.MaxIterations < 0 {
 		req.MaxIterations = 0
@@ -559,22 +539,10 @@ func applyDefaults(req RunRequest) (RunRequest, error) {
 	return req, nil
 }
 
-// buildInitialMessages constructs the messages slice for turn 0.
-//
-// Order:
-//  1. Agent prompt (system message) — always present unless blank.
-//  2. Pre-prepared context (system message) — caller-supplied JSON
-//     payload. v1 placeholder; pipeline stage 8 refines into structured
-//     per-agent views.
-//  3. Conversation history (system message) — current ticket's prior
-//     messages, formatted under a "## Conversation history (current
-//     ticket)" header. Skipped when history is empty.
-//  4. Inbound message (user turn) — the customer message the agent
-//     should draft a reply to.
-//
-// Distinct from the get_conversation_history capability: that surfaces
-// PRIOR conversations from the same customer; the history system block
-// here is the CURRENT ticket's running context.
+// buildInitialMessages constructs the turn-0 messages, in order: agent
+// prompt, pre-prepared context, conversation history (each a system
+// message, skipped when blank/empty), then the inbound customer message
+// as the user turn.
 func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string) []llm.Message {
 	out := make([]llm.Message, 0, 4)
 
@@ -623,11 +591,9 @@ func buildInitialMessages(systemPrompt string, ctxData map[string]any, history [
 	return out
 }
 
-// formatConversationHistory renders the current ticket's prior messages
-// into a labeled system block. Sender values outside {"customer", "agent"}
-// fall back to "Other:" so a misclassified row doesn't crash the runner.
-// Returns "" when history is empty so the caller can skip the system
-// message entirely.
+// formatConversationHistory renders prior messages into a labeled system
+// block. Senders outside {customer, agent} fall back to "Other"; returns
+// "" on empty history so the caller can skip the system message.
 func formatConversationHistory(history []ConversationMessage) string {
 	if len(history) == 0 {
 		return ""
@@ -662,11 +628,9 @@ func countSystemMessages(msgs []llm.Message) int {
 	return n
 }
 
-// decodeKBScope unmarshals ai_agents.kb_scope into the runtime shape
-// the kb_search capability reads. Validation already ran at agent save
-// time; the runner just decodes. A malformed shape (shouldn't happen on
-// a write that went through the handler) returns a zero KBScope and
-// logs at WARN so ops can spot drift between schema and code.
+// decodeKBScope unmarshals ai_agents.kb_scope into the shape kb_search
+// reads. A malformed shape (shouldn't happen post-save-validation)
+// returns a zero KBScope and logs at WARN so ops can spot drift.
 func decodeKBScope(raw json.RawMessage, lo *logf.Logger, traceID string, agentID int) builtin.KBScope {
 	if len(raw) == 0 {
 		return builtin.KBScope{}
@@ -707,10 +671,9 @@ func decodePresetOverrides(raw json.RawMessage) map[string]string {
 	return m
 }
 
-// encodeToolResult serializes a ToolCallLog into the string the LLM
-// gets back as the tool_result content. Uses JSON for structured
-// outputs so the model can parse fields; passes string outputs through
-// unchanged.
+// encodeToolResult serializes a ToolCallLog into the tool_result content
+// the LLM gets back: JSON for structured outputs, string outputs passed
+// through unchanged.
 func encodeToolResult(log ToolCallLog) string {
 	if log.Status == "success" {
 		switch v := log.Data.(type) {
@@ -749,9 +712,8 @@ func encodeToolResult(log ToolCallLog) string {
 	return string(b)
 }
 
-// buildResponse fills out a RunResponse with the aggregate fields.
-// Status is left zero so the caller (the loop branches above) sets it
-// — keeps the "what to set" decision in one place.
+// buildResponse fills a RunResponse with the aggregate fields. Status is
+// left zero for the caller to set, keeping that decision in one place.
 func (r *Runner) buildResponse(
 	agent agentmodels.Agent,
 	draft *string,
@@ -784,10 +746,8 @@ func (r *Runner) buildResponse(
 	}
 }
 
-// emitRunLog writes a single structured INFO line per terminal Run
-// outcome. Per-turn / per-tool logs are emitted by the provider and
-// dispatcher respectively at lower layers; this is the run-level
-// summary so ops can pull "agent X had Y outcome at trace Z" cleanly.
+// emitRunLog writes one INFO line per terminal Run outcome — the
+// run-level summary. Per-turn / per-tool logs come from lower layers.
 func (r *Runner) emitRunLog(traceID string, agent agentmodels.Agent, iterations int, usage llm.Usage, status, msg string) {
 	r.opts.Lo.Info("runner.run.terminal",
 		"trace_id", traceID,
@@ -802,16 +762,13 @@ func (r *Runner) emitRunLog(traceID string, agent agentmodels.Agent, iterations 
 	)
 }
 
-// recordUsage writes one ai_usage row per LLM provider call. Best-
-// effort: the runner never aborts a run because persistence failed.
-// Skips silently when no UsageRecorder is wired (test contexts) or
-// when InboxID is zero (the caller didn't stamp it — see
-// cmd/ai_run.go for the resolution path).
+// recordUsage writes one ai_usage row per LLM provider call. Best-effort:
+// never aborts the run on persistence failure, and skips silently when no
+// UsageRecorder is wired or InboxID is zero.
 //
-// The call_sequence_in_trace counter is the iteration index (1-based),
-// which doubles as a per-trace identifier when retries land. The
-// idempotency invariant on (trace_id, call_sequence, created_at) is
-// safe because created_at is stamped here once per call.
+// call_sequence_in_trace is the 1-based iteration index; the idempotency
+// invariant on (trace_id, call_sequence, created_at) holds because
+// created_at is stamped here once per call.
 func (r *Runner) recordUsage(
 	ctx context.Context,
 	req RunRequest,
@@ -914,10 +871,9 @@ func coalesceString(values ...string) string {
 	return ""
 }
 
-// outcomeForError maps a provider error to one of the ai_usage outcome
-// values. Mirrors the constants in internal/ai/usage. Unknown errors
-// fall through to "other" rather than "success" — analytics queries
-// that filter on outcome != 'success' should catch them.
+// outcomeForError maps a provider error to an ai_usage outcome value.
+// Unknown errors fall through to "other" (not "success") so analytics
+// filtering on outcome != 'success' still catch them.
 func outcomeForError(err error) string {
 	if err == nil {
 		return "success"

@@ -17,11 +17,17 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// Sentinel errors returned by getUserFromPool when no assignee can be drawn:
+// the team has no round-robin balancer, or its pool is currently empty (e.g. all
+// members are away). The assignment loop treats both as benign skip signals rather
+// than failures.
 var (
 	ErrTeamNotFound  = errors.New("team not found")
 	ErrNoUsersInPool = errors.New("no users in pool")
 )
 
+// AssignmentTypeRoundRobin is the team's conversation_assignment_type value that
+// opts the team into auto-assignment; teams with any other value are skipped.
 const (
 	AssignmentTypeRoundRobin = "Round robin"
 )

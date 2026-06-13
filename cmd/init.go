@@ -177,9 +177,8 @@ func initFlags() {
 	f.Bool("set-system-user-password", false, "set password for the system user")
 	f.String("static-dir", "", "path to a directory with custom static files and templates to override the defaults")
 
-	// F12 RAG reindex CLI. --reindex-embeddings starts a Temporal
-	// BulkReindexWorkflow; the binary exits after dispatch (the workflow
-	// runs on the embeddings worker pool).
+	// --reindex-embeddings starts a Temporal BulkReindexWorkflow and exits;
+	// the workflow itself runs on the embeddings worker pool.
 	f.Bool("reindex-embeddings", false, "trigger a Temporal bulk-reindex of embeddings and exit")
 	f.String("reindex-content-type", "kb_chunk", "content type to reindex (default: kb_chunk)")
 	f.Int("reindex-batch-size", 100, "articles per page during bulk reindex (default: 100)")
@@ -448,13 +447,9 @@ func initExecToken(rdb *redis.Client) *exectoken.Manager {
 	return mgr
 }
 
-// initSystemUserID looks up the System Agent user's ID. The user is
-// created by the v2.5.0 migration (and seeded in schema.sql for fresh
-// installs). Boots fatally if the user is missing — that indicates the
-// migration didn't run.
-//
-// The system user is identified by a stable email, not by ID, so this
-// works across deployments.
+// initSystemUserID looks up the System Agent user by its stable email
+// (created by the v2.5.0 migration, seeded in schema.sql for fresh
+// installs). Fatal if missing — the migration didn't run.
 func initSystemUserID(db *sqlx.DB) int {
 	var id int
 	err := db.QueryRow(
@@ -468,9 +463,9 @@ func initSystemUserID(db *sqlx.DB) int {
 	return id
 }
 
-// initExecRunner constructs the script-execution dispatcher. Fatally
-// errors if the [exec] config block is missing or incomplete; that's
-// deliberate, the platform should not boot in a half-configured state.
+// initExecRunner constructs the script-execution dispatcher. Fatal if the
+// [exec] config block is missing or incomplete — the platform should not
+// boot half-configured.
 func initExecRunner(db *sqlx.DB, tokMgr *exectoken.Manager, systemUserID int, secretMgr *secret.Manager) *execrunner.Manager {
 	lo := initLogger("exec-runner")
 	mgr, err := execrunner.New(execrunner.Opts{
@@ -784,8 +779,7 @@ func initAITools(db *sqlx.DB, i18n *i18n.I18n) *aitools.Manager {
 
 // initFunction initializes the unified functions manager — the single home
 // for every named, sandbox-runnable code blob (custom AI tools, customer-
-// identification executors, future domains). It runs functions through the
-// shared exec runner.
+// identification executors). It runs functions through the shared exec runner.
 func initFunction(db *sqlx.DB, runner *execrunner.Manager, i18n *i18n.I18n) *function.Manager {
 	lo := initLogger("function")
 	m, err := function.New(function.Opts{
@@ -829,9 +823,8 @@ func initContract(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager, funct
 	return m
 }
 
-// initAIExecutions wires the persistence manager for agent_executions +
-// agent_execution_outcomes (the Composer tab's storage layer, migration
-// v2_7_6).
+// initAIExecutions wires the persistence manager for agent_executions and
+// agent_execution_outcomes (the Composer tab's storage layer).
 func initAIExecutions(db *sqlx.DB, i18n *i18n.I18n) *aiexecutions.Manager {
 	lo := initLogger("ai-executions")
 	m, err := aiexecutions.New(aiexecutions.Opts{
@@ -857,10 +850,9 @@ func initAIOperations(db *sqlx.DB) *aioperations.Manager {
 	return m
 }
 
-// initAIUsage wires the ai_usage Manager — one row per LLM provider
-// call. Depends on the model catalog (cost calculation reads
-// per-million-token rates from there); fails loudly if the catalog
-// hasn't been loaded yet.
+// initAIUsage wires the ai_usage Manager (one row per LLM provider call).
+// Requires the model catalog for cost calculation; fatal if it hasn't been
+// loaded yet.
 func initAIUsage(db *sqlx.DB, cat *aicatalog.Catalog) *aiusage.Manager {
 	lo := initLogger("ai-usage")
 	m, err := aiusage.New(aiusage.Opts{
@@ -874,10 +866,9 @@ func initAIUsage(db *sqlx.DB, cat *aicatalog.Catalog) *aiusage.Manager {
 	return m
 }
 
-// initSystemInboxID resolves the seeded "System (Internal)" inbox row
-// by its stable UUID (see migrations.SystemInboxUUID). Every ai_usage
-// row that has no real conversation context FKs to this id. Fails
-// loudly when the seed row is missing.
+// initSystemInboxID resolves the seeded "System (Internal)" inbox by its
+// stable UUID (migrations.SystemInboxUUID); ai_usage rows with no real
+// conversation context FK to this id. Fatal if the seed row is missing.
 func initSystemInboxID(db *sqlx.DB) int {
 	var id int
 	err := db.QueryRow(
@@ -894,14 +885,11 @@ func initSystemInboxID(db *sqlx.DB) int {
 	return id
 }
 
-// initAIModelCatalog loads provider model catalogs into an in-memory catalog
-// used to validate preset model references at startup. The legacy
-// `ai.models_catalog_path` override still loads a single Anthropic-shaped file;
-// by default we load config/anthropic_models.json, config/openai_models.json,
-// and config/azure_models.json.
-//
-// Missing or malformed catalog is fatal: a typo in a model id should
-// crash startup, not silently fall back to a default.
+// initAIModelCatalog loads provider model catalogs used to validate preset
+// model references at startup. The legacy `ai.models_catalog_path` override
+// loads a single Anthropic-shaped file; otherwise the per-provider config
+// files are loaded. Missing or malformed catalog is fatal — a typo in a
+// model id should crash startup, not silently fall back to a default.
 func initAIModelCatalog() *aicatalog.Catalog {
 	path := ko.String("ai.models_catalog_path")
 	var (
@@ -936,12 +924,10 @@ func initAIModelCatalog() *aicatalog.Catalog {
 	return cat
 }
 
-// initAIPresetRegistry loads config/ai_presets.json into the in-memory
-// preset registry, validating every preset's model against the catalog
-// and every purpose mapping against llm.KnownPurposes. Path is
-// configurable via `ai.presets_path`. Validation failure is fatal — the
-// alternative (silently starting with broken config) is worse than a
-// crash on launch.
+// initAIPresetRegistry loads config/ai_presets.json (override via
+// `ai.presets_path`), validating each preset's model against the catalog
+// and each purpose mapping against llm.KnownPurposes. Validation failure
+// is fatal.
 func initAIPresetRegistry(cat *aicatalog.Catalog) *aipreset.Registry {
 	path := ko.String("ai.presets_path")
 	if path == "" {
@@ -1052,12 +1038,10 @@ func initAgentRunEventPublisher(rdb *redis.Client) runner.EventPublisher {
 	return pub
 }
 
-// runnerUsageAdapter bridges runner.UsageRecorder (which uses
-// runner.UsageRow to avoid importing internal/ai/usage from inside the
-// runner package) and the real usage.Manager.Record. The adapter
-// copies fields 1:1; CreatedAt is stamped here so the
-// (trace_id, call_sequence, created_at) idempotency invariant holds
-// even on retry of the parent HTTP request.
+// runnerUsageAdapter bridges runner.UsageRow (kept distinct to avoid the
+// runner package importing internal/ai/usage) to usage.Manager.Record.
+// CreatedAt is stamped here so the (trace_id, call_sequence, created_at)
+// idempotency invariant holds even on retry of the parent HTTP request.
 type runnerUsageAdapter struct {
 	m *aiusage.Manager
 }
@@ -1712,15 +1696,10 @@ func initSearcher(store *embeddings.Store, embed embeddings.Provider, rank reran
 	return s
 }
 
-// initTemporal builds the Temporal client used by handlers and
-// managers to start workflows. Returns nil when [temporal].enabled
-// is false (graceful-degradation per CONVENTIONS.md) — callers
-// branch on app.temporal == nil before starting a workflow.
-//
-// Dial failures are NOT fatal: Temporal outages shouldn't take down
-// the inbox. The error is logged and the client stays nil so
-// workflow-starting paths fall back to their documented behaviour
-// (sync, or refuse-and-log).
+// initTemporal builds the Temporal client for starting workflows. Returns
+// nil (never fatal) when [temporal].enabled is false or the dial fails —
+// an outage shouldn't take down the inbox. Callers branch on nil and fall
+// back to their documented behaviour (sync, or refuse-and-log).
 func initTemporal() *temporal.Client {
 	cfg := temporal.Config{
 		Enabled:       ko.Bool("temporal.enabled"),

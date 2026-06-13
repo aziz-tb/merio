@@ -20,9 +20,8 @@ import (
 var efs embed.FS
 
 // Store is the DB-side surface for embeddings: insert, query, swap
-// active version, delete. Searcher composes a Store with a Provider +
-// reranker to build the hybrid pipeline; activities compose a Store
-// with the provider to write embeddings during indexing.
+// active version, delete. Composed by Searcher (hybrid pipeline) and by
+// indexing activities (writing embeddings).
 type Store struct {
 	db *sqlx.DB
 	q  storeQueries
@@ -70,9 +69,8 @@ type StoredChunk struct {
 	Embedding []float32
 }
 
-// StoreEmbeddings inserts a batch of chunks under (contentType, sourceID,
-// sourceVersion). ON CONFLICT DO NOTHING handles idempotent retries:
-// the same chunk with the same model is a no-op.
+// StoreEmbeddings inserts chunks under (contentType, sourceID,
+// sourceVersion). ON CONFLICT DO NOTHING makes retries idempotent.
 func (s *Store) StoreEmbeddings(
 	ctx context.Context,
 	contentType string,
@@ -101,9 +99,8 @@ func (s *Store) StoreEmbeddings(
 	return nil
 }
 
-// SwapActiveVersion is the atomic version flip — once this UPDATE
-// commits, the hybrid search starts seeing the new vectors. The old
-// version's rows stay in the table until CleanupOldVectorsWorkflow
+// SwapActiveVersion atomically flips the active version; search sees the
+// new vectors once it commits. Old rows linger until CleanupOldVectorsWorkflow
 // deletes them after the 7-day grace.
 func (s *Store) SwapActiveVersion(ctx context.Context, articleID int64, newVersion int, model string) error {
 	_, err := s.q.UpsertArticlesIndexState.ExecContext(ctx, articleID, newVersion, model)
@@ -204,9 +201,8 @@ type keywordRow struct {
 	Rank        float64 `db:"rank"`
 }
 
-// semanticSearch runs the chunk-level vector similarity query. Returns
-// up to `limit` rows ordered by cosine distance (ascending) — closest
-// first. folderIDs nil/empty = no folder filter.
+// semanticSearch runs the chunk-level vector query, returning up to limit
+// rows closest-first by cosine distance. Empty folderIDs = no folder filter.
 func (s *Store) semanticSearch(
 	ctx context.Context,
 	queryVec []float32,

@@ -15,23 +15,16 @@ import (
 
 // QueryEmbeddingCache caches query embeddings in Redis with a TTL.
 //
-// Cache key format: "embed:<model>:<sha256(query)>". Different models
-// have different vector spaces; co-mingling would return the wrong
-// vector after a model upgrade. Including the model in the key
-// invalidates the cache automatically on model swap.
-//
-// Cache miss is silent on read error — Redis being down should never
-// make hybrid search fail. The provider call is the load-bearing
-// dependency; the cache is a latency optimization.
+// Key is "embed:<model>:<sha256(query)>"; the model segment invalidates
+// the cache automatically on a model swap (vector spaces differ).
+// Read errors are treated as a miss so Redis downtime never fails search.
 type QueryEmbeddingCache struct {
 	rdb *redis.Client
 	ttl time.Duration
 	lo  *logf.Logger
 }
 
-// NewQueryEmbeddingCache builds a cache. Pass a non-zero ttl
-// (typical: 1h). Pass a logger so cache failures surface in the same
-// log stream.
+// NewQueryEmbeddingCache builds a cache; a non-positive ttl defaults to 1h.
 func NewQueryEmbeddingCache(rdb *redis.Client, ttl time.Duration, lo *logf.Logger) (*QueryEmbeddingCache, error) {
 	if rdb == nil {
 		return nil, errors.New("embeddings.QueryEmbeddingCache: rdb is required")

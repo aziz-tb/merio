@@ -1,3 +1,4 @@
+// Package openai implements the llm provider for OpenAI's Chat Completions API.
 package openai
 
 import (
@@ -50,6 +51,7 @@ type Provider struct {
 	healthy    atomic.Bool
 }
 
+// Opts holds the dependencies and tuning passed to New.
 type Opts struct {
 	APIKey      string
 	Resolver    *secret.Resolver
@@ -61,6 +63,8 @@ type Opts struct {
 	HTTPClient  *http.Client
 }
 
+// New builds an OpenAI Provider. It errors if no API key or resolver is set, or if the
+// catalog, registry, or logger is nil.
 func New(opt Opts) (*Provider, error) {
 	if opt.APIKey == "" && opt.Resolver == nil {
 		return nil, fmt.Errorf("openai: api key is empty")
@@ -110,8 +114,12 @@ func New(opt Opts) (*Provider, error) {
 	return p, nil
 }
 
+// Name returns the provider's name.
 func (p *Provider) Name() string { return "openai" }
 
+// Complete runs one chat completion: it resolves the request's preset, enforces the
+// concurrency limit and circuit breaker, retries transient failures, and returns typed llm
+// errors (ErrPresetNotFound, ErrAuth, ErrCircuitOpen, ...).
 func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
 	if req.PresetSlug == "" {
 		return llm.CompletionResponse{}, fmt.Errorf("openai: PresetSlug is required")
@@ -186,6 +194,7 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 	return out, nil
 }
 
+// StreamComplete is not implemented for OpenAI; it always returns llm.ErrStreamingNotImplemented.
 func (p *Provider) StreamComplete(_ context.Context, _ llm.CompletionRequest, _ func(string)) (llm.CompletionResponse, error) {
 	return llm.CompletionResponse{}, llm.ErrStreamingNotImplemented
 }

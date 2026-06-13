@@ -9,13 +9,12 @@ import (
 )
 
 // produceDraftToolName is the platform-mandatory terminal tool every
-// agent must call to commit its customer-facing draft. Runner-owned,
-// not a built-in capability — operators cannot disable or filter it.
+// agent must call to commit its draft. Runner-owned, not a built-in —
+// operators cannot disable or filter it.
 const produceDraftToolName = "produce_draft"
 
-// produceDraftInstructions is appended to the operator-authored agent
-// prompt at runtime only. It is never stored back into ai_agents.prompt.
-// Kept as a single constant so later localization can swap it cleanly.
+// produceDraftInstructions is appended to the operator prompt at runtime
+// only; never stored back into ai_agents.prompt.
 const produceDraftInstructions = `Interne Plattformregel für den finalen Entwurf:
 - Rufe produce_draft genau einmal als letzten Schritt dieses Laufs auf.
 - Übergib im Feld "draft" ausschließlich kundensichtbaren Antworttext.

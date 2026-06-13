@@ -1,9 +1,7 @@
-// Package models holds DB-wire and domain types for the AI tools
-// configuration table (ai_tools). ai_tools holds only the AI-facing
-// metadata for Python/JS custom tools; the code itself lives in the
-// functions table, linked by function_id (Unified Executor Framework)
-// Internal capabilities (kb_search, etc.) live in Go code under
-// internal/ai/tools/builtin/.
+// Package models holds DB-wire and domain types for the ai_tools table.
+// ai_tools stores only AI-facing metadata for custom tools; the code lives
+// in the functions table, linked by function_id. Internal capabilities
+// (kb_search, etc.) live in Go under internal/ai/tools/builtin/.
 package models
 
 import (
@@ -12,19 +10,12 @@ import (
 )
 
 // Tool is the DB-wire representation of an ai_tools row joined with its
-// linked functions row.
+// linked functions row. The dispatcher runs the tool via
+// function.Manager.Run(tool.Slug).
 //
-// InputParameters and OutputSchema are stored as raw JSONB on ai_tools.
-// The code/language/packages live on the linked functions row; the
-// dispatcher runs the tool via function.Manager.Run(tool.Slug).
-//
-//   - InputParameters: array of {key, name, type, required, visibility,
-//     description, options}. Extra fields are ignored for compatibility
-//     with older saved JSON shapes.
-//   - OutputSchema: JSON Schema describing the tool's structured output
-//   - Implementation: {code, language, packages} — reconstructed from the
-//     functions row on reads, parsed into the functions row on writes. NOT
-//     an ai_tools column (db:"-").
+// InputParameters and OutputSchema are raw JSONB. InputParameters is an
+// array of parameter objects; extra fields are ignored for compatibility
+// with older saved JSON shapes.
 type Tool struct {
 	ID              int             `db:"id" json:"id"`
 	CreatedAt       time.Time       `db:"created_at" json:"created_at"`
@@ -41,8 +32,8 @@ type Tool struct {
 	FunctionID      int64           `db:"function_id" json:"function_id"`
 
 	// Implementation is the {code, language, packages} view of the linked
-	// functions row — reconstructed on reads, consumed on writes. Not a
-	// column (db:"-"); the handler splits it into the functions row.
+	// functions row — reconstructed on reads, split back into that row on
+	// writes. Not an ai_tools column (db:"-").
 	Implementation json.RawMessage `db:"-" json:"implementation"`
 
 	// Transient columns selected from the JOINed functions row on read

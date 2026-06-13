@@ -1,3 +1,5 @@
+// Package email is the SMTP-backed notifier.Notifier registered under notifier.ProviderEmail;
+// it sends through one of the configured SMTP pools, chosen at random when several exist.
 package email
 
 import (
@@ -12,7 +14,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// Email implements the MessageSender interface for sending emails.
+// Email is the SMTP-backed notifier.Notifier; it holds no per-send state, so a single instance
+// is safe for concurrent use.
 type Email struct {
 	lo        *logf.Logger
 	from      string
@@ -25,7 +28,8 @@ type Opts struct {
 	FromEmail string
 }
 
-// New initializes a new Email sender.
+// New builds an Email sender with one SMTP pool per config entry; it errors if any pool fails
+// to initialize.
 func New(smtpConfig []models.SMTPConfig, opts Opts) (*Email, error) {
 	pools, err := email.NewSmtpPool(smtpConfig, nil)
 	if err != nil {
@@ -38,13 +42,14 @@ func New(smtpConfig []models.SMTPConfig, opts Opts) (*Email, error) {
 	}, nil
 }
 
-// Send sends a notification message via email.
+// Send renders msg and delivers it over one randomly chosen SMTP pool. msg.ContentType "plain"
+// sets the text body; anything else is HTML (with msg.AltContent as the text fallback).
 func (e *Email) Send(msg notifier.Message) error {
 	emailMessage := e.prepareEmail(msg.Subject, msg.Content, msg.RecipientEmails, msg)
 	return e.send(emailMessage)
 }
 
-// Name returns the name of the provider.
+// Name returns notifier.ProviderEmail, the key this provider is registered under.
 func (e *Email) Name() string {
 	return notifier.ProviderEmail
 }

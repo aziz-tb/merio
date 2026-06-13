@@ -1,3 +1,4 @@
+// Package models defines the user type (agents, contacts, visitors) and related constants.
 package models
 
 import (
@@ -11,26 +12,25 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// User-related constants: the user-model key, the built-in system account, user types,
+// and availability statuses (Away is automatic/inactivity; AwayManual is set from the sidebar).
 const (
 	UserModel = "user"
 
 	SystemUserEmail = "system@merio.local"
 
-	// User types
 	UserTypeAgent   = "agent"
 	UserTypeContact = "contact"
 	UserTypeVisitor = "visitor"
 
-	// User availability statuses
-	Online  = "online"
-	Offline = "offline"
-	// Away due to inactivity
-	Away = "away"
-	// Away due to manual setting from sidebar
+	Online             = "online"
+	Offline            = "offline"
+	Away               = "away"
 	AwayManual         = "away_manual"
 	AwayAndReassigning = "away_and_reassigning"
 )
 
+// UserCompact is a reduced user projection for list views.
 type UserCompact struct {
 	ID             int         `db:"id" json:"id"`
 	Type           string      `db:"type" json:"type"`
@@ -47,6 +47,7 @@ type UserCompact struct {
 	Total int `db:"total" json:"-"`
 }
 
+// LinkedContact is a minimal contact reference (id, name, email).
 type LinkedContact struct {
 	ID        int         `db:"id" json:"id"`
 	Email     null.String `db:"email" json:"email"`
@@ -54,6 +55,8 @@ type LinkedContact struct {
 	LastName  string      `db:"last_name" json:"last_name"`
 }
 
+// User is an agent, contact, or visitor account — with roles and permissions, customer-identity
+// link state, and optional API-key credentials.
 type User struct {
 	ID                     int                  `db:"id" json:"id"`
 	CreatedAt              time.Time            `db:"created_at" json:"created_at"`
@@ -104,6 +107,7 @@ type ChatUser struct {
 	ActiveAt           null.Time   `db:"active_at" json:"active_at"`
 }
 
+// Note is an internal note attached to a contact.
 type Note struct {
 	ID        int         `db:"id" json:"id"`
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`
@@ -116,19 +120,23 @@ type Note struct {
 	AvatarURL null.String `db:"avatar_url" json:"avatar_url"`
 }
 
+// OfflineUser is a minimal reference (id, type) to a user that is offline.
 type OfflineUser struct {
 	ID   int    `db:"id"`
 	Type string `db:"type"`
 }
 
+// FullName returns the user's first and last name joined.
 func (u *User) FullName() string {
 	return u.FirstName + " " + u.LastName
 }
 
+// HasAdminRole reports whether the user holds the Admin role.
 func (u *User) HasAdminRole() bool {
 	return slices.Contains(u.Roles, rmodels.RoleAdmin)
 }
 
+// IsSystemUser reports whether the user is the built-in system account, by flag or system email.
 func (u *User) IsSystemUser() bool {
 	return u.IsSystem || u.Email.String == SystemUserEmail
 }

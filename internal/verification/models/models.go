@@ -1,8 +1,7 @@
-// Package models holds the input/output and rule shapes for the
-// verification engine. The engine is pure logic: given a
-// prepared message, a resolved customer/contract, and extracted attributes,
-// it evaluates the channel's configured rules and returns a level + a
-// human-readable reason + a per-criterion trace.
+// Package models holds the input/output and rule shapes for the verification
+// engine, which evaluates a channel's configured rules against a message,
+// resolved customer/contract, and extracted attributes to produce a level,
+// reason, and per-criterion trace.
 package models
 
 import (
@@ -11,8 +10,10 @@ import (
 	custmodels "github.com/aziz-tb/merio/internal/customer/models"
 )
 
+// VerificationLevel is how confidently a conversation's contact has been identified.
 type VerificationLevel int
 
+// Verification levels, from unverified (0) to operator-set manual confirmation (3).
 const (
 	VerificationLevelUnverified VerificationLevel = 0
 	VerificationLevelPartial    VerificationLevel = 1
@@ -34,10 +35,8 @@ type EvalInput struct {
 	// extraction, e.g. {"contractId":"12606412","firstname":"Moussa"}.
 	ExtractedAttrs map[string]any
 	// Rules are pre-loaded by the caller (from the
-	// customer_identification.verification_rules_async setting) and passed
-	// in — the engine has no settings dependency of its own, so the data
-	// dependency is visible at the call site. Engine picks Rules[Channel]
-	// out. Custom criteria are nested per group inside the rules.
+	// customer_identification.verification_rules_async setting); the engine has
+	// no settings dependency of its own and selects Rules[Channel].
 	Rules RulesAsync
 }
 

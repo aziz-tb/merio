@@ -1,3 +1,4 @@
+// Package models defines SLA policy, applied-SLA, and SLA-event types.
 package models
 
 import (
@@ -23,6 +24,7 @@ type SLAPolicy struct {
 	Notifications     SlaNotifications `db:"notifications" json:"notifications"`
 }
 
+// SlaNotifications is a list of SLA notification settings stored as JSON in one column (see Scan/Value).
 type SlaNotifications []SlaNotification
 
 // Value implements the driver.Valuer interface.
@@ -93,6 +95,7 @@ type AppliedSLA struct {
 	ConversationStatusCategory  string    `db:"conversation_status_category"`
 }
 
+// SLAEvent tracks one SLA metric deadline (Type) for an applied SLA, with its met/breached times.
 type SLAEvent struct {
 	ID           int       `db:"id"`
 	CreatedAt    time.Time `db:"created_at"`

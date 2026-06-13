@@ -10,25 +10,20 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// defaultInterceptors returns the project-default worker interceptor
-// chain. Currently one interceptor: structured logging on every
-// activity start/finish. Add tracing / metrics interceptors here as
-// they land.
+// defaultInterceptors returns the default worker interceptor chain (currently
+// just activity start/finish logging). Add tracing / metrics here.
 func defaultInterceptors(lo *logf.Logger) []interceptor.WorkerInterceptor {
 	return []interceptor.WorkerInterceptor{
 		&loggingInterceptor{lo: lo},
 	}
 }
 
-// loggingInterceptor emits log lines on every activity invocation so
-// Temporal execution shows up alongside the rest of the app's logs
-// (correlated by trace_id via search attributes — see
-// internal/temporal/search_attributes.go).
+// loggingInterceptor logs every activity invocation, correlated by trace_id
+// (see search_attributes.go).
 //
-// Workflow-side interception is intentionally NOT done here: workflow
-// code is replayed on history events, so logging from inside an
-// interceptor would emit duplicate lines on every replay. Workflows
-// use workflow.GetLogger(ctx) directly for that reason.
+// Workflow-side interception is intentionally omitted: workflow code replays
+// on history events, so an interceptor would log duplicate lines on every
+// replay. Workflows use workflow.GetLogger(ctx) instead.
 type loggingInterceptor struct {
 	interceptor.WorkerInterceptorBase
 	lo *logf.Logger

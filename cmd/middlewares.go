@@ -16,20 +16,13 @@ import (
 	"github.com/zerodha/simplesessions/v3"
 )
 
-// headerScriptSystem is the per-call override scripts send to make the
-// callback act as the System Agent instead of the original invoker.
-// The Python SDK sets this to "true" when sdk.api.<verb>(..., system=True).
+// headerScriptSystem makes a script callback act as the System Agent instead
+// of the original invoker. The Python SDK sets it via sdk.api.<verb>(..., system=True).
 const headerScriptSystem = "X-Script-System"
 
-// authenticateUser handles three authentication paths in priority order:
-//  1. Authorization header carrying a script execution token (sx_...) —
-//     resolved via app.execToken; the actor (invoker vs. System) is picked
-//     from the X-Script-System header.
-//  2. Authorization header carrying an API key (Basic or Token).
-//  3. Session cookie — the standard agent UI flow. CSRF is checked for
-//     POST/PUT/DELETE.
-//
-// Returns the authenticated user or an error.
+// authenticateUser tries, in priority order: script execution token (sx_...,
+// actor picked from X-Script-System), API key (Basic/Token), then session
+// cookie. CSRF is enforced on POST/PUT/DELETE in the session path only.
 func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	var user models.User
 
@@ -90,11 +83,9 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	return user, nil
 }
 
-// authenticateScriptToken resolves an sx_-prefixed token and loads the
-// resolved user. Picks invoker vs. System Agent identity based on the
-// X-Script-System header. Surfaces token + actor metadata on the request
-// context so handlers (like handleToolCall) can read it for recursive
-// dispatch attribution.
+// authenticateScriptToken resolves an sx_-prefixed token to a user, picking
+// invoker vs. System Agent identity from X-Script-System. Stashes token and
+// actor metadata on the request context for recursive-dispatch attribution.
 func authenticateScriptToken(r *fastglue.Request, app *App, prefixedToken string) (models.User, error) {
 	var user models.User
 
@@ -112,9 +103,7 @@ func authenticateScriptToken(r *fastglue.Request, app *App, prefixedToken string
 			app.i18n.T("auth.invalidOrExpiredSession"), nil)
 	}
 
-	// Load the full user record so authz works as usual. GetAgentCachedOrLoad
-	// is what the session path uses too — keeping the same call avoids
-	// cache divergence between auth modes.
+	// Same loader as the session path, so the cache stays consistent across auth modes.
 	user, err = app.user.GetAgentCachedOrLoad(res.UserID)
 	if err != nil {
 		return user, err
@@ -130,9 +119,8 @@ func authenticateScriptToken(r *fastglue.Request, app *App, prefixedToken string
 	return user, nil
 }
 
-// tryAuth attempts to authenticate the user and add them to the context but doesn't enforce authentication.
-// Handlers can check if user exists in context optionally.
-// Supports both API key authentication (Authorization header) and session-based authentication.
+// tryAuth authenticates and sets the user on the context if possible, but does
+// not enforce it; on failure it proceeds with no user.
 func tryAuth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
@@ -156,8 +144,7 @@ func tryAuth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	}
 }
 
-// auth validates the session or API key and adds the user to the request context.
-// Supports both API key authentication (Authorization header) and session-based authentication.
+// auth enforces authentication and adds the user to the request context.
 func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
@@ -186,8 +173,7 @@ func auth(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	}
 }
 
-// perm checks if the user has the required permission to access the endpoint.
-// Supports both API key authentication (Authorization header) and session-based authentication.
+// perm enforces authentication and the given "object:action" permission.
 func perm(handler fastglue.FastRequestHandler, perm string) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)

@@ -20,12 +20,16 @@ import (
 //go:embed queries.sql
 var queriesFS embed.FS
 
+// UserNotificationManager is the userID-scoped store for the user_notifications table (a user
+// only sees their own rows). Methods log the cause and return a generic i18n envelope error;
+// read and mark-as-read treat a missing row as success.
 type UserNotificationManager struct {
 	lo   *logf.Logger
 	i18n *i18n.I18n
 	q    queries
 }
 
+// UserNotificationOpts holds the dependencies for NewUserNotificationManager.
 type UserNotificationOpts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger

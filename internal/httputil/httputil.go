@@ -1,3 +1,7 @@
+// Package httputil holds small, dependency-free helpers for validating
+// network input from untrusted sources: URLs, request origins, and client
+// IP / CIDR allow- and block-lists. The validators are used to guard
+// user-supplied inbox and widget config before it is persisted or trusted.
 package httputil
 
 import (
@@ -6,6 +10,9 @@ import (
 	"strings"
 )
 
+// IsValidHTTPURL reports whether raw is an absolute http or https URL. Relative
+// references and other schemes (javascript:, data:, ftp:, ...) are rejected, so
+// it is safe as a guard for user-supplied links and image URLs.
 func IsValidHTTPURL(raw string) bool {
 	u, err := url.ParseRequestURI(raw)
 	if err != nil {

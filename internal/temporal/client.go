@@ -28,10 +28,9 @@ func IsAlreadyStarted(err error) bool {
 	return errors.As(err, &alreadyStarted)
 }
 
-// Client wraps go.temporal.io/sdk/client.Client with project-level
-// conventions. Workflow-starting code in handlers and managers reaches
-// for [Client.StartWorkflow] instead of the underlying SDK to ensure
-// every start carries deterministic ID + search attributes.
+// Client wraps go.temporal.io/sdk/client.Client. Start workflows via
+// [Client.StartWorkflow] rather than the SDK so every start carries a
+// deterministic ID + search attributes.
 type Client struct {
 	sdk client.Client
 	lo  *logf.Logger
@@ -46,14 +45,10 @@ type Opts struct {
 
 // New dials the Temporal frontend and returns a wrapped client.
 //
-// Returns nil + nil when [Config.Enabled] is false. Callers MUST
-// check the returned *Client for nil before use — that is the
-// graceful-degradation contract (see CONVENTIONS.md).
-//
-// Dial failures are NOT fatal: a Temporal outage shouldn't take down
-// the inbox. Callers see a non-nil error and decide whether to retry
-// (e.g., the worker binary) or to keep app.temporal nil and fall
-// back to sync (e.g., the main API binary).
+// Returns (nil, nil) when [Config.Enabled] is false; callers MUST nil-check
+// the result (the graceful-degradation contract, see CONVENTIONS.md). Dial
+// failures return a non-nil error but are not fatal — callers decide whether
+// to retry (worker binary) or fall back to sync (main API binary).
 func New(opt Opts) (*Client, error) {
 	if !opt.Config.Enabled {
 		return nil, nil
@@ -83,13 +78,8 @@ func New(opt Opts) (*Client, error) {
 
 	c := &Client{sdk: sdkClient, lo: opt.Lo, cfg: opt.Config}
 
-	// Register the project's custom search attributes with the
-	// namespace. Idempotent server-side: re-registering an existing
-	// attribute returns AlreadyExists which we swallow. A short
-	// dedicated timeout keeps a slow Temporal server from blocking
-	// boot indefinitely; failure is logged but non-fatal — the client
-	// stays usable, only filter-by-attribute in the UI breaks until
-	// the next boot.
+	// Register custom search attributes. Short dedicated timeout so a slow
+	// Temporal server can't block boot; failure is logged, non-fatal.
 	saCtx, saCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer saCancel()
 	c.registerSearchAttributes(saCtx)
@@ -97,22 +87,14 @@ func New(opt Opts) (*Client, error) {
 	return c, nil
 }
 
-// registerSearchAttributes ensures the project's custom search
-// attributes (defined in search_attributes.go) exist on the namespace.
-// All registered as KEYWORD so the OperatorService accepts the same
-// shape regardless of caller-side type (numeric inbox_id / entity_id
-// are stamped as their string form at workflow-start time).
+// registerSearchAttributes ensures the custom search attributes exist on the
+// namespace, all as KEYWORD. Idempotent per attribute; non-AlreadyExists
+// errors are logged at warn and boot continues.
 //
-// One RPC per attribute, not a single batched RPC. Rationale: the
-// batched form fails atomically with AlreadyExists when ANY single
-// attribute is already registered, leaving the remaining (missing)
-// attributes unregistered. Per-attribute calls let each one succeed
-// or skip independently so a partially-registered namespace gets
-// reconciled on every boot. Five RPCs at boot is cheap.
-//
-// Idempotent per attribute. Other errors are logged at warn level and
-// the boot continues — the client stays usable, only filter-by-that-
-// attribute in the UI is degraded until the next boot.
+// One RPC per attribute, not a batch: the batched form fails atomically with
+// AlreadyExists if ANY attribute already exists, leaving the rest
+// unregistered. Per-attribute calls reconcile a partial namespace on every
+// boot.
 func (c *Client) registerSearchAttributes(ctx context.Context) {
 	attrs := []string{SATraceID, SAWorkflowKind, SAEntityType, SAEntityID, SAInboxID, SAAgentID}
 	var registered, existing []string
@@ -144,18 +126,14 @@ func (c *Client) registerSearchAttributes(ctx context.Context) {
 		"already_existed", existing)
 }
 
-// SDK exposes the underlying Temporal client. Use sparingly — most
-// call sites should go through StartWorkflow / SignalWorkflow on this
-// wrapper so search-attribute attachment and logging stay consistent.
-// SDK access is needed for things like ListWorkflowExecutions where
-// no wrapper convenience exists yet.
+// SDK exposes the underlying Temporal client. Use sparingly — prefer the
+// wrapper's StartWorkflow / SignalWorkflow; reach for SDK only where no
+// wrapper exists yet (e.g. ListWorkflowExecutions).
 func (c *Client) SDK() client.Client {
 	return c.sdk
 }
 
 // Config returns a copy of the config the client was built with.
-// Useful for the worker binary, which reads worker-tuning values from
-// the same struct.
 func (c *Client) Config() Config {
 	return c.cfg
 }
@@ -169,10 +147,8 @@ func (c *Client) Close() {
 	c.sdk.Close()
 }
 
-// StartOptions carries the per-start arguments. Mirrors the subset of
-// client.StartWorkflowOptions we use consistently across the codebase
-// — keeping this struct intentionally small forces every caller to
-// think about the load-bearing fields.
+// StartOptions is the deliberately small subset of
+// client.StartWorkflowOptions this codebase uses.
 type StartOptions struct {
 	// ID is the workflow ID — MUST be deterministic from inputs.
 	// See CONVENTIONS.md for the format.
@@ -186,20 +162,15 @@ type StartOptions struct {
 	SearchAttributes map[string]any
 
 	// ReusePolicy controls server behaviour when no workflow with this ID is
-	// currently running, but a completed workflow with this ID already exists.
-	// Zero value = SDK default (AllowDuplicate). Common values from
-	// go.temporal.io/api/enums/v1:
-	//   - WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-	//   - WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
-	//   - WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE
-	//   - WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING
+	// running but a completed one with this ID exists. Zero value = SDK default
+	// (AllowDuplicate); other values are the WORKFLOW_ID_REUSE_POLICY_* enums
+	// in go.temporal.io/api/enums/v1.
 	ReusePolicy enumspb.WorkflowIdReusePolicy
 
-	// ErrorWhenAlreadyStarted makes ExecuteWorkflow return an error when the
-	// workflow ID is already running, or when ReusePolicy disallows reusing a
-	// completed workflow ID. When false, the SDK may return the current/last
-	// WorkflowRun handle instead. Keep false unless the caller needs to surface
-	// "already in progress" to the user.
+	// ErrorWhenAlreadyStarted makes ExecuteWorkflow return an error when the ID
+	// is already running (or ReusePolicy disallows reuse) instead of returning
+	// the current/last WorkflowRun handle. Keep false unless the caller must
+	// surface "already in progress" to the user.
 	ErrorWhenAlreadyStarted bool
 
 	// WorkflowExecutionTimeout is a coarse safety net for the entire
@@ -207,13 +178,10 @@ type StartOptions struct {
 	WorkflowExecutionTimeout time.Duration
 }
 
-// StartWorkflow asynchronously starts a workflow. Returns the
-// client.WorkflowRun handle (fire-and-forget is the standard usage;
-// callers rarely .Get(ctx, &result) the result, because that blocks).
-//
-// Returns an error if the wrapper is nil (caller should branch on
-// app.temporal == nil before reaching here — but we guard anyway so
-// a missed check fails loudly instead of nil-derefing).
+// StartWorkflow asynchronously starts a workflow and returns its
+// client.WorkflowRun handle; usage is normally fire-and-forget (calling
+// .Get on the handle blocks for the result). Errors if the wrapper is nil,
+// so a missed app.temporal == nil check fails loudly instead of nil-derefing.
 func (c *Client) StartWorkflow(
 	ctx context.Context,
 	opts StartOptions,

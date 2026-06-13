@@ -1,3 +1,4 @@
+// Package erp maps ERP-provided JSON into merio customer and contract records.
 package erp
 
 import (
@@ -24,9 +25,8 @@ var zone1CustomerKeys = map[string]bool{
 	"billingAddress": true, "billing_address": true,
 }
 
-// FromExecutorData normalizes customer-shaped ERP executor output. Zone 1
-// fields are extracted into typed columns and every non-Zone-1 key is kept as
-// ordered, original-casing Zone 2 data in ExtraData.
+// FromExecutorData normalizes customer-shaped ERP executor output: typed fields into columns,
+// and every other key kept (ordered, original-casing) as custom pass-through data in ExtraData.
 func FromExecutorData(raw json.RawMessage, fallbackCustomerID string) (custmodels.Customer, bool, error) {
 	raw, data, err := customerdata.UnwrapObject(raw, "customer")
 	if err != nil {

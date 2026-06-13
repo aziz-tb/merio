@@ -16,12 +16,10 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// Per-tool wall-clock timeouts. Internal capabilities run in-process
-// and finish in milliseconds; the 15s guard catches buggy capabilities
-// that loop. Custom tools dispatch through the F6 sandbox; the
-// dispatcher already honors ai_tools.timeout_ms (defaulting to 30s),
-// but we wrap the whole dispatch (including sandbox round-trip) in a
-// safety ceiling.
+// Per-tool wall-clock timeouts. Internal capabilities run in-process; the
+// 15s guard catches ones that loop. Custom tools dispatch through the
+// sandbox, which already honors ai_tools.timeout_ms (~30s default); the
+// wrapped ceiling is belt-and-braces over the sandbox round-trip.
 const (
 	internalToolTimeout       = 15 * time.Second
 	customToolTimeoutFallback = 30 * time.Second
@@ -105,14 +103,10 @@ func (r *Runner) dispatchAllTools(
 	return logs
 }
 
-// dispatchOneTool runs one tool_use block through the dispatcher.
-// Wraps the whole call in a deferred panic recover so a buggy
-// capability or Python tool can't crash the runner goroutine.
-//
-// Resolution: the LLM emits tool_use with a `Name` field. We look up
-// the matching ResolvedTool by name to figure out which kind to dispatch
-// as. If the LLM hallucinates a tool name we didn't register, return
-// an unavailable result rather than crashing.
+// dispatchOneTool runs one tool_use block through the dispatcher, wrapped
+// in a deferred recover so a buggy capability can't crash the goroutine.
+// The tool is resolved by name; a hallucinated (unregistered) name yields
+// an unavailable result rather than a crash.
 func (r *Runner) dispatchOneTool(
 	ctx context.Context,
 	tu llm.ContentBlock,
@@ -168,13 +162,12 @@ func (r *Runner) dispatchOneTool(
 		}, pub)
 	}()
 
-	// Match the LLM's tool name to one of the resolved tools. The
-	// translator emits internal capability id and ai_tools.slug as the
-	// Anthropic tool name, both unique within a run.
+	// Match the LLM's tool name to a resolved tool (translator uses the
+	// capability id / ai_tools.slug as the name, unique within a run).
 	found, ok := resolvedByName[tu.ToolName]
 	if !ok {
-		// LLM hallucinated a tool name. Surface as unavailable so the
-		// model can adjust on the next turn.
+		// Hallucinated tool name — surface as unavailable so the model
+		// can adjust next turn.
 		logEntry.ToolKind = "unknown"
 		logEntry.Status = "unavailable"
 		logEntry.Error = fmt.Sprintf("tool %q not registered for this agent", tu.ToolName)
@@ -191,9 +184,8 @@ func (r *Runner) dispatchOneTool(
 		Input:     tu.ToolInput,
 	}, pub)
 
-	// Per-tool timeout. Internal: 15s. Custom: ai_tools.timeout_ms +
-	// a small buffer (the dispatcher itself already enforces the tool's
-	// declared timeout via the F6 runner; this is a belt-and-braces cap).
+	// Custom tools get ai_tools.timeout_ms plus a buffer over the
+	// dispatcher's own enforcement; internal tools use the flat 15s.
 	timeout := internalToolTimeout
 	if found.Kind == agentmodels.ToolRefKindCustom && found.Custom != nil {
 		ms := found.Custom.TimeoutMS
@@ -205,8 +197,8 @@ func (r *Runner) dispatchOneTool(
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Build the dispatch request. Slug semantics differ by kind:
-	// internal → capability id; custom → ai_tools.slug.
+	// Slug semantics differ by kind: internal → capability id, custom →
+	// ai_tools.slug.
 	dispatchReq := aitools.DispatchRequest{
 		Kind:              found.Kind,
 		Slug:              found.ID(),
@@ -309,10 +301,8 @@ func unavailableToolLog(tu llm.ContentBlock, err error) ToolCallLog {
 	}
 }
 
-// classifyDispatcherError maps a dispatcher sentinel error to one of the
-// 4 ToolCallLog.Status values. Same scheme the manual-invoke handler
-// uses for HTTP codes; consistency keeps the audit shape coherent
-// across surfaces.
+// classifyDispatcherError maps a dispatcher sentinel error to a
+// ToolCallLog.Status value, matching the manual-invoke handler's scheme.
 func classifyDispatcherError(err error) string {
 	switch {
 	case errors.Is(err, aitools.ErrToolNotFound):

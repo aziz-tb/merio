@@ -12,13 +12,8 @@ func init() {
 }
 
 // getConversationHistoryCapability lists the customer's recent past
-// conversations so an agent can ground its reply in earlier context.
-//
-// v1 resolves the contact from the current conversation (or a supplied
-// conversation_id) and uses
-// conversation.Manager.GetContactPreviousConversations. Lookup by
-// customer_email is deferred — the inbound pipeline always has a
-// conversation in scope, and one entry-point keeps the capability simple.
+// conversations. Resolves the contact from a supplied conversation_id or
+// the conversation in scope; lookup by customer_email is not supported.
 type getConversationHistoryCapability struct{}
 
 func (g *getConversationHistoryCapability) ID() string { return "get_conversation_history" }

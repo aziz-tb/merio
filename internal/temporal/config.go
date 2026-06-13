@@ -23,8 +23,7 @@ type Config struct {
 	// "127.0.0.1:7233".
 	Address string `koanf:"address"`
 
-	// Namespace defaults to "merio". Multi-namespace setup (per
-	// tenant, per workflow class) is deferred until needed.
+	// Namespace defaults to "merio".
 	Namespace string `koanf:"namespace"`
 
 	// DialTimeout caps how long client.Dial may block at startup.
@@ -40,9 +39,8 @@ type Config struct {
 	Workers map[string]WorkerConfig `koanf:"workers"`
 }
 
-// WorkerConfig tunes one queue's worker pool. Sensible per-queue
-// defaults exist in [WorkerConfig.Resolved] — callers don't have to
-// configure every queue.
+// WorkerConfig tunes one queue's worker pool. Defaults are filled by
+// [WorkerConfig.Resolved], so not every queue must be configured.
 type WorkerConfig struct {
 	// MaxConcurrentActivities caps the number of activity invocations
 	// running on this worker at once. Tune empirically per queue;
@@ -55,9 +53,8 @@ type WorkerConfig struct {
 	MaxConcurrentWorkflows int `koanf:"max_concurrent_workflows"`
 }
 
-// Resolved fills zero-valued fields with sensible defaults. Returns a
-// new WorkerConfig — never mutates the receiver, so a config value
-// from koanf round-trips cleanly.
+// Resolved returns a copy with zero-valued fields filled with defaults;
+// it never mutates the receiver.
 func (w WorkerConfig) Resolved() WorkerConfig {
 	if w.MaxConcurrentActivities == 0 {
 		w.MaxConcurrentActivities = 30

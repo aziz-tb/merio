@@ -160,10 +160,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/knowledge/articles/{id}/move", perm(handleMoveKnowledgeArticle, "knowledge:write"))
 	g.DELETE("/api/v1/knowledge/articles/{id}", perm(handleDeleteKnowledgeArticle, "knowledge:delete"))
 
-	// Script-side recursive tool dispatch. Only callable with a valid
-	// script-execution token; the handler rejects session/API-key callers.
-	// Inert in v1 (app.toolRegistry is nil → 404). Becomes live when the
-	// AI Manager registers a tool registry.
+	// Script-side recursive tool dispatch: only callable with a script-execution token
+	// (session/API-key callers rejected). Inert in v1 (app.toolRegistry nil → 404).
 	g.POST("/api/v1/tools/{name}/call", perm(handleToolCall, "tools:call"))
 
 	// Agents.
@@ -300,11 +298,9 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Manual tool invocation — admin testing pre-agent-runtime.
 	g.POST("/api/v1/ai/tools/{slug}/invoke", perm(handleInvokeAITool, "ai_tools:invoke"))
 
-	// Unified functions (Unified Executor Framework batch). The HTTP surface
-	// is deliberately narrow — list/get/update + preview. Create and Delete
-	// have no HTTP route in this batch (the ai_tools admin handlers call the
-	// Go Manager methods directly; customer-identification rows are seeded by
-	// migration and protected from deletion).
+	// Unified functions: a deliberately narrow HTTP surface (list/get/update + preview). Create
+	// and Delete have no HTTP route here — ai_tools admin handlers call the Go Manager directly,
+	// and customer-identification rows are migration-seeded and delete-protected.
 	g.GET("/api/v1/functions", perm(handleListFunctions, "functions:manage"))
 	g.GET("/api/v1/functions/{name}", perm(handleGetFunction, "functions:manage"))
 	g.PUT("/api/v1/functions/{name}", perm(handleUpdateFunction, "functions:manage"))
@@ -423,7 +419,6 @@ func serveIndexPage(r *fastglue.Request) error {
 	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
 	r.RequestCtx.Response.Header.Add("Expires", "-1")
 
-	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(frontendDir, "index.html"))
 	if err != nil {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
@@ -431,7 +426,6 @@ func serveIndexPage(r *fastglue.Request) error {
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
 	r.RequestCtx.SetBody(file.ReadBytes())
 
-	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
 		app.lo.Error("error setting csrf cookie", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
@@ -454,7 +448,6 @@ func serveWidgetIndexPage(r *fastglue.Request) error {
 		r.RequestCtx.Response.Header.Set("Content-Security-Policy", csp)
 	}
 
-	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(widgetDir, "index.html"))
 	if err != nil {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
@@ -490,17 +483,14 @@ func serveStaticFiles(r *fastglue.Request) error {
 func serveFrontendStaticFiles(r *fastglue.Request) error {
 	app := r.Context.(*App)
 
-	// Get the requested file path.
 	filePath := string(r.RequestCtx.Path())
 
-	// Fetch and serve the file from the embedded filesystem.
 	finalPath := filepath.Join(frontendDir, filePath)
 	file, err := app.fs.Get(finalPath)
 	if err != nil {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 
-	// Set the appropriate Content-Type based on the file extension.
 	ext := filepath.Ext(filePath)
 	contentType := mime.TypeByExtension(ext)
 	if contentType == "" {

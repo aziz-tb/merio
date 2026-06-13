@@ -1,3 +1,4 @@
+// Package openaitranslate converts llm requests and responses to and from the OpenAI SDK types.
 package openaitranslate
 
 import (

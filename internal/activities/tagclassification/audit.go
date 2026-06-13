@@ -9,11 +9,9 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
-// classificationRow is the activity-internal shape passed to
-// insertClassification. It is flattened into an ai_operations row of type
-// tag_classification plus a TagClassificationPayload. Token counts and
-// latency are NOT carried here — they land in ai_usage via recordAIUsage,
-// joined to this operation by trace_id.
+// classificationRow flattens into an ai_operations row plus a
+// TagClassificationPayload. Token counts and latency are NOT carried here;
+// they land in ai_usage via recordAIUsage, joined by trace_id.
 type classificationRow struct {
 	ConversationID    int
 	TraceID           string
@@ -29,10 +27,9 @@ type classificationRow struct {
 	ErrorMessage      string
 }
 
-// insertClassification writes one ai_operations row of type
-// tag_classification and returns its id. The id is stored on
-// conversation_tags.ai_operation_id for AI-applied tags and broadcast to
-// the UI in the realtime tags-update event.
+// insertClassification writes one tag_classification ai_operations row and
+// returns its id, which is stored on conversation_tags.ai_operation_id for
+// AI-applied tags and broadcast in the realtime tags-update event.
 func (a *Activities) insertClassification(ctx context.Context, row classificationRow) (int64, error) {
 	payload := payloads.TagClassificationPayload{
 		CandidateTagIDs: row.CandidateTagIDs,

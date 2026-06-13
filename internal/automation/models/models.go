@@ -1,3 +1,5 @@
+// Package models defines automation rule types and the action, event, and rule-type
+// constants, plus the action-to-permission map.
 package models
 
 import (
@@ -9,6 +11,7 @@ import (
 	"github.com/lib/pq"
 )
 
+// Automation action types, rule trigger types, rule event names, and execution modes.
 const (
 	ActionAssignTeam      = "assign_team"
 	ActionAssignUser      = "assign_user"
@@ -37,7 +40,7 @@ const (
 	ExecutionModeFirstMatch = "first_match"
 )
 
-// ActionPermissions maps actions to permissions
+// ActionPermissions maps each action to the permission an actor must hold to run it.
 var ActionPermissions = map[string]string{
 	ActionAssignTeam:      authzModels.PermConversationsUpdateTeamAssignee,
 	ActionAssignUser:      authzModels.PermConversationsUpdateUserAssignee,
@@ -65,6 +68,8 @@ type RuleRecord struct {
 	Rules         json.RawMessage `db:"rules" json:"rules"`
 }
 
+// Rule is the parsed form of a RuleRecord: its trigger type, events, detection criteria,
+// and actions.
 type Rule struct {
 	RuleID        int                 `json:"-"`
 	Type          string              `json:"type"`
@@ -74,6 +79,8 @@ type Rule struct {
 	Actions       []RuleAction        `json:"actions"`
 }
 
+// RuleAction is a single action applied when a rule matches; DisplayValue is UI-only
+// (not persisted).
 type RuleAction struct {
 	Type         string   `json:"type" db:"type"`
 	Value        []string `json:"value" db:"value"`

@@ -1,11 +1,6 @@
-// Package resolver turns an agent's `tools` JSONB array into a fully
-// dereferenced []ResolvedTool that the agent runtime + dispatcher +
-// translator all consume. v1's job is small but central: shape unification.
-//
-// The resolver doesn't dispatch — that's the dispatcher's job.
-// It doesn't translate to provider format — that's the translator's job
-// It just resolves slugs/ids into a single typed list and
-// reports anything that won't fit.
+// Package resolver dereferences an agent's `tools` JSONB array into a typed
+// []ResolvedTool. It resolves slugs/ids only — it does not dispatch (dispatcher)
+// or translate to provider format (translator).
 package resolver
 
 import (
@@ -38,8 +33,8 @@ type ResolvedTool struct {
 }
 
 // ID returns the tool's stable identifier — internal capability id for
-// internal tools, ai_tools.slug for custom tools. Used for log fields,
-// metric labels, and tool-name compliance with Anthropic's naming regex.
+// internal tools, ai_tools.slug for custom tools. Used as the provider-facing
+// tool name, so it must satisfy Anthropic's naming regex.
 func (r ResolvedTool) ID() string {
 	switch r.Kind {
 	case agentmodels.ToolRefKindInternal:
@@ -87,9 +82,8 @@ func (r ResolvedTool) Category() string {
 	return "write"
 }
 
-// Resolver dereferences agent.tools refs to ResolvedTool. Holds the
-// tool manager + capability registry; same instance is shared across
-// agent runs.
+// Resolver dereferences agent.tools refs to ResolvedTool. Safe to share
+// across agent runs.
 type Resolver struct {
 	tools    *aitools.Manager
 	registry *builtin.Registry
@@ -116,16 +110,13 @@ func hasResolvedTool(out []ResolvedTool, id string) bool {
 	return false
 }
 
-// Resolve turns agent.Tools (raw JSONB) into a list of ResolvedTool.
-// Tool-level verification gating was dropped (agents gate their tools), so
-// the only drops here are unregistered/missing internal capabilities,
-// empty kb_scope for kb_search, and missing/disabled custom tools —
-// operators don't want disabled tools firing.
+// Resolve turns agent.Tools (raw JSONB) into a list of ResolvedTool. Refs are
+// dropped (not errored) when an internal capability is unregistered/missing, a
+// custom tool is missing/disabled, or kb_scope is empty for kb_search.
 //
-// Returns the resolved list plus a "drops" map keyed by the source
-// element's index for diagnostics. Errors only on malformed agent.Tools
-// shape (which the agent handler validates at save time, so this should
-// be unreachable from the runtime path).
+// Returns the resolved list plus a drops map keyed by source-element index for
+// diagnostics. Errors only on malformed agent.Tools shape, which the agent
+// handler validates at save time.
 func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([]ResolvedTool, map[int]string, error) {
 	var refs []agentmodels.ToolRef
 	if len(rawTools) > 0 && string(rawTools) != "null" && string(rawTools) != "[]" {
@@ -171,11 +162,9 @@ func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([
 				drops[i] = "internal capability not registered: " + cid
 				continue
 			}
-			// This is the first scope/runtime-conditional resolver drop.
-			// The builtin registry currently exposes only static metadata
-			// (id, name, schemas). When a second case lands, add an
-			// availability hook on the capability interface instead of
-			// growing more hardcoded tool-id checks here.
+			// Only runtime-conditional drop today. If a second one lands,
+			// add an availability hook to the capability interface rather
+			// than more hardcoded tool-id checks here.
 			if cid == "kb_search" && isKBScopeEmpty(kbScope) {
 				drops[i] = "kb_scope is empty"
 				continue
@@ -201,8 +190,7 @@ func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([
 				drops[i] = fmt.Sprintf("ai_tools.id=%d disabled", id)
 				continue
 			}
-			// Custom tools are no longer gated per tool; agent-level
-			// verification covers the data-access decision upstream.
+			// No per-tool gating; agent-level verification covers data access.
 			out = append(out, ResolvedTool{
 				Kind:           agentmodels.ToolRefKindCustom,
 				Custom:         t,
@@ -223,9 +211,7 @@ func (r *Resolver) Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([
 		}
 	}
 
-	// Stable order — sort by ID so the LLM sees tools in a deterministic
-	// position across calls. Agent prompts that say "use tool X" benefit
-	// from positional consistency.
+	// Sort by ID so the LLM sees tools in a deterministic position across calls.
 	sort.SliceStable(out, func(a, b int) bool { return out[a].ID() < out[b].ID() })
 
 	if len(drops) == 0 {

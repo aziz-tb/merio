@@ -1,3 +1,5 @@
+// Package models defines the inbox type and its channel configuration (email SMTP/IMAP,
+// OAuth, livechat).
 package models
 
 import (

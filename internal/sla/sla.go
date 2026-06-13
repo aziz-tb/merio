@@ -33,11 +33,14 @@ import (
 
 var (
 	//go:embed queries.sql
-	efs                           embed.FS
+	efs embed.FS
+	// ErrUnmetSLAEventAlreadyExists is returned when an unmet SLA event already exists for the same applied SLA and metric.
 	ErrUnmetSLAEventAlreadyExists = errors.New("unmet SLA event already exists, cannot create a new one for the same applied SLA and metric")
-	ErrLatestSLAEventNotFound     = errors.New("latest SLA event not found for the applied SLA and metric")
+	// ErrLatestSLAEventNotFound is returned when no latest SLA event exists for the applied SLA and metric.
+	ErrLatestSLAEventNotFound = errors.New("latest SLA event not found for the applied SLA and metric")
 )
 
+// SLA metric names and notification types.
 const (
 	MetricFirstResponse = "first_response"
 	MetricResolution    = "resolution"
@@ -54,6 +57,7 @@ var metricLabels = map[string]string{
 	MetricNextResponse:  "Next response",
 }
 
+// Manager handles SLA policies, applied SLAs, deadline calculation, and breach notifications.
 type Manager struct {
 	q                queries
 	lo               *logf.Logger

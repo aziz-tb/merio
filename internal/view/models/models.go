@@ -1,3 +1,4 @@
+// Package models defines the saved-view type and its visibility constants.
 package models
 
 import (
@@ -12,6 +13,7 @@ const (
 	VisibilityUser = "user"
 )
 
+// View is a saved, filtered conversation view, scoped by Visibility to all, a team, or a user.
 type View struct {
 	ID         int             `db:"id" json:"id"`
 	CreatedAt  time.Time       `db:"created_at" json:"created_at"`

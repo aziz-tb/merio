@@ -21,8 +21,7 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
-// fwdSubjectPrefix matches a leading Fwd:/FW:/FWD: (case-insensitive, with optional trailing whitespace).
-// Used to strip an existing forward prefix before prepending a fresh "Fwd: " so the chain doesn't stack.
+// fwdSubjectPrefix matches a leading Fwd:/FW:/FWD: prefix, stripped before prepending a fresh "Fwd: " so the chain doesn't stack.
 var fwdSubjectPrefix = regexp.MustCompile(`(?i)^\s*(fwd?|fw):\s*`)
 
 type forwardReq struct {
@@ -154,7 +153,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	})
 }
 
-// handleGetMessage fetches a single from DB using the uuid.
+// handleGetMessage fetches a single message by uuid.
 func handleGetMessage(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -339,18 +338,10 @@ func handleSendMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(message)
 }
 
-// handleForwardMessage forwards one or more existing messages to new recipients within the same
-// conversation. v1 is email-only (the inbox channel must be ChannelEmail). Each source message's
-// attachments are CLONED (new media rows + duplicated blob), not reattached, so the originals keep
-// their attachments and each cloned media's ContentID is preserved verbatim — the CID rewrite at
-// send time resolves cid:... refs in the body to the cloned media's URLs.
-//
-// Two modes:
-//   - New (preferred): caller sends `message_uuids[]` + `body` (full HTML built client-side) +
-//     `skip_quote: true`. Server clones attachments from each source, submits Body verbatim.
-//   - Legacy: caller sends `comment` only with the URL-path source UUID. Server builds the quoted
-//     body via buildForwardedBody and appends the original content. Kept for back-compat; remove
-//     once all callers migrate.
+// handleForwardMessage forwards existing messages to new recipients in the same conversation
+// (email only). Source attachments are CLONED (new media rows, duplicated blob) with ContentID
+// preserved so the send-time CID rewrite resolves cid:... refs. Two modes: message_uuids[] + body
+// (client HTML, skip_quote, verbatim), or legacy comment-only built via buildForwardedBody.
 func handleForwardMessage(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -454,10 +445,9 @@ func handleForwardMessage(r *fastglue.Request) error {
 		body = buildForwardedBody(req.Comment, primaryFrom, primaryTo, primarySubject, primary.CreatedAt.Format("Mon, 2 Jan 2006 15:04:05 -0700"), primary.Content)
 	}
 
-	// Clone every source's attachments into a single attachment list for the new forward message.
-	// Attachments expose UUID (not the numeric media.id), so look up each via Get(0, uuid) first.
-	// Pass modelID=0 — InsertMessage downstream calls mediaStore.Attach for each media in the
-	// message, pointing the cloned rows at the new message's ID.
+	// Clone every source's attachments for the new message. Attachments expose UUID (not media.id),
+	// so look each up via Get(0, uuid). modelID=0: InsertMessage downstream Attaches the cloned rows
+	// to the new message's ID.
 	clonedMedia := make([]mmodels.Media, 0)
 	for _, src := range sources {
 		for _, att := range src.Attachments {
@@ -500,9 +490,8 @@ func handleForwardMessage(r *fastglue.Request) error {
 	return r.SendEnvelope(newMsg)
 }
 
-// buildForwardedBody produces the HTML body of a forwarded message. The original content is
-// inlined unchanged inside a styled blockquote — keeping cid:... references intact so the
-// existing CID rewrite at send time resolves them against the cloned media.
+// buildForwardedBody produces the forwarded HTML body. Original content is inlined unchanged in a
+// blockquote, keeping cid:... refs intact so the send-time CID rewrite resolves them to the clones.
 func buildForwardedBody(comment string, origFrom, origTo []any, origSubject, origDate, origContent string) string {
 	var sb strings.Builder
 	if strings.TrimSpace(comment) != "" {

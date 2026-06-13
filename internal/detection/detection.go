@@ -22,6 +22,9 @@ type Manager struct {
 	systemInboxID  int
 }
 
+// Opts configures New. LLMProvider and PresetRegistry are required only for
+// the AI-backed modes; when either is nil those modes degrade to an
+// unmatched result instead of failing (see Manager.Evaluate).
 type Opts struct {
 	Lo             *logf.Logger
 	LLMProvider    llm.LLMProvider
@@ -32,6 +35,8 @@ type Opts struct {
 	SystemInboxID int
 }
 
+// New builds a Manager from opts; it never fails, so missing AI dependencies
+// surface only when an AI mode is evaluated.
 func New(opts Opts) *Manager {
 	return &Manager{
 		lo:             opts.Lo,

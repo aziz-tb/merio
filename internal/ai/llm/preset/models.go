@@ -1,18 +1,11 @@
-// Package preset loads and resolves AI presets from config/ai_presets.json.
-// Presets are platform-tuning decisions (which model + temperature +
-// max_tokens + caching config to use for a given Purpose), authored in a
-// JSON file in version control rather than the database. Reload requires
-// app restart in v1.
+// Package preset loads and resolves AI presets (model + tuning knobs per
+// Purpose) from config/ai_presets.json. Reload requires app restart in v1.
 package preset
 
-// Preset is one entry in config/ai_presets.json's "presets" array. Field
-// tags mirror the JSON key names exactly so the file is the human-edit
-// surface.
+// Preset is one entry in config/ai_presets.json's "presets" array.
 //
-// Pointer fields (TopP, TopK) are deliberate: a NULL in the file means
-// "use the provider default," distinct from "set this knob to 0." Empty
-// StopSequences means "no stop sequences" — same behavior either way, so
-// a slice (nil-vs-empty) is fine.
+// TopP and TopK are pointers so a NULL in the file means "use the provider
+// default," distinct from "set this knob to 0."
 type Preset struct {
 	Slug               string   `json:"slug"`
 	Name               string   `json:"name"`

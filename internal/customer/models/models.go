@@ -8,15 +8,9 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
-// Customer is the DB-wire representation of a customers row — a cache of an
-// ERP-resolved customer record. Stable fields from the executor return
-// shape are typed columns; everything else lives in ExtraData. The struct
-// mirrors the CREATE TABLE customers block exactly.
-//
-// Business toggles the firstname/lastname-vs-company branching enforced by
-// the constraint_customers_on_business_consistency CHECK: a company row
-// (business = true) has Company set; an individual row (business = false)
-// has Lastname set.
+// Customer is a customers row: a cache of an ERP-resolved customer. Stable fields are typed
+// columns; everything else lives in ExtraData. Business selects the firstname/lastname-vs-company
+// branching enforced by the customers business-consistency CHECK.
 type Customer struct {
 	ID              int64           `db:"id" json:"-"`
 	CreatedAt       time.Time       `db:"created_at" json:"created_at"`

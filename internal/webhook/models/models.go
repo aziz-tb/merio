@@ -1,3 +1,4 @@
+// Package models defines the webhook type and the event names that can trigger webhooks.
 package models
 
 import (
@@ -21,18 +22,16 @@ type Webhook struct {
 // WebhookEvent represents an event that can trigger a webhook
 type WebhookEvent string
 
+// Webhook event names; a webhook fires for the events listed in Webhook.Events.
 const (
-	// Conversation events
 	EventConversationCreated       WebhookEvent = "conversation.created"
 	EventConversationStatusChanged WebhookEvent = "conversation.status_changed"
 	EventConversationTagsChanged   WebhookEvent = "conversation.tags_changed"
 	EventConversationAssigned      WebhookEvent = "conversation.assigned"
 	EventConversationUnassigned    WebhookEvent = "conversation.unassigned"
 
-	// Message events
 	EventMessageCreated WebhookEvent = "message.created"
 	EventMessageUpdated WebhookEvent = "message.updated"
 
-	// Test event
 	EventWebhookTest WebhookEvent = "webhook.test"
 )

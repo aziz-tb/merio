@@ -1,4 +1,4 @@
-// Package user managers all users in merio - agents and contacts.
+// Package user manages all users in merio — agents and contacts.
 package user
 
 import (
@@ -40,6 +40,7 @@ var (
 	// GenerateFromPassword is too long (i.e. > 72 bytes).
 	ErrPasswordTooLong = errors.New("password length exceeds 72 bytes")
 
+	// PasswordHint describes the password strength requirements; it is embedded in validation error messages.
 	PasswordHint = fmt.Sprintf("Password must be %d-%d characters long should contain at least one uppercase letter, one lowercase letter, one number, and one special character.", minPassword, maxPassword)
 )
 

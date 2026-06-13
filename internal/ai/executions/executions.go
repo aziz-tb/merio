@@ -1,10 +1,7 @@
-// Package executions is the persistence layer for the Composer tab —
-// agent_executions (immutable per-run records) and
-// agent_execution_outcomes (at-most-one commitment per run).
-//
-// The runner stays stateless; this package is the boundary where its
-// output materializes in Postgres. Future pipeline-driven runs use the
-// same Insert path with source="pipeline" + run_by_user_id=NULL.
+// Package executions persists Composer runs: agent_executions (immutable
+// per-run records) and agent_execution_outcomes (at-most-one commitment
+// per run). Pipeline-driven runs reuse Insert with source="pipeline" and
+// run_by_user_id=NULL.
 package executions
 
 import (
@@ -29,15 +26,13 @@ import (
 //go:embed queries.sql
 var efs embed.FS
 
-// Sentinel errors. Mapped to HTTP codes by the handler.
+// Sentinel errors, mapped to HTTP codes by the handler.
 var (
-	// ErrOutcomeExists fires when a second InsertOutcome attempt hits
-	// the UNIQUE(agent_execution_id) constraint. Idempotency response:
-	// 409 with the existing outcome in the body.
+	// ErrOutcomeExists is the UNIQUE(agent_execution_id) violation on a
+	// second InsertOutcome; handler returns 409 with the existing outcome.
 	ErrOutcomeExists = errors.New("executions: outcome already recorded for this run")
 
-	// ErrNotFound fires when GetByID or GetOutcomeByExecutionID find no
-	// row. Translates to 404 at the handler.
+	// ErrNotFound is a missing row (404 at the handler).
 	ErrNotFound = errors.New("executions: row not found")
 )
 
@@ -74,9 +69,9 @@ func New(opt Opts) (*Manager, error) {
 	return &Manager{q: q, lo: opt.Lo, i18n: opt.I18n}, nil
 }
 
-// InsertParams carries everything the handler captures from a Run()
-// response. Trace and Usage are pre-serialized JSON so this package
-// doesn't take a dependency on the runner's structured types.
+// InsertParams is the captured Run() response. Trace and Usage are
+// pre-serialized JSON so this package avoids depending on the runner's
+// structured types.
 type InsertParams struct {
 	ConversationID      int64
 	AgentID             int
@@ -155,15 +150,10 @@ func (m *Manager) LatestExecutionForConversation(conversationID int64) (models.A
 	return out, nil
 }
 
-// LatestForConversation returns the latest composer-source execution
-// per enabled agent for the given conversation_id, with the outcome
-// joined (nil when none) and is_stale computed from the agent's
-// current updated_at vs. the snapshot taken at run time.
-//
-// The supporting SQL query joins the three tables and aliases columns
-// with dotted names; we scan into a flat struct and then re-shape into
-// the nested API response. sqlx's named-mapper handles the dotted
-// aliases when we use Queryx + StructScan into a flat target.
+// LatestForConversation returns the latest composer-source execution per
+// enabled agent for the conversation, with the outcome joined (nil when
+// none) and is_stale computed from the agent's current updated_at vs. the
+// snapshot taken at run time.
 func (m *Manager) LatestForConversation(conversationID int64) ([]models.LatestExecutionRow, error) {
 	rows, err := m.q.LatestForConversation.Queryx(conversationID)
 	if err != nil {
@@ -205,10 +195,9 @@ func (m *Manager) LatestForConversation(conversationID int64) ([]models.LatestEx
 	return out, nil
 }
 
-// latestExecutionFlat is the flat row shape we scan into from the
-// dotted-alias query. sqlx maps "agent_execution.id" → Execution.ID via
-// the dot path. Outcome columns use null.X because the LEFT JOIN
-// produces NULLs when an execution has no outcome row yet.
+// latestExecutionFlat is the flat scan target for the dotted-alias query.
+// Outcome columns are null.X: the LEFT JOIN yields NULLs when an execution
+// has no outcome row yet.
 type latestExecutionFlat struct {
 	Execution models.AgentExecution `db:"agent_execution"`
 	Agent     models.AgentSummary   `db:"agent"`
@@ -270,6 +259,9 @@ func (m *Manager) ListByAgent(p ListByAgentParams) ([]models.AgentExecution, err
 	return out, nil
 }
 
+// PersistCompleteRun records a successful run (with draft) and returns its
+// execution id. No-op (0, nil) when the conversation id or agent snapshot
+// is missing; err is non-nil only on insert failure.
 func (m *Manager) PersistCompleteRun(
 	_ context.Context,
 	params wfairuns.AgentRunWorkflowParams,
@@ -313,6 +305,8 @@ func (m *Manager) PersistCompleteRun(
 	return row.ID, nil
 }
 
+// PersistFailedRun records a failed run (no draft), defaulting status to
+// StatusFailed. Same no-op (0, nil) skip as PersistCompleteRun.
 func (m *Manager) PersistFailedRun(
 	_ context.Context,
 	params wfairuns.AgentRunWorkflowParams,
@@ -372,7 +366,6 @@ type InsertOutcomeParams struct {
 
 // InsertOutcome writes one agent_execution_outcomes row. Returns
 // ErrOutcomeExists when the UNIQUE constraint fires (idempotency).
-// Caller maps to HTTP 409 + returns the existing outcome.
 func (m *Manager) InsertOutcome(p InsertOutcomeParams) (models.AgentExecutionOutcome, error) {
 	var reason interface{}
 	if p.OutcomeReason != nil {

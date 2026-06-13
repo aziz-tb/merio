@@ -1,15 +1,7 @@
-// Package models holds DB-wire types for the agent-executions tables
-// introduced by migration v2_7_6:
-//
-//   - AgentExecution: immutable record of one Runner.Run() invocation
-//     against a conversation. Inserted on success; never updated.
-//   - AgentExecutionOutcome: at-most-one commitment per execution
-//     ("sent", "drafted", "escalated", "discarded"). UNIQUE on
-//     agent_execution_id enforces the at-most-one rule.
-//
-// The two tables together are the persistence layer for the Composer
-// tab — and for future pipeline-driven runs that flip source to
-// 'pipeline' and run_by_user_id to NULL.
+// Package models holds DB-wire types for the agent-executions tables:
+// AgentExecution is an immutable record of one Runner.Run() (inserted on
+// success, never updated); AgentExecutionOutcome is its at-most-one
+// commitment, enforced by a UNIQUE on agent_execution_id.
 package models
 
 import (
@@ -35,16 +27,10 @@ const (
 
 // AgentExecution mirrors the agent_executions row.
 //
-// trace + usage are kept as raw JSON so the runner's structured types
-// (TurnTrace, llm.Usage) don't bleed into this package. The handler
-// marshals what the runner returns; readers unmarshal back into the
-// runner's types where needed.
-//
-// draft is nullable from format_version=2 onward: incomplete runs that
-// never call produce_draft persist draft=NULL as a loud failure mode.
-//
-// BIGINT columns use null.Int64; the INT-typed resolution_attempt_id
-// uses null.Int.
+// Trace/Usage stay raw JSON so the runner's types (TurnTrace, llm.Usage)
+// don't bleed into this package. Draft is nullable from format_version=2
+// onward: a run that never calls produce_draft persists draft=NULL as a
+// loud failure mode.
 type AgentExecution struct {
 	ID                  int64           `db:"id" json:"id"`
 	ConversationID      int64           `db:"conversation_id" json:"conversation_id"`
@@ -67,10 +53,8 @@ type AgentExecution struct {
 
 // AgentExecutionOutcome mirrors the agent_execution_outcomes row.
 //
-// message_id is nullable because not every outcome corresponds to a
-// sent message — "drafted" / "escalated" / "discarded" have no
-// associated conversation_messages row. message_id and
-// committed_by_user_id are both BIGINT in the schema, so null.Int64.
+// MessageID is nullable because only "sent" maps to a conversation
+// message; "drafted"/"escalated"/"discarded" have none.
 type AgentExecutionOutcome struct {
 	ID                int64       `db:"id" json:"id"`
 	AgentExecutionID  int64       `db:"agent_execution_id" json:"agent_execution_id"`
@@ -82,11 +66,9 @@ type AgentExecutionOutcome struct {
 	CreatedAt         time.Time   `db:"created_at" json:"created_at"`
 }
 
-// LatestExecutionRow is the shape returned by LatestForConversation —
-// one execution plus its outcome (if any) plus the joined agent
-// summary plus a computed stale flag. The frontend Composer tab
-// consumes this shape directly; the API handler serializes it
-// unchanged.
+// LatestExecutionRow is the shape returned by LatestForConversation: one
+// execution, its outcome (if any), the joined agent summary, and a
+// computed stale flag.
 type LatestExecutionRow struct {
 	Execution AgentExecution         `json:"agent_execution"`
 	Outcome   *AgentExecutionOutcome `json:"outcome"`
@@ -95,9 +77,8 @@ type LatestExecutionRow struct {
 }
 
 // AgentSummary is the trimmed ai_agents projection embedded in the
-// latest-execution response. The full Agent struct would surface
-// prompt / tools / kb_scope to the tab, which doesn't need them and
-// shouldn't see them.
+// latest-execution response; it deliberately omits prompt/tools/kb_scope,
+// which the Composer tab must not see.
 type AgentSummary struct {
 	ID        int       `db:"id" json:"id"`
 	Name      string    `db:"name" json:"name"`

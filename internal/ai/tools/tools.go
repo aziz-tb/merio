@@ -1,7 +1,6 @@
 // Package aitools provides CRUD access to the ai_tools configuration
-// table. After the F5 schema cleanup ai_tools holds only Python custom
-// tools; internal capabilities (kb_search, etc.) are registered in Go
-// code via internal/ai/tools/builtin/.
+// table, which holds only Python custom tools; internal capabilities
+// (kb_search, etc.) are registered in Go via internal/ai/tools/builtin/.
 package aitools
 
 import (
@@ -239,9 +238,8 @@ func (m *Manager) DeleteTx(ctx context.Context, tx *sqlx.Tx, id int) error {
 	return nil
 }
 
-// defaults fills NULL-equivalent fields with their canonical zero values
-// so the INSERT/UPDATE never sends Postgres NULL for JSONB NOT NULL
-// columns.
+// defaults fills zero-valued fields so INSERT/UPDATE never sends NULL for
+// the JSONB NOT NULL columns.
 func defaults(t *models.Tool) {
 	if len(t.InputParameters) == 0 {
 		t.InputParameters = json.RawMessage(`[]`)
@@ -258,9 +256,7 @@ func defaults(t *models.Tool) {
 }
 
 // buildImplementation reconstructs the {code, language, packages} JSON view
-// from the JOINed functions columns so the admin API response carries the
-// same `implementation` shape it did before code moved to the functions
-// table.
+// from the JOINed functions columns for the admin API response.
 func buildImplementation(t *models.Tool) {
 	b, _ := json.Marshal(models.PythonScriptImpl{
 		Code:     t.FnCode,

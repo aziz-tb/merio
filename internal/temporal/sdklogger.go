@@ -6,16 +6,13 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// sdkLogger bridges the project's logf.Logger to Temporal's
-// sdklog.Logger interface. Temporal SDK logs flow through the same
-// pipeline as everything else (same format, same sink).
+// sdkLogger bridges logf.Logger to Temporal's sdklog.Logger so SDK logs flow
+// through the same pipeline as the rest of the app.
 type sdkLogger struct {
 	lo *logf.Logger
 }
 
-// NewSDKLogger returns a Temporal-SDK-compatible Logger backed by
-// logf. Used at client and worker construction time via
-// client.Options.Logger / worker.Options.Logger.
+// NewSDKLogger returns a Temporal-SDK-compatible Logger backed by logf.
 func NewSDKLogger(lo *logf.Logger) sdklog.Logger {
 	return &sdkLogger{lo: lo}
 }

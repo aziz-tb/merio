@@ -1,10 +1,7 @@
 // Package catalog loads model catalog JSON files into an in-memory Catalog
 // used by the preset registry to validate that every preset's provider/model
-// pair references a known model.
-//
-// The catalog is data, not config in the koanf sense: edits require a
-// version-control PR + restart, and a typo in a model id should crash
-// startup rather than silently fall back.
+// pair references a known model. The catalog is immutable after load; a typo
+// in a model id crashes startup rather than silently falling back.
 package catalog
 
 import (
@@ -18,14 +15,14 @@ import (
 // Not load-bearing in routing — the preset itself names the model.
 type Tier string
 
+// The model cost/quality tiers.
 const (
 	TierHaiku  Tier = "haiku"
 	TierSonnet Tier = "sonnet"
 	TierOpus   Tier = "opus"
 )
 
-// Model is one entry in a model catalog JSON file. Field tags mirror the JSON
-// key names exactly so the files remain the human-edit surface.
+// Model is one entry in a model catalog JSON file.
 type Model struct {
 	ID                      string `json:"id"`
 	Provider                string `json:"provider"`
@@ -34,26 +31,22 @@ type Model struct {
 	MaxOutputTokens         int    `json:"max_output_tokens"`
 	SupportsCaching         bool   `json:"supports_caching"`
 	SupportsExtendedCaching bool   `json:"supports_extended_caching"`
-	// SupportsThinking means the model can emit provider-visible thinking
-	// content blocks that should be preserved and round-tripped. Today this is
-	// Claude-specific and is independent of OpenAI reasoning-token controls.
+	// SupportsThinking means the model emits provider-visible thinking blocks
+	// that must be preserved and round-tripped. Claude-specific today; distinct
+	// from OpenAI reasoning-token controls.
 	SupportsThinking bool `json:"supports_thinking"`
-	// IsReasoningModel means the provider translator must use reasoning-model
-	// request semantics: max_completion_tokens instead of max_tokens and no
-	// temperature knob unless the provider explicitly allows it. OpenAI o-series
-	// and GPT reasoning modes use this; it does not imply visible thinking blocks.
+	// IsReasoningModel means the translator must use reasoning-model request
+	// semantics: max_completion_tokens instead of max_tokens, no temperature
+	// unless the provider allows it (OpenAI o-series, GPT reasoning modes). Does
+	// not imply visible thinking blocks.
 	IsReasoningModel bool    `json:"is_reasoning_model"`
 	Tier             Tier    `json:"tier"`
 	Pricing          Pricing `json:"pricing"`
 }
 
-// Pricing carries the model's per-million-token rates. Currency is USD
-// in v1; the field exists so a future multi-currency rollout has the
-// shape ready. EffectiveFrom is the date the rate took effect — kept
-// for traceability when Anthropic ships price changes. Long-context
-// premium tiers (Anthropic charges more for prompts >200k tokens) are
-// NOT modeled in v1 — the runtime applies the base rate uniformly and
-// a future "pricing tier per call" extension can fold them in.
+// Pricing carries the model's per-million-token rates. Long-context premium
+// tiers (e.g. Anthropic prompts >200k tokens) are NOT modeled; the runtime
+// applies the base rate uniformly.
 type Pricing struct {
 	InputPerMillionTokensUSD       float64 `json:"input_per_million_tokens_usd"`
 	OutputPerMillionTokensUSD      float64 `json:"output_per_million_tokens_usd"`
@@ -62,16 +55,14 @@ type Pricing struct {
 	EffectiveFrom                  string  `json:"effective_from"`
 }
 
-// Catalog is the loaded set of models, keyed by provider:id for O(1) lookup. It's
-// immutable after Load — any edits to the source file require an app
-// restart to take effect (v1 limitation).
+// Catalog is the loaded set of models, keyed by provider:id for O(1) lookup.
+// Immutable after Load; source-file edits need a restart to take effect.
 type Catalog struct {
 	models map[string]Model
 	all    []Model
 }
 
-// catalogFile mirrors the JSON file's top-level shape. The leading
-// underscore key is informational and ignored.
+// catalogFile is the JSON file's top-level shape; the _comment key is ignored.
 type catalogFile struct {
 	Comment string  `json:"_comment,omitempty"`
 	Models  []Model `json:"models"`
@@ -147,9 +138,8 @@ func loadFile(path string, provider string) ([]Model, error) {
 		if provider != "" && m.Provider != provider {
 			return nil, fmt.Errorf("catalog: %s model %q provider=%q does not match file provider %q", path, m.ID, m.Provider, provider)
 		}
-		// Pricing must be present + non-zero for every model. ai_usage
-		// cost columns depend on it; a missing entry would silently log
-		// $0 costs. Fail loudly at boot instead.
+		// Pricing must be non-zero: ai_usage cost columns depend on it, and a
+		// missing entry would silently log $0 costs. Fail loudly at boot.
 		if m.Pricing.InputPerMillionTokensUSD <= 0 ||
 			m.Pricing.OutputPerMillionTokensUSD <= 0 {
 			return nil, fmt.Errorf(
@@ -172,9 +162,7 @@ func (c *Catalog) Get(provider, modelID string) (Model, bool) {
 	return m, ok
 }
 
-// All returns the catalog's models in their original file order. The
-// returned slice is a fresh copy; callers can mutate it without affecting
-// the catalog.
+// All returns the catalog's models in file order as a fresh copy safe to mutate.
 func (c *Catalog) All() []Model {
 	if c == nil {
 		return nil

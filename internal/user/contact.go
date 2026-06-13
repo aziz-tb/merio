@@ -10,6 +10,9 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// CreateContact creates a contact, deduplicating by external ID and then email: it enriches or
+// reuses a matching existing contact when possible, otherwise inserts a new one. It sets user.ID
+// in all cases.
 func (u *Manager) CreateContact(user *models.User) error {
 	password, err := u.generatePassword()
 	if err != nil {
@@ -81,6 +84,8 @@ func (u *Manager) UpdateContactBasicInfo(id int, firstName, lastName, email stri
 	return nil
 }
 
+// UpdateContact updates a contact's profile fields; it returns an input error if the email
+// collides with another contact.
 func (u *Manager) UpdateContact(id int, user models.User) error {
 	if _, err := u.q.UpdateContact.Exec(id, user.FirstName, user.LastName, user.Email, user.AvatarURL, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
@@ -92,6 +97,8 @@ func (u *Manager) UpdateContact(id int, user models.User) error {
 	return nil
 }
 
+// UpdateContactLinkedCustomer sets the contact's linked customer ID, or clears it when
+// customerID is invalid.
 func (u *Manager) UpdateContactLinkedCustomer(id int, customerID null.String) error {
 	var value any
 	if customerID.Valid {
@@ -114,7 +121,7 @@ func (u *Manager) GetContactsLinkedToCustomer(customerID string, excludeContactI
 	return contacts, nil
 }
 
-// GetAllContacts returns a list of all contacts.
+// GetContacts returns a page of contacts and visitors, clamping pagination to safe bounds.
 func (u *Manager) GetContacts(page, pageSize int, order, orderBy string, filtersJSON string) ([]models.UserCompact, error) {
 	if pageSize > maxListPageSize {
 		pageSize = maxListPageSize

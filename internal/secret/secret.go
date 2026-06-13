@@ -26,10 +26,15 @@ var (
 	//go:embed queries.sql
 	efs embed.FS
 
+	// ErrSecretNotFound is returned by Update and Delete when no row matches the name. Get instead
+	// reports a miss via its (_, false, nil) tuple.
 	ErrSecretNotFound = errors.New("secret not found")
-	ErrSecretExists   = errors.New("secret already exists")
-	ErrInvalidName    = errors.New("invalid secret name")
-	ErrValueTooLarge  = errors.New("secret value exceeds 5 KB")
+	// ErrSecretExists is returned by Create when the name already exists.
+	ErrSecretExists = errors.New("secret already exists")
+	// ErrInvalidName is returned by every mutator (and Get) when the name fails ValidName.
+	ErrInvalidName = errors.New("invalid secret name")
+	// ErrValueTooLarge is returned by Create and Update when the plaintext exceeds MaxValueBytes.
+	ErrValueTooLarge = errors.New("secret value exceeds 5 KB")
 
 	nameRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,63}$`)
 )

@@ -1,3 +1,4 @@
+// Package models defines the team type and its compact projections.
 package models
 
 import (
@@ -9,6 +10,8 @@ import (
 	"github.com/volatiletech/null/v9"
 )
 
+// Team is an agent team with its assignment strategy, business hours, SLA policy,
+// and auto-assignment cap.
 type Team struct {
 	ID                           int         `db:"id" json:"id"`
 	CreatedAt                    time.Time   `db:"created_at" json:"created_at"`
@@ -22,20 +25,24 @@ type Team struct {
 	MaxAutoAssignedConversations int         `db:"max_auto_assigned_conversations" json:"max_auto_assigned_conversations"`
 }
 
+// TeamCompact is a minimal team reference (id, name, emoji).
 type TeamCompact struct {
 	ID    int         `db:"id" json:"id"`
 	Name  string      `db:"name" json:"name"`
 	Emoji null.String `db:"emoji" json:"emoji"`
 }
 
+// TeamMember is a team membership: a user, their team, and their availability.
 type TeamMember struct {
 	ID                 int    `db:"id" json:"id"`
 	AvailabilityStatus string `db:"availability_status" json:"availability_status"`
 	TeamID             int    `db:"team_id" json:"team_id"`
 }
 
+// TeamsCompact is a list of teams stored as JSON in a single column (see Scan/Value).
 type TeamsCompact []TeamCompact
 
+// IDs returns the team IDs.
 func (t TeamsCompact) IDs() []int {
 	ids := make([]int, len(t))
 	for i, team := range t {

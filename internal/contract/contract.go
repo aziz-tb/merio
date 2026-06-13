@@ -1,9 +1,6 @@
-// Package contract manages the contracts cache table — ERP-resolved
-// contract records belonging to a customer, persisted by the identification
-// workflow and read back by the sidebar (multi-contract PillSwitcher), the
-// verification engine, and agent-run hydration. Like customers, the table
-// is a cache: last_synced_at drives the TTL and callers refetch from the
-// ERP when a row goes stale.
+// Package contract manages the contracts cache table — ERP-resolved contract records belonging
+// to a customer. Like customers it is a cache: last_synced_at drives the TTL, and callers
+// refetch from the ERP when a row goes stale.
 package contract
 
 import (
@@ -142,12 +139,15 @@ func (m *Manager) GetFresh(ctx context.Context, id int64) (*models.Contract, err
 	return m.refreshIfStale(ctx, c, FreshOptions{})
 }
 
+// FreshOptions carries attribution/trace context forwarded into any ERP function call a
+// stale-cache refresh triggers; it does not affect cache-hit results. The zero value is valid.
 type FreshOptions struct {
 	InvokerUserID  int
 	ConversationID int
 	TraceID        string
 }
 
+// GetFreshWithOptions is GetFresh with attribution: it threads opts into any ERP refresh it triggers.
 func (m *Manager) GetFreshWithOptions(ctx context.Context, id int64, opts FreshOptions) (*models.Contract, error) {
 	c, err := m.Get(id)
 	if err != nil {

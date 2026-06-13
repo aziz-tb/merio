@@ -1,3 +1,5 @@
+// Package sla manages SLA policies, deadline calculation against business hours, and breach
+// notifications.
 package sla
 
 import (
@@ -10,9 +12,12 @@ import (
 )
 
 var (
+	// ErrInvalidSLADuration is returned when the SLA duration is not positive.
 	ErrInvalidSLADuration = fmt.Errorf("invalid SLA duration")
-	ErrMaxIterations      = fmt.Errorf("sla: exceeded maximum iterations - check configuration")
-	ErrInvalidTime        = fmt.Errorf("invalid time")
+	// ErrMaxIterations is returned when deadline calculation exceeds its iteration cap (a likely misconfiguration).
+	ErrMaxIterations = fmt.Errorf("sla: exceeded maximum iterations - check configuration")
+	// ErrInvalidTime is returned when a working-hours time string cannot be parsed.
+	ErrInvalidTime = fmt.Errorf("invalid time")
 )
 
 // CalculateDeadline computes the SLA deadline from a start time and SLA duration in minutes

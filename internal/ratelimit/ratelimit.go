@@ -1,3 +1,5 @@
+// Package ratelimit provides Redis-backed, per-client-IP sliding-window rate limiting for the
+// HTTP API, grouped into named rules (e.g. "auth", "widget").
 package ratelimit
 
 import (
@@ -31,12 +33,16 @@ func New(redisClient *redis.Client) *Limiter {
 	}
 }
 
-// AddRule registers a named rate limiting rule.
+// AddRule registers a rule, replacing any with the same Name. Intended for startup; the rule
+// map is not safe for concurrent mutation with Check.
 func (l *Limiter) AddRule(rule Rule) {
 	l.rules[rule.Name] = rule
 }
 
-// Check checks if the request should be rate limited for the given rule.
+// Check records the request against ruleName's per-IP window and reports rejection. It fails
+// open (allows the request) for an unknown/disabled rule or a Redis error. On rejection it
+// returns a non-nil error and has already written the 429 response to ctx, so the caller must
+// not write further.
 func (l *Limiter) Check(ctx *fasthttp.RequestCtx, ruleName string) error {
 	rule, ok := l.rules[ruleName]
 	if !ok || !rule.Enabled {

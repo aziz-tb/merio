@@ -1,3 +1,5 @@
+// Package azure implements the llm provider for Azure Foundry, routing OpenAI-family
+// deployments through the OpenAI SDK and Claude deployments through direct Anthropic HTTP.
 package azure
 
 import (
@@ -59,6 +61,7 @@ type Provider struct {
 	healthy    atomic.Bool
 }
 
+// Opts holds the dependencies and tuning passed to New.
 type Opts struct {
 	APIKey      string
 	Endpoint    string
@@ -70,6 +73,8 @@ type Opts struct {
 	HTTPClient  *http.Client
 }
 
+// New builds an Azure Foundry Provider. It errors if neither an API key/endpoint nor a
+// resolver is set, or if the catalog, registry, or logger is nil.
 func New(opt Opts) (*Provider, error) {
 	if opt.Resolver == nil && opt.APIKey == "" {
 		return nil, fmt.Errorf("azure: api key is empty")
@@ -122,8 +127,12 @@ func New(opt Opts) (*Provider, error) {
 	return p, nil
 }
 
+// Name returns the provider's name.
 func (p *Provider) Name() string { return "azure" }
 
+// Complete runs one completion, dispatching by model family — Claude via direct Anthropic
+// HTTP, OpenAI-family via the OpenAI SDK — under the concurrency limit and circuit breaker,
+// and returns typed llm errors (ErrPresetNotFound, ErrAuth, ErrCircuitOpen, ...).
 func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
 	if req.PresetSlug == "" {
 		return llm.CompletionResponse{}, fmt.Errorf("azure: PresetSlug is required")
@@ -239,6 +248,7 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 	}
 }
 
+// StreamComplete is not implemented for Azure; it always returns llm.ErrStreamingNotImplemented.
 func (p *Provider) StreamComplete(_ context.Context, _ llm.CompletionRequest, _ func(string)) (llm.CompletionResponse, error) {
 	return llm.CompletionResponse{}, llm.ErrStreamingNotImplemented
 }

@@ -47,6 +47,9 @@ type SignedURLStore interface {
 	GetSignedURL(name string) string
 }
 
+// Manager is the media facade: it keeps the storage backend (Store) and the media DB rows in
+// sync, so callers go through it rather than touching the store directly. Most methods return
+// envelope errors (NotFoundError / GeneralError) suitable for sending straight to HTTP responses.
 type Manager struct {
 	store   Store
 	lo      *logf.Logger

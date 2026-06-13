@@ -15,12 +15,10 @@ func init() {
 	builtin.RegisterInternal(&getCustomerDataCapability{})
 }
 
-// getCustomerDataCapability returns the full customer + contract record
-// linked to a conversation — the same payload the agent desk shows in the
-// sidebar and that GET /conversations/{uuid}/customer returns. The
-// conversation's stored customer_id / contract_id are the verified
-// identity, so the tool resolves everything from the conversation rather
-// than trusting free-form ids from the model.
+// getCustomerDataCapability returns the customer + contract record linked
+// to a conversation (same payload as GET /conversations/{uuid}/customer).
+// Resolves everything from the conversation's stored customer_id /
+// contract_id — the verified identity — never from model-supplied ids.
 type getCustomerDataCapability struct{}
 
 func (g *getCustomerDataCapability) ID() string   { return "get_customer_data" }
@@ -48,10 +46,9 @@ func (g *getCustomerDataCapability) InputSchema() map[string]any {
 }
 
 func (g *getCustomerDataCapability) OutputSchema() map[string]any {
-	// The shape mirrors GET /conversations/{uuid}/customer: a flat customer
-	// object (Zone 1 + ERP-authored Zone 2 fields) with a nested
-	// `contracts` array. Fields are ERP-dependent, so we describe the
-	// envelope rather than enumerate every key.
+	// Mirrors GET /conversations/{uuid}/customer: a flat customer object
+	// (typed columns + custom pass-through fields) with a nested `contracts`
+	// array. Fields are ERP-dependent, so describe the envelope only.
 	return map[string]any{
 		"type":        "object",
 		"description": "Customer record with a nested `contracts` array. Each contract includes an `agent_preview` list of {label, value, tooltip} pairs plus raw ERP fields. Null when no customer is linked to the conversation.",
@@ -65,9 +62,9 @@ func (g *getCustomerDataCapability) Execute(ctx context.Context, params map[stri
 		return nil, fmt.Errorf("get_customer_data: runtime conversation/customer/contract managers are nil")
 	}
 
-	// Resolve strictly by the provided uuid when given (id=0), otherwise
-	// fall back to the conversation currently in scope. get-conversation
-	// matches id OR uuid, so leaving both set could resolve the wrong row.
+	// Resolve by uuid when given (id=0), else by the conversation in
+	// scope. GetConversation matches id OR uuid, so setting both could
+	// resolve the wrong row.
 	convUUID, _ := paramString(params, "conversation_uuid")
 	lookupID := rt.ConversationID
 	if convUUID != "" {

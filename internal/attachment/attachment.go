@@ -1,3 +1,4 @@
+// Package attachment defines the message attachment types and a helper for building MIME headers.
 package attachment
 
 import (
@@ -6,6 +7,7 @@ import (
 	"net/textproto"
 )
 
+// Content-Disposition values for an attachment.
 const (
 	DispositionInline     = "inline"
 	DispositionAttachment = "attachment"
@@ -24,8 +26,10 @@ type Attachment struct {
 	Header      textproto.MIMEHeader `json:"-"`
 }
 
+// Attachments is a JSON-stored list of Attachment used as a DB column (see Scan and MarshalJSON).
 type Attachments []Attachment
 
+// Scan implements sql.Scanner, decoding the JSON column into Attachments; a NULL column yields an empty slice.
 func (a *Attachments) Scan(value interface{}) error {
 	if value == nil {
 		*a = make(Attachments, 0)
@@ -38,6 +42,7 @@ func (a *Attachments) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, a)
 }
 
+// MarshalJSON encodes Attachments as a JSON array, rendering nil as [] rather than null.
 func (a Attachments) MarshalJSON() ([]byte, error) {
 	if a == nil {
 		a = make(Attachments, 0)

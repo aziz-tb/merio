@@ -1,15 +1,11 @@
 // Package validate is the shared parameter validator used by both the
-// HTTP manual-invoke handler and the unified dispatcher's runtime path.
-// Sharing the implementation guarantees that ops sees identical error
-// messages regardless of how a tool was invoked — no "this works in the
-// admin tester but fails in the agent run" surprises.
+// HTTP manual-invoke handler and the dispatcher's runtime path, so error
+// messages are identical regardless of how a tool was invoked.
 //
-// The validator is intentionally shallow: it checks required-ness and
-// the F5 type tags (STRING, INTEGER, FLOAT, BOOL, DATE, LIST, OBJECT)
-// against the raw param map. Deep schema validation (nested object
-// shape, enum values, string formats) is the dispatched code's
-// responsibility — the Python SDK and the internal capabilities both
-// surface their own typed errors.
+// It is intentionally shallow: only required-ness and the F5 type tags
+// (STRING, INTEGER, FLOAT, BOOL, DATE, LIST, OBJECT) against the raw param
+// map. Deep validation (nested shape, enums, formats) is the dispatched
+// code's responsibility.
 package validate
 
 import (
@@ -18,25 +14,21 @@ import (
 	"strings"
 )
 
-// Params is a JSON-decoded parameter map (json.Unmarshal into
-// map[string]any). All number fields arrive as float64 unless the
-// caller pre-converted; the validator handles both shapes.
+// Params is a JSON-decoded parameter map. Numbers arrive as float64
+// unless the caller pre-converted; the validator handles both shapes.
 type Params = map[string]any
 
 // ParameterDef is one entry in a tool's input_parameters JSONB array.
-// Only the fields the validator needs are mapped — extra fields
-// (description, options, etc.) are ignored.
+// Only the fields the validator needs are mapped; extra fields are ignored.
 type ParameterDef struct {
 	Key      string `json:"key"`
 	Type     string `json:"type"`
 	Required bool   `json:"required"`
 }
 
-// Schema validates rawSchema (a tool's input_parameters JSONB) against
-// params. Returns nil on success, a descriptive error on the first
-// validation failure. A nil / empty / malformed schema is accept-any
-// (matches the existing F9 behavior so a tool-config bug doesn't lock
-// out admins).
+// Schema validates params against rawSchema (a tool's input_parameters
+// JSONB), returning an error on the first failure. A nil/empty/malformed
+// schema is accept-any, so a tool-config bug doesn't lock out admins.
 func Schema(rawSchema json.RawMessage, params Params) error {
 	defs, ok := decodeSchema(rawSchema)
 	if !ok {

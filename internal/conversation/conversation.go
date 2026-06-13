@@ -525,7 +525,8 @@ func (c *Manager) MarkAsUnread(uuid string, userID int) error {
 	return nil
 }
 
-// UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
+// UpdateConversationContactLastSeen sets the contact's last-seen timestamp on the conversation to now
+// and broadcasts the new contact_last_seen_at to all subscribers over the websocket.
 func (c *Manager) UpdateConversationContactLastSeen(uuid string) error {
 	if _, err := c.q.UpdateConversationContactLastSeen.Exec(uuid); err != nil {
 		c.lo.Error("error updating contact last seen timestamp", "conversation_id", uuid, "error", err)
@@ -618,6 +619,9 @@ func (c *Manager) InsertMentions(conversationID, messageID, mentionedByUserID in
 	return nil
 }
 
+// GetViewConversationsList retrieves the conversations for a saved view: the generic form of the
+// per-list helpers above, taking an explicit set of list types to union. viewingUserID drives the
+// per-agent unread counts; see GetConversations for the filtering, ordering, and pagination contract.
 func (c *Manager) GetViewConversationsList(viewingUserID, userID int, teamIDs []int, listType []string, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
 	return c.GetConversations(viewingUserID, userID, teamIDs, listType, order, orderBy, filters, page, pageSize)
 }

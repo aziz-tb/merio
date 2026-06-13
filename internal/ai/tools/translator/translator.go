@@ -1,20 +1,14 @@
-// Package translator turns resolved agent tools (the unified
-// ResolvedTool type) into the provider-agnostic llm.ToolDef shape that
-// the LLM provider then forwards to its SDK. v1 produces JSON Schema
-// from two source shapes:
+// Package translator converts resolved agent tools (ResolvedTool) into the
+// provider-agnostic llm.ToolDef shape. Two source shapes produce JSON Schema:
 //
-//   - InternalCapability — already declares JSON Schema (subset:
-//     basic types, enum, nested object, array). Pass-through with a
-//     defensive copy so caller mutations don't propagate.
-//   - Custom Python tool — declares the F5 array-of-{key, type, ...}
-//     shape (Enneo-derived). We map each entry to a JSON Schema property
-//     and collect requireds.
+//   - InternalCapability — already JSON Schema; pass-through with a defensive
+//     copy so caller mutations don't propagate.
+//   - Custom Python tool — the F5 array-of-{key, type, ...} shape, mapped
+//     per entry to a property with collected requireds.
 //
-// Tool names go on the wire to Anthropic, which enforces ^[a-zA-Z0-9_-]{1,64}$.
-// Internal capability ids and ai_tools.slug values both comply by
-// construction (slugify produces lowercase + dashes; capability ids are
-// lowercase + underscores). The translator validates anyway and surfaces
-// a typed error rather than letting the SDK reject silently.
+// Tool names go on the wire to Anthropic (^[a-zA-Z0-9_-]{1,64}$); the
+// translator validates and returns a typed error rather than letting the SDK
+// reject silently.
 package translator
 
 import (
@@ -28,14 +22,11 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
 )
 
-// anthropicToolNameRegex mirrors the SDK's documented constraint. We
-// validate at translate time to surface the failure here rather than
-// inside the Anthropic translator.
+// anthropicToolNameRegex mirrors the SDK's documented tool-name constraint.
 var anthropicToolNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
-// Translate converts a list of ResolvedTool to llm.ToolDef. Stops at the
-// first translation error so callers see a single failure message. An
-// empty input produces an empty output with no error.
+// Translate converts ResolvedTools to llm.ToolDefs, stopping at the first
+// translation error. Empty input yields nil output and no error.
 func Translate(tools []resolver.ResolvedTool) ([]llm.ToolDef, error) {
 	if len(tools) == 0 {
 		return nil, nil
@@ -51,8 +42,7 @@ func Translate(tools []resolver.ResolvedTool) ([]llm.ToolDef, error) {
 	return out, nil
 }
 
-// TranslateOne is exposed for callers that already hold a single tool —
-// the test endpoint, debug paths.
+// TranslateOne converts a single ResolvedTool (test endpoint, debug paths).
 func TranslateOne(t resolver.ResolvedTool) (llm.ToolDef, error) {
 	return translateOne(t)
 }
@@ -68,8 +58,8 @@ func translateOne(t resolver.ResolvedTool) (llm.ToolDef, error) {
 	}
 }
 
-// translateInternal handles the easy case: capabilities declare proper
-// JSON Schema already, just needs a deep copy + name/description pull.
+// translateInternal copies a capability's already-declared JSON Schema and
+// pulls its name/description.
 func translateInternal(t resolver.ResolvedTool) (llm.ToolDef, error) {
 	if t.Internal == nil {
 		return llm.ToolDef{}, fmt.Errorf("internal capability is nil")
@@ -89,23 +79,8 @@ func translateInternal(t resolver.ResolvedTool) (llm.ToolDef, error) {
 	}, nil
 }
 
-// translateCustom maps the F5 array shape to JSON Schema. Each F5 type
-// tag maps to a JSON Schema type:
-//
-//	STRING/TEXT/DATE/DATETIME → {"type":"string"}     (DATE adds format)
-//	INTEGER/INT               → {"type":"integer"}
-//	FLOAT/NUMBER              → {"type":"number"}
-//	BOOL/BOOLEAN              → {"type":"boolean"}
-//	LIST/ARRAY                → {"type":"array"}      (no item type in v1)
-//	OBJECT/MAP                → {"type":"object"}
-//
-// Unknown tags become {"type":"string"} with a description noting the
-// original tag — surfaces tool-config drift to the LLM rather than
-// silently widening the schema.
-//
-// `options` (a list of allowed values from the F5 schema) becomes a JSON
-// Schema `enum`. Nested objects: a parameter whose `type` is OBJECT can
-// declare `properties` directly; the translator passes those through.
+// translateCustom maps the F5 array shape to a JSON Schema object (per-param
+// mapping in paramToProperty). Empty description falls back to the tool name.
 func translateCustom(t resolver.ResolvedTool) (llm.ToolDef, error) {
 	if t.Custom == nil {
 		return llm.ToolDef{}, fmt.Errorf("custom tool is nil")
@@ -148,8 +123,8 @@ func translateCustom(t resolver.ResolvedTool) (llm.ToolDef, error) {
 	}, nil
 }
 
-// customParamDef mirrors the F5 input_parameters JSONB shape. Only the
-// fields the translator reads are mapped; extra fields are ignored.
+// customParamDef is the subset of the F5 input_parameters JSONB shape the
+// translator reads.
 type customParamDef struct {
 	Key         string          `json:"key"`
 	Name        string          `json:"name"`
@@ -197,8 +172,7 @@ func paramToProperty(def customParamDef) map[string]any {
 		}
 	case "DATE", "DATETIME":
 		prop["type"] = "string"
-		// Hint to the LLM that this is a date-shaped string. format is
-		// not part of our v1 validator surface but Anthropic forwards it.
+		// format isn't in the v1 validator surface but Anthropic forwards it.
 		if t == "DATE" {
 			prop["format"] = "date"
 		} else {
@@ -224,8 +198,7 @@ func paramToProperty(def customParamDef) map[string]any {
 	}
 
 	if d := strings.TrimSpace(def.Description); d != "" {
-		// Only set if we didn't already populate it via the unknown-tag
-		// branch above.
+		// Don't clobber the description set by the unknown-tag branch.
 		if _, exists := prop["description"]; !exists {
 			prop["description"] = d
 		}
@@ -233,9 +206,8 @@ func paramToProperty(def customParamDef) map[string]any {
 	return prop
 }
 
-// deepCopy is a JSON-roundtrip clone for map[string]any. Used so a
-// caller mutating the returned schema doesn't accidentally mutate the
-// capability's internal copy.
+// deepCopy JSON-roundtrip clones a map so a caller mutating the returned
+// schema can't reach the capability's internal copy.
 func deepCopy(in map[string]any) map[string]any {
 	if in == nil {
 		return nil

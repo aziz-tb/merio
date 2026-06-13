@@ -61,13 +61,13 @@ func BuildTicketJSON(conv cmodels.Conversation) (map[string]any, error) {
 }
 
 // BuildCustomerJSON marshals a cached customer into the same flat shape exposed
-// by customer APIs, including Zone 2 pass-through fields.
+// by customer APIs, including custom pass-through fields.
 func BuildCustomerJSON(customer customermodels.Customer) (map[string]any, error) {
 	return customerdata.CustomerToMap(customer, nil)
 }
 
 // BuildContractJSON marshals a cached contract into the same flat shape exposed
-// by contract APIs, including Zone 2 pass-through fields.
+// by contract APIs, including custom pass-through fields.
 func BuildContractJSON(contract contractmodels.Contract) (map[string]any, error) {
 	return customerdata.ContractToMap(contract)
 }
