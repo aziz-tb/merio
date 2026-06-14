@@ -9,6 +9,7 @@ import (
 	"time"
 
 	activitydeps "github.com/aziz-tb/merio/internal/activities/dependencies"
+	aiagents "github.com/aziz-tb/merio/internal/ai/agents"
 	executions "github.com/aziz-tb/merio/internal/ai/executions"
 	executionmodels "github.com/aziz-tb/merio/internal/ai/executions/models"
 	"github.com/aziz-tb/merio/internal/ai/llm"
@@ -21,6 +22,7 @@ import (
 
 type Activities struct {
 	Runner     *runner.Runner
+	Agents     *aiagents.Manager
 	Executions *executions.Manager
 	Events     runner.EventPublisher
 	Lo         *logf.Logger
@@ -29,6 +31,7 @@ type Activities struct {
 func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 	return &Activities{
 		Runner:     deps.AgentRunner,
+		Agents:     deps.Agents,
 		Executions: deps.Executions,
 		Events:     deps.RunEvents,
 		Lo:         deps.Logger("ai-run-activities"),
@@ -53,6 +56,14 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 	pub := a.publisherForSource(params.Source)
 	req := buildRunRequest(params)
 	req.EventPublisher = pub
+	// Attach the sub-agent invoker. The runner only uses it on an orchestrator
+	// run (gated on RunRequest.IsOrchestrator), so this is a no-op for ordinary
+	// composer/pipeline runs. Sub-agent runs the invoker itself spawns leave
+	// SubAgentInvoker nil, so recursion can't occur.
+	// TODO(slice-3): orchestrator runs (which set IsOrchestrator) are wired when
+	// orchestrator provisioning lands; until then this invoker is inert here and
+	// exercised directly by the sub-agent invoker's tests.
+	req.SubAgentInvoker = a.subAgentInvoker()
 
 	resp, runErr := a.Runner.Run(ctx, req)
 	if runErr != nil {

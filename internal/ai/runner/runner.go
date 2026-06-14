@@ -164,7 +164,9 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		return RunResponse{Status: StatusFailed, PartialReason: "inbound_message is required"},
 			errors.New("runner: inbound_message is required")
 	}
-	if req.AgentID <= 0 {
+	// An orchestrator run has no ai_agents row (it uses the platform config),
+	// so AgentID is required only for ordinary agent runs.
+	if !req.IsOrchestrator && req.AgentID <= 0 {
 		return RunResponse{Status: StatusFailed, PartialReason: "agent_id is required"},
 			errors.New("runner: agent_id is required")
 	}
@@ -176,10 +178,18 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 
 	startedAt := time.Now()
 
-	// Load the agent.
-	agent, err := r.opts.Agents.Get(req.AgentID)
-	if err != nil {
-		return RunResponse{Status: StatusFailed, PartialReason: "agent not found"}, fmt.Errorf("%w: %v", ErrAgentNotFound, err)
+	// Load the agent. An orchestrator run is NOT backed by an ai_agents row —
+	// the orchestrator is a platform component executed via the Runner — so it
+	// uses the platform orchestrator config instead of a DB lookup. See
+	// call_subagent.go (TODO(slice-3): config comes from Composer).
+	var agent agentmodels.Agent
+	if req.IsOrchestrator {
+		agent = platformOrchestratorAgent()
+	} else {
+		agent, err = r.opts.Agents.Get(req.AgentID)
+		if err != nil {
+			return RunResponse{Status: StatusFailed, PartialReason: "agent not found"}, fmt.Errorf("%w: %v", ErrAgentNotFound, err)
+		}
 	}
 	if !agent.Enabled {
 		return RunResponse{
@@ -220,6 +230,22 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	}
 	toolDefs = append(toolDefs, produceDraftToolDef)
 
+	// Orchestrator seam: an orchestrator run carrying a sub-agent invoker also
+	// gets the call_subagent tool + its instructions. Gated on the run-level
+	// IsOrchestrator flag (the orchestrator's identity comes from how the run
+	// is started, not from a row) — generic agents and every sub-agent run
+	// never see it, so the runner stays a primitive. See call_subagent.go.
+	orchestratorInstructions := ""
+	if req.IsOrchestrator {
+		if req.SubAgentInvoker != nil {
+			toolDefs = append(toolDefs, callSubagentToolDef)
+			orchestratorInstructions = callSubagentInstructions
+		} else {
+			r.opts.Lo.Warn("runner: orchestrator run has no sub-agent invoker; call_subagent unavailable",
+				"trace_id", req.TraceID)
+		}
+	}
+
 	// Resolve preset for the agent's main reasoning purpose. v1 hardcodes
 	// "reason" for every turn; once stage-specific purposes land
 	// (extract_parameters mid-turn, etc.) this becomes per-turn.
@@ -235,7 +261,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	// pre-prepared context as a second system message, then the inbound
 	// message as the user turn. The cache marker manager seeds with a
 	// marker after the last system message.
-	messages := buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage)
+	messages := buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, orchestratorInstructions)
 	systemCount := countSystemMessages(messages)
 	cacheMgr := newCacheMarkerManager(systemCount)
 
@@ -464,6 +490,8 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 				req.TraceID,
 				iter,
 				pub,
+				req.SubAgentInvoker,
+				subAgentParentContext(req),
 			)
 			toolLatency += int(time.Since(toolStart).Milliseconds())
 			turn.ToolCalls = results
@@ -575,10 +603,22 @@ func applyDefaults(req RunRequest) (RunRequest, error) {
 // Distinct from the get_conversation_history capability: that surfaces
 // PRIOR conversations from the same customer; the history system block
 // here is the CURRENT ticket's running context.
-func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string) []llm.Message {
+func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, orchestratorInstructions string) []llm.Message {
 	out := make([]llm.Message, 0, 4)
 
-	if runtimePrompt := buildRuntimeSystemPrompt(systemPrompt); strings.TrimSpace(runtimePrompt) != "" {
+	// Orchestrator instructions (call_subagent) are appended after the
+	// produce_draft rule, mirroring how buildRuntimeSystemPrompt appends it to
+	// the operator prompt. Empty for non-orchestrators, keeping their prompt
+	// byte-for-byte unchanged.
+	runtimePrompt := buildRuntimeSystemPrompt(systemPrompt)
+	if strings.TrimSpace(orchestratorInstructions) != "" {
+		if strings.TrimSpace(runtimePrompt) == "" {
+			runtimePrompt = orchestratorInstructions
+		} else {
+			runtimePrompt = runtimePrompt + "\n\n" + orchestratorInstructions
+		}
+	}
+	if strings.TrimSpace(runtimePrompt) != "" {
 		out = append(out, llm.Message{
 			Role: llm.RoleSystem,
 			Content: []llm.ContentBlock{{

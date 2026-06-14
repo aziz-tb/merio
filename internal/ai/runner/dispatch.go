@@ -47,6 +47,8 @@ func (r *Runner) dispatchAllTools(
 	traceID string,
 	turnIndex int,
 	pub EventPublisher,
+	subInvoker SubAgentInvoker,
+	subParent SubAgentParentContext,
 ) []ToolCallLog {
 	if len(turnToolUses) == 0 {
 		return nil
@@ -60,11 +62,19 @@ func (r *Runner) dispatchAllTools(
 
 	var reads, writes []plannedToolCall
 	for i, tu := range turnToolUses {
+		plan := plannedToolCall{idx: i, tu: tu}
+		// call_subagent is the orchestrator seam, not a dispatcher tool: it
+		// routes to the sub-agent invoker (in dispatchOneTool) and always runs
+		// sequentially — a future multi-sub-agent turn must not parallelize
+		// world-changing sub-agent calls.
+		if tu.ToolName == callSubagentToolName {
+			writes = append(writes, plan)
+			continue
+		}
 		category := "write"
 		if tool, ok := resolvedByName[tu.ToolName]; ok {
 			category = tool.Category()
 		}
-		plan := plannedToolCall{idx: i, tu: tu}
 		if category == "read" {
 			reads = append(reads, plan)
 			continue
@@ -87,6 +97,7 @@ func (r *Runner) dispatchAllTools(
 					gctx, plan.tu, resolvedByName, rt,
 					invokerUserID, conversationID, verificationLevel,
 					traceID, turnIndex, pub,
+					subInvoker, subParent,
 				)
 				return nil
 			})
@@ -99,6 +110,7 @@ func (r *Runner) dispatchAllTools(
 			ctx, plan.tu, resolvedByName, rt,
 			invokerUserID, conversationID, verificationLevel,
 			traceID, turnIndex, pub,
+			subInvoker, subParent,
 		)
 	}
 
@@ -124,7 +136,16 @@ func (r *Runner) dispatchOneTool(
 	traceID string,
 	turnIndex int,
 	pub EventPublisher,
+	subInvoker SubAgentInvoker,
+	subParent SubAgentParentContext,
 ) (logEntry ToolCallLog) {
+	// Orchestrator seam: call_subagent is not a dispatcher tool — route it to
+	// the sub-agent invoker. Handled before the timing/defer setup so it owns
+	// its own events. See call_subagent.go.
+	if tu.ToolName == callSubagentToolName {
+		return r.handleCallSubagent(ctx, tu, subInvoker, subParent, traceID, turnIndex, pub)
+	}
+
 	startedAt := time.Now().UTC()
 	logEntry = ToolCallLog{
 		ToolID:    tu.ToolName,

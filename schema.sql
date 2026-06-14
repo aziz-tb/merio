@@ -909,16 +909,13 @@ CREATE TABLE ai_agents (
 	tools                JSONB NOT NULL DEFAULT '[]'::jsonb,
 	kb_scope             JSONB NOT NULL DEFAULT '{"folder_ids":[],"article_ids":[]}'::jsonb,
 	preset_overrides     JSONB NOT NULL DEFAULT '{}'::jsonb,
-	confidence_threshold NUMERIC(4,3) NOT NULL DEFAULT 0.5,
 	max_iterations       INT NOT NULL DEFAULT 5,
 	extended_thinking_enabled BOOL NOT NULL DEFAULT TRUE,
 	min_verification     INT NOT NULL DEFAULT 0,
-	autonomy             JSONB NOT NULL DEFAULT '{}'::jsonb,
 	enabled              BOOL NOT NULL DEFAULT TRUE,
 	CONSTRAINT constraint_ai_agents_on_name              CHECK (length(name) <= 140),
 	CONSTRAINT constraint_ai_agents_on_slug              CHECK (length(slug) <= 140),
 	CONSTRAINT constraint_ai_agents_on_description       CHECK (description IS NULL OR length(description) <= 1000),
-	CONSTRAINT constraint_ai_agents_on_threshold         CHECK (confidence_threshold >= 0 AND confidence_threshold <= 1),
 	CONSTRAINT constraint_ai_agents_on_iterations        CHECK (max_iterations > 0 AND max_iterations <= 50),
 	CONSTRAINT constraint_ai_agents_on_min_verification  CHECK (min_verification >= 0 AND min_verification <= 3),
 	CONSTRAINT constraint_ai_agents_on_name_unique       UNIQUE (name),
@@ -1214,7 +1211,7 @@ CREATE INDEX index_ai_tools_on_enabled ON ai_tools(enabled) WHERE enabled = TRUE
 -- in code under internal/ai/tools/builtin/.
 INSERT INTO ai_agents (
 	name, slug, description, prompt, detection, tools, kb_scope,
-	preset_overrides, confidence_threshold, max_iterations, min_verification, autonomy, enabled
+	preset_overrides, max_iterations, min_verification, enabled
 ) VALUES (
 	'Test Agent',
 	'test-agent',
@@ -1224,10 +1221,8 @@ INSERT INTO ai_agents (
 	'[]'::jsonb,
 	'{"folder_ids":[],"article_ids":[]}'::jsonb,
 	'{}'::jsonb,
-	0.5,
 	5,
 	0,
-	'{}'::jsonb,
 	FALSE
 ) ON CONFLICT (slug) DO NOTHING;
 
@@ -1382,7 +1377,7 @@ CREATE TABLE agent_executions (
 	created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 	updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 	CONSTRAINT constraint_agent_executions_on_source
-	    CHECK (source IN ('composer', 'pipeline'))
+	    CHECK (source IN ('composer', 'pipeline', 'subagent'))
 );
 CREATE INDEX index_agent_executions_on_conv_agent_run_at
 	ON agent_executions (conversation_id, agent_id, run_at DESC);

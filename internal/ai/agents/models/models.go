@@ -9,18 +9,18 @@ import (
 	"time"
 )
 
-// Agent is the DB-wire representation of an ai_agents row.
+// Agent is the DB-wire representation of an ai_agents row. Every ai_agents row
+// is a sub-agent (user-authored: prompt, tools, detection, knowledge); the
+// orchestrator is a platform component, not a row (see internal/ai/runner).
 //
-// Detection, Tools, PresetOverrides, and Autonomy are stored as raw JSONB
-// and unmarshalled at the handler/runtime layer where the structured shape
-// matters:
+// Detection, Tools, and PresetOverrides are stored as raw JSONB and
+// unmarshalled at the handler/runtime layer where the structured shape matters:
 //
 //   - Detection unmarshals into internal/detection.Detection by the validation
 //     runtime. New agents get the structured DefaultDetection scaffold from
 //     internal/ai/agents so the visual builder has usable data.
 //   - Tools unmarshals into []ToolRef
 //   - PresetOverrides unmarshals into map[string]string (purpose → preset slug)
-//   - Autonomy unmarshals into Autonomy
 //
 // Description allows NULL in the DB but the API and handlers always
 // pass a non-NULL string (matching the automation_rules precedent).
@@ -36,11 +36,9 @@ type Agent struct {
 	Tools                   json.RawMessage `db:"tools" json:"tools"`
 	KBScope                 json.RawMessage `db:"kb_scope" json:"kb_scope"`
 	PresetOverrides         json.RawMessage `db:"preset_overrides" json:"preset_overrides"`
-	ConfidenceThreshold     float64         `db:"confidence_threshold" json:"confidence_threshold"`
 	MaxIterations           int             `db:"max_iterations" json:"max_iterations"`
 	ExtendedThinkingEnabled bool            `db:"extended_thinking_enabled" json:"extended_thinking_enabled"`
 	MinVerification         int             `db:"min_verification" json:"min_verification"`
-	Autonomy                json.RawMessage `db:"autonomy" json:"autonomy"`
 	Enabled                 bool            `db:"enabled" json:"enabled"`
 }
 
@@ -102,13 +100,4 @@ func (r ToolRef) InternalID() (string, bool) {
 		return "", false
 	}
 	return id, true
-}
-
-// Autonomy is the structured shape of the `autonomy` JSONB on an Agent —
-// per-agent GATE policy thresholds. Empty/zero values are valid; the
-// runtime treats them as "use the system default for this preset."
-type Autonomy struct {
-	MinConfidenceSend      float64 `json:"min_confidence_send"`
-	MinConfidenceDraft     float64 `json:"min_confidence_draft"`
-	EscalateOnDisagreement bool    `json:"escalate_on_disagreement"`
 }

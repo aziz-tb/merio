@@ -171,6 +171,23 @@ type RunRequest struct {
 	// (the future inbound pipeline) pass the System user id.
 	// Must reference an existing users.id — Postgres FK enforces this.
 	InvokerUserID int
+
+	// IsOrchestrator marks this as an orchestrator run. The orchestrator is a
+	// platform component, NOT an ai_agents row, so when this is set the runner
+	// uses the platform orchestrator config (platformOrchestratorAgent) instead
+	// of loading AgentID from the DB, and injects call_subagent (given an
+	// invoker). The orchestrator's identity comes from how the run is started,
+	// not from a row. See call_subagent.go.
+	IsOrchestrator bool
+
+	// SubAgentInvoker, when non-nil on an orchestrator run, lets the
+	// orchestrator call sub-agents via the call_subagent tool. The runner
+	// injects the tool only when IsOrchestrator && SubAgentInvoker != nil;
+	// generic agents and every (recursively-invoked) sub-agent run leave both
+	// unset — which both hides the tool and makes sub-agent recursion
+	// impossible. Per-call override in the spirit of EventPublisher. See
+	// call_subagent.go.
+	SubAgentInvoker SubAgentInvoker
 }
 
 // RunResponse is what Run() returns alongside its error. Even on

@@ -16,8 +16,8 @@
 // same live instance.
 //
 // Save payload shape mirrors the legacy monolithic form: kb_scope,
-// tools, autonomy, preset_overrides, detection are all embedded directly
-// on the agent record so one save action covers every tab. No per-tab
+// tools, preset_overrides, detection are all embedded directly on the
+// agent record so one save action covers every tab. No per-tab
 // partial saves.
 
 import { computed, onMounted, onUnmounted, ref, toValue } from 'vue'
@@ -55,7 +55,6 @@ function buildSavePayload(agent) {
   const reasonPreset = asPlainObject(agent.preset_overrides).reason
   if (reasonPreset) presetOverrides.reason = reasonPreset
 
-  const confidenceThreshold = Number(agent.confidence_threshold)
   const maxIterations = Number(agent.max_iterations)
   const verificationFloor = Number(agent.min_verification ?? 0)
 
@@ -70,9 +69,7 @@ function buildSavePayload(agent) {
     },
     detection: asPlainObject(agent.detection),
     tools: normalizeToolRefs(agent.tools),
-    autonomy: asPlainObject(agent.autonomy),
     preset_overrides: presetOverrides,
-    confidence_threshold: Number.isFinite(confidenceThreshold) ? confidenceThreshold : 0.5,
     extended_thinking_enabled: agent.extended_thinking_enabled !== false,
     max_iterations: Number.isFinite(maxIterations) ? maxIterations : 5,
     min_verification: Number.isFinite(verificationFloor) ? verificationFloor : 0,
@@ -91,11 +88,9 @@ function createEmptyAgent() {
     tools: [],
     kb_scope: { folder_ids: [], article_ids: [] },
     preset_overrides: {},
-    confidence_threshold: 0.5,
     max_iterations: 5,
     extended_thinking_enabled: true,
     min_verification: 0,
-    autonomy: {},
     enabled: false
   }
 }

@@ -3,7 +3,7 @@
   Server-side validation does the real work; this component only catches
   obviously malformed input client-side so users get fast feedback.
 
-  Used by AI agent/tool forms for detection, tools, autonomy,
+  Used by AI agent/tool forms for detection, tools,
   input_parameters, output_schema.
 -->
 <template>

@@ -46,12 +46,13 @@ type Opts struct {
 }
 
 type queries struct {
-	GetAll   *sqlx.Stmt `query:"get-all"`
-	CountAll *sqlx.Stmt `query:"count-all"`
-	GetByID  *sqlx.Stmt `query:"get-by-id"`
-	Insert   *sqlx.Stmt `query:"insert"`
-	Update   *sqlx.Stmt `query:"update"`
-	Delete   *sqlx.Stmt `query:"delete"`
+	GetAll    *sqlx.Stmt `query:"get-all"`
+	CountAll  *sqlx.Stmt `query:"count-all"`
+	GetByID   *sqlx.Stmt `query:"get-by-id"`
+	GetBySlug *sqlx.Stmt `query:"get-by-slug"`
+	Insert    *sqlx.Stmt `query:"insert"`
+	Update    *sqlx.Stmt `query:"update"`
+	Delete    *sqlx.Stmt `query:"delete"`
 }
 
 // New builds a Manager.
@@ -104,6 +105,22 @@ func (m *Manager) Get(id int) (models.Agent, error) {
 	return a, nil
 }
 
+// GetBySlug returns one agent by its unique slug. Used by the orchestrator
+// to resolve a sub-agent reference (call_subagent passes a slug). Slugs are
+// UNIQUE in the schema and locked after create in the edit UI, so a slug is a
+// stable handle.
+func (m *Manager) GetBySlug(slug string) (models.Agent, error) {
+	var a models.Agent
+	if err := m.q.GetBySlug.Get(&a, slug); err != nil {
+		if err == sql.ErrNoRows {
+			return a, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error fetching ai agent by slug", "slug", slug, "error", err)
+		return a, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return a, nil
+}
+
 // Create inserts a new agent. Caller is responsible for validating
 // JSONB shapes, slug format, kb_scope folder/article existence, and tool refs.
 func (m *Manager) Create(a models.Agent) (models.Agent, error) {
@@ -112,8 +129,8 @@ func (m *Manager) Create(a models.Agent) (models.Agent, error) {
 	if err := m.q.Insert.Get(&out,
 		a.Name, a.Slug, a.Description, a.Prompt,
 		a.Detection, a.Tools, a.KBScope,
-		a.PresetOverrides, a.ConfidenceThreshold, a.MaxIterations, a.ExtendedThinkingEnabled,
-		a.MinVerification, a.Autonomy, a.Enabled,
+		a.PresetOverrides, a.MaxIterations, a.ExtendedThinkingEnabled,
+		a.MinVerification, a.Enabled,
 	); err != nil {
 		if isUniqueViolation(err) {
 			return out, envelope.NewError(envelope.InputError, "AI agent with this name or slug already exists", nil)
@@ -132,8 +149,8 @@ func (m *Manager) Update(id int, a models.Agent) (models.Agent, error) {
 	if err := m.q.Update.Get(&out, id,
 		a.Name, a.Slug, a.Description, a.Prompt,
 		a.Detection, a.Tools, a.KBScope,
-		a.PresetOverrides, a.ConfidenceThreshold, a.MaxIterations, a.ExtendedThinkingEnabled,
-		a.MinVerification, a.Autonomy, a.Enabled,
+		a.PresetOverrides, a.MaxIterations, a.ExtendedThinkingEnabled,
+		a.MinVerification, a.Enabled,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return out, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.notFound"), nil)
@@ -170,9 +187,6 @@ func defaults(a *models.Agent) {
 	}
 	if len(a.Tools) == 0 {
 		a.Tools = json.RawMessage(`[]`)
-	}
-	if len(a.Autonomy) == 0 {
-		a.Autonomy = json.RawMessage(`{}`)
 	}
 	if len(a.KBScope) == 0 {
 		a.KBScope = emptyKBScope

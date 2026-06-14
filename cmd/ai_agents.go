@@ -58,7 +58,7 @@ func handleGetAIAgent(r *fastglue.Request) error {
 
 // handleCreateAIAgent creates an ai agent. Runs the full validation pass
 // (slug shape, prompt-required-when-enabled, kb_scope folder/article refs
-// and tool refs exist, autonomy keys, tools[] shape, min_verification
+// and tool refs exist, tools[] shape, preset_overrides, min_verification
 // non-negative).
 func handleCreateAIAgent(r *fastglue.Request) error {
 	var (
@@ -152,11 +152,6 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 	// Prompt required when enabled.
 	if a.Enabled && strings.TrimSpace(a.Prompt) == "" {
 		return envelope.NewError(envelope.InputError, "prompt is required when the agent is enabled", nil)
-	}
-
-	// Confidence threshold range (DB CHECK enforces too; surface as 400 not 500).
-	if a.ConfidenceThreshold < 0 || a.ConfidenceThreshold > 1 {
-		return envelope.NewError(envelope.InputError, "confidence_threshold must be between 0 and 1", nil)
 	}
 
 	// Max iterations sanity (matches DB CHECK).
@@ -254,31 +249,6 @@ func validateAIAgent(app *App, a *agentmodels.Agent) error {
 	if a.MinVerification < int(verificationmodels.VerificationLevelUnverified) ||
 		a.MinVerification > int(verificationmodels.VerificationLevelManual) {
 		return envelope.NewError(envelope.InputError, "min_verification must be between 0 and 3", nil)
-	}
-
-	// Autonomy: validate keys when non-empty (anything other than {} or null).
-	if len(a.Autonomy) > 0 && string(a.Autonomy) != "{}" && string(a.Autonomy) != "null" {
-		// Use a permissive struct decode, then a strict known-keys check
-		// against the raw map so unknown keys are rejected.
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(a.Autonomy, &raw); err != nil {
-			return envelope.NewError(envelope.InputError, "autonomy must be a JSON object", nil)
-		}
-		allowed := map[string]struct{}{
-			"min_confidence_send":      {},
-			"min_confidence_draft":     {},
-			"escalate_on_disagreement": {},
-		}
-		for k := range raw {
-			if _, ok := allowed[k]; !ok {
-				return envelope.NewError(envelope.InputError, "autonomy contains unknown key: "+k, nil)
-			}
-		}
-		// Type-check the values.
-		var typed agentmodels.Autonomy
-		if err := json.Unmarshal(a.Autonomy, &typed); err != nil {
-			return envelope.NewError(envelope.InputError, "autonomy fields have wrong types (expected numbers/bool)", nil)
-		}
 	}
 
 	// preset_overrides: must be a JSON object of purpose → preset slug.

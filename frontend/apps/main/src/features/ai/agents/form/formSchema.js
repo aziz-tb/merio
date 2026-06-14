@@ -15,14 +15,9 @@ export const createAgentFormSchema = (t) =>
       description: z.string().optional().default(''),
       prompt: z.string().optional().default(''),
       // preset_overrides is JSON-string-edited via a JsonField (mirroring
-      // tools/detection/autonomy). It lives in a local ref on the form
-      // component, NOT in vee-validate state, so it doesn't appear in this
-      // schema. Submit is gated on a parse-error ref.
-      confidence_threshold: z
-        .number({ invalid_type_error: t('globals.messages.required') })
-        .min(0)
-        .max(1)
-        .default(0.5),
+      // tools/detection). It lives in a local ref on the form component, NOT
+      // in vee-validate state, so it doesn't appear in this schema. Submit is
+      // gated on a parse-error ref.
       extended_thinking_enabled: z.boolean().default(true),
       max_iterations: z
         .number({ invalid_type_error: t('globals.messages.required') })

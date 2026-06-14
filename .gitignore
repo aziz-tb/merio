@@ -32,5 +32,7 @@ exec-runner/.venv
 !internal/ai/llm/openaitranslate/translate_test.go
 !internal/ai/llm/preset/registry_test.go
 !internal/ai/llm/router_test.go
+!internal/ai/runner/call_subagent_test.go
+!internal/activities/airuns/subagent_test.go
 /graphify-out
 /ai_dump.txt
