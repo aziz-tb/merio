@@ -18,7 +18,9 @@ import (
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
 	"github.com/aziz-tb/merio/internal/approvals"
 	"github.com/aziz-tb/merio/internal/composer"
+	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
+	"github.com/aziz-tb/merio/internal/customer"
 	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
 	"github.com/zerodha/logf"
 	"go.temporal.io/sdk/activity"
@@ -32,6 +34,8 @@ type Activities struct {
 	Composer     *composer.Manager
 	Approvals    *approvals.Manager
 	Conversation *conversation.Manager
+	Customers    *customer.Manager
+	Contracts    *contract.Manager
 	Events       runner.EventPublisher
 	Lo           *logf.Logger
 }
@@ -45,6 +49,8 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 		Composer:     deps.Composer,
 		Approvals:    deps.Approvals,
 		Conversation: deps.Conversation,
+		Customers:    deps.Customers,
+		Contracts:    deps.Contracts,
 		Events:       deps.RunEvents,
 		Lo:           deps.Logger("ai-run-activities"),
 	}, nil
@@ -82,6 +88,23 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 		// recursion can't occur.
 		req.SubAgentInvoker = a.subAgentInvoker()
 		req.ApprovalRequiredSlugs = a.approvalSlugs(params.InboxID)
+		// Composer guidance (Slice 5): assemble the config against the live
+		// ticket and inject the matching guidance prose. Composer-only here;
+		// sub-agents receive it threaded through the invoker. Additive +
+		// best-effort — it shapes the reply, it never blocks the run.
+		if params.IsComposer && a.Conversation != nil {
+			if conv, cErr := a.Conversation.GetConversation(params.ConversationID, "", ""); cErr != nil {
+				a.Lo.Warn("composer guidance: load conversation failed", "conversation_id", params.ConversationID, "error", cErr)
+			} else if assembled, ok := a.assembleFor(ctx, params.InboxID, conv); ok {
+				req.GuidanceProse = assembled.GuidanceProse()
+				// Rule-fired escalation (deterministic arm of the §4 union): a
+				// matched escalation rule forces escalation regardless of model
+				// judgment. The runner short-circuits on this.
+				if escalate, reason := assembled.Escalate(); escalate {
+					req.ForceEscalateReason = reason
+				}
+			}
+		}
 		resp, runErr = a.Runner.Run(ctx, req)
 	}
 	if runErr != nil {

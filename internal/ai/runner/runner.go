@@ -224,6 +224,15 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		ConversationID: req.ConversationID,
 	}, pub)
 
+	// Rule-fired escalation (Slice 5, §4 union): a deterministic escalation rule
+	// matched the live ticket, so the platform escalates regardless of model
+	// judgment — short-circuit before any model call. The caller (the activity)
+	// evaluates the rules via composer.Assembled.Escalate and sets the reason.
+	if req.ForceEscalateReason != "" {
+		base := RunResponse{AgentSlug: agent.Slug, IsComposer: req.IsComposer}
+		return synthesizeEscalation(base, req.ForceEscalateReason), nil
+	}
+
 	kbScope := decodeKBScope(agent.KBScope, r.opts.Lo, req.TraceID, agent.ID)
 
 	// Resolve agent.tools to ResolvedTool. Drops are surfaced into
@@ -332,7 +341,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		trace = append(trace, extraTrace...)
 		toolCallLog = append(toolCallLog, extraLogs...)
 	} else {
-		messages = buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions)
+		messages = buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions, req.GuidanceProse)
 	}
 	systemCount := countSystemMessages(messages)
 	cacheMgr := newCacheMarkerManager(systemCount)
@@ -718,6 +727,19 @@ func applyDefaults(req RunRequest) (RunRequest, error) {
 	return req, nil
 }
 
+// guidanceSystemBlock renders assembled Composer-config guidance (Slice 5) as a
+// system message, or returns false when there is none to inject. Shared by the
+// fresh and resume prompt builders so guidance lands the same way on both.
+func guidanceSystemBlock(prose string) (llm.Message, bool) {
+	if strings.TrimSpace(prose) == "" {
+		return llm.Message{}, false
+	}
+	return llm.Message{
+		Role:    llm.RoleSystem,
+		Content: []llm.ContentBlock{{Type: llm.ContentBlockTypeText, Text: prose}},
+	}, true
+}
+
 // buildInitialMessages constructs the messages slice for turn 0.
 //
 // Order:
@@ -734,7 +756,7 @@ func applyDefaults(req RunRequest) (RunRequest, error) {
 // Distinct from the get_conversation_history capability: that surfaces
 // PRIOR conversations from the same customer; the history system block
 // here is the CURRENT ticket's running context.
-func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, isComposer bool, composerInstructions string) []llm.Message {
+func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, isComposer bool, composerInstructions, guidanceProse string) []llm.Message {
 	out := make([]llm.Message, 0, 4)
 
 	// Composers terminate via answer/escalate, so their runtime prompt
@@ -755,6 +777,10 @@ func buildInitialMessages(systemPrompt string, ctxData map[string]any, history [
 				Text: runtimePrompt,
 			}},
 		})
+	}
+
+	if msg, ok := guidanceSystemBlock(guidanceProse); ok {
+		out = append(out, msg)
 	}
 
 	if len(ctxData) > 0 {

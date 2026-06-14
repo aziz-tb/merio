@@ -102,6 +102,8 @@ func (s *subAgentInvoker) InvokeSubAgent(
 		// The approval gate is origin-agnostic: a sub-agent gates on the same
 		// slugs as the composer.
 		ApprovalRequiredSlugs: parent.ApprovalRequiredSlugs,
+		// Composer guidance reaches domain work too (Slice 5).
+		GuidanceProse: parent.GuidanceProse,
 		// SubAgentInvoker left nil — a sub-agent cannot call sub-agents.
 	}
 

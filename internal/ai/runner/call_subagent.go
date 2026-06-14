@@ -83,6 +83,10 @@ type SubAgentParentContext struct {
 	// ApprovalRequiredSlugs threads the composer's approval gate set into each
 	// sub-agent run so the gate is origin-agnostic.
 	ApprovalRequiredSlugs []string
+
+	// GuidanceProse threads the composer's assembled guidance into each
+	// sub-agent run so guidance reaches domain work too (Slice 5).
+	GuidanceProse string
 }
 
 // SubAgentCall is one call_subagent invocation parsed from a tool_use block.
@@ -179,6 +183,7 @@ func subAgentParentContext(req RunRequest) SubAgentParentContext {
 		TraceID:               req.TraceID,
 		History:               req.ConversationHistory,
 		ApprovalRequiredSlugs: req.ApprovalRequiredSlugs,
+		GuidanceProse:         req.GuidanceProse,
 	}
 }
 

@@ -43,6 +43,7 @@ type resumeSeed struct {
 	context           map[string]any
 	history           []runner.ConversationMessage
 	approvalSlugs     []string
+	guidanceProse     string
 	deadline          time.Duration
 	eventPublisher    runner.EventPublisher
 }
@@ -88,6 +89,7 @@ func baseResumeReq(seed resumeSeed, traceID string) runner.RunRequest {
 		InvokerUserID:         seed.invokerUserID,
 		TraceID:               traceID,
 		ApprovalRequiredSlugs: seed.approvalSlugs,
+		GuidanceProse:         seed.guidanceProse,
 		Deadline:              seed.deadline,
 		EventPublisher:        seed.eventPublisher,
 	}
@@ -220,7 +222,7 @@ func (a *Activities) resumeApproval(ctx context.Context, params wfairuns.AgentRu
 		heldReason:      formatGapReason(gap),
 		gatedTrace:      decodeTrace(gatedExec.Trace),
 		resumeTraceID:   params.TraceID,
-		seed:            a.buildResumeSeed(params, conv, toRunnerHistory(msgs), pub),
+		seed:            a.buildResumeSeed(ctx, params, conv, toRunnerHistory(msgs), pub),
 	}
 	if in.subAgentGate {
 		compExec, cErr := a.Executions.GetByTraceID(ap.ParentTraceID.String)
@@ -241,10 +243,17 @@ const resumeContinuationPrompt = "Continue and finalize your response, grounded 
 // the substance (prior reasoning); this seed is the up-to-date framing. Customer/
 // contract context-map hydration (inline in the fresh-run handler) is not
 // reachable from the activity and is left to the trace for now.
-func (a *Activities) buildResumeSeed(params wfairuns.AgentRunWorkflowParams, conv convmodels.Conversation, history []runner.ConversationMessage, pub runner.EventPublisher) resumeSeed {
+func (a *Activities) buildResumeSeed(ctx context.Context, params wfairuns.AgentRunWorkflowParams, conv convmodels.Conversation, history []runner.ConversationMessage, pub runner.EventPublisher) resumeSeed {
 	var deadline time.Duration
 	if params.DeadlineMs > 0 {
 		deadline = time.Duration(params.DeadlineMs) * time.Millisecond
+	}
+	// Guidance (Slice 5) shapes the resumed reply too. Best-effort: an assemble
+	// failure just yields no guidance. Approval slugs stay on the proven Slice-4
+	// path so resume gating is unchanged.
+	var guidanceProse string
+	if assembled, ok := a.assembleFor(ctx, params.InboxID, conv); ok {
+		guidanceProse = assembled.GuidanceProse()
 	}
 	return resumeSeed{
 		conversationID:    conv.ID,
@@ -254,6 +263,7 @@ func (a *Activities) buildResumeSeed(params wfairuns.AgentRunWorkflowParams, con
 		inbound:           resumeContinuationPrompt,
 		history:           history,
 		approvalSlugs:     a.approvalSlugs(params.InboxID),
+		guidanceProse:     guidanceProse,
 		deadline:          deadline,
 		eventPublisher:    pub,
 	}

@@ -204,6 +204,22 @@ type RunRequest struct {
 	// See the gate in runner.go and Slice 4.
 	ApprovalRequiredSlugs []string
 
+	// GuidanceProse is the assembled Composer-config guidance that applies to
+	// this conversation — the matching guidance items' prose (Slice 5),
+	// pre-evaluated by the caller (composer.Assemble) against the live ticket.
+	// Injected as a system block after the persona prompt. Empty = none applies.
+	// Set on Composer runs and threaded into the sub-agents they spawn so
+	// guidance reaches domain work too.
+	GuidanceProse string
+
+	// ForceEscalateReason, when non-empty, makes this run escalate
+	// deterministically without calling the model — the hard arm of the
+	// escalation union (§4): a Composer-config escalation RULE matched the live
+	// ticket (composer.Assembled.Escalate). The platform escalates regardless of
+	// what the model would have decided. The string is the internal reason
+	// recorded on the escalation. See the short-circuit in Run.
+	ForceEscalateReason string
+
 	// Resume, when non-nil, makes this a RESUMING run: instead of starting
 	// fresh, the runner reconstructs the prior context from Resume.PriorTrace,
 	// resolves the previously-gated tool call (execute the approved write /

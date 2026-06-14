@@ -170,6 +170,9 @@ func buildResumeSeedMessages(systemPrompt string, req RunRequest, composerInstru
 	if strings.TrimSpace(runtimePrompt) != "" {
 		out = append(out, llm.Message{Role: llm.RoleSystem, Content: []llm.ContentBlock{{Type: llm.ContentBlockTypeText, Text: runtimePrompt}}})
 	}
+	if msg, ok := guidanceSystemBlock(req.GuidanceProse); ok {
+		out = append(out, msg)
+	}
 	if len(req.Context) > 0 {
 		if body, err := json.MarshalIndent(req.Context, "", "  "); err == nil {
 			out = append(out, llm.Message{Role: llm.RoleSystem, Content: []llm.ContentBlock{{Type: llm.ContentBlockTypeText, Text: "Context:\n" + string(body)}}})
