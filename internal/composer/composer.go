@@ -28,6 +28,7 @@ var (
 	emptyGuidance   = json.RawMessage(`[]`)
 	emptyAutomation = json.RawMessage(`{"auto_send":false,"approval_required_tool_slugs":[]}`)
 	emptyEscalation = json.RawMessage(`{"rules":[],"guidance":[]}`)
+	emptyCapability = json.RawMessage(`{"kb_scope":{"folder_ids":[],"article_ids":[]},"tool_slugs":[]}`)
 )
 
 // Manager is the DB-backed façade for the singleton composer_config row.
@@ -80,7 +81,7 @@ func (m *Manager) GetConfig() (models.ComposerConfig, error) {
 func (m *Manager) Upsert(c models.ComposerConfig) (models.ComposerConfig, error) {
 	applyDefaults(&c)
 	var out models.ComposerConfig
-	if err := m.q.Upsert.Get(&out, c.Guidance, c.Automation, c.Escalation); err != nil {
+	if err := m.q.Upsert.Get(&out, c.Guidance, c.Automation, c.Escalation, c.Capability); err != nil {
 		m.lo.Error("error upserting composer config", "error", err)
 		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -93,6 +94,7 @@ func defaultConfig() models.ComposerConfig {
 		Guidance:   emptyGuidance,
 		Automation: emptyAutomation,
 		Escalation: emptyEscalation,
+		Capability: emptyCapability,
 	}
 }
 
@@ -105,5 +107,8 @@ func applyDefaults(c *models.ComposerConfig) {
 	}
 	if len(c.Escalation) == 0 {
 		c.Escalation = emptyEscalation
+	}
+	if len(c.Capability) == 0 {
+		c.Capability = emptyCapability
 	}
 }

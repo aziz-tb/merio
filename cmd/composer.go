@@ -59,6 +59,7 @@ func handleUpdateComposerConfig(r *fastglue.Request) error {
 		Guidance:   mustJSON(cfg.Guidance),
 		Automation: mustJSON(cfg.Automation),
 		Escalation: mustJSON(cfg.Escalation),
+		Capability: mustJSON(cfg.Capability),
 	})
 	if sErr != nil {
 		return sendErrorEnvelope(r, sErr)
@@ -92,10 +93,23 @@ func (app *App) composerValidationRefs(cfg composermodels.Config) (composer.Vali
 		}
 	}
 
+	// Capability tool slugs may be read OR write (general tier) — existence only.
+	capSlugs := map[string]bool{}
+	if slugs := cfg.Capability.ToolSlugs; len(slugs) > 0 {
+		tools, tErr := app.aiTools.GetBySlugs(slugs)
+		if tErr != nil {
+			return composer.ValidationRefs{}, tErr
+		}
+		for _, t := range tools {
+			capSlugs[t.Slug] = true
+		}
+	}
+
 	return composer.ValidationRefs{
-		WriteToolSlugs: writeSlugs,
-		InboxIDs:       inboxIDs,
-		AllowedSources: composerConditionSources,
+		WriteToolSlugs:      writeSlugs,
+		InboxIDs:            inboxIDs,
+		AllowedSources:      composerConditionSources,
+		CapabilityToolSlugs: capSlugs,
 	}, nil
 }
 

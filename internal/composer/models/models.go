@@ -66,12 +66,32 @@ type Escalation struct {
 	Guidance []GuidanceItem            `json:"guidance"`
 }
 
+// Capability is the Composer's general tier (AI_LAYER_DESIGN.md §2/§7): the
+// general KB scope and general tool slugs it may use to answer directly, without
+// delegating. GENERAL only — domain tools/KB stay with their sub-agent. The
+// general-vs-domain boundary is operator judgment + a UI hint + approval as the
+// safety net, NOT a hard code ban (you cannot perfectly classify "domain-ness").
+// Empty = today's behavior (the Composer answers from its base prompt only).
+type Capability struct {
+	KBScope   KBScope  `json:"kb_scope"`
+	ToolSlugs []string `json:"tool_slugs"`
+}
+
+// KBScope is the Composer's knowledge whitelist — general knowledge folders (and
+// optionally specific articles). Mirrors the per-agent kb_scope shape so the run
+// path resolves it through the same mechanism sub-agents use.
+type KBScope struct {
+	FolderIDs  []int `json:"folder_ids"`
+	ArticleIDs []int `json:"article_ids"`
+}
+
 // Config is the decoded, typed Composer configuration. The resolver and the
 // validator operate on this, never on the raw JSONB.
 type Config struct {
 	Guidance   []GuidanceItem `json:"guidance"`
 	Automation Automation     `json:"automation"`
 	Escalation Escalation     `json:"escalation"`
+	Capability Capability     `json:"capability"`
 }
 
 // ComposerConfig is the DB-wire row for the singleton composer_config table
@@ -82,6 +102,7 @@ type ComposerConfig struct {
 	Guidance   json.RawMessage `db:"guidance" json:"guidance"`
 	Automation json.RawMessage `db:"automation" json:"automation"`
 	Escalation json.RawMessage `db:"escalation" json:"escalation"`
+	Capability json.RawMessage `db:"capability" json:"capability"`
 	CreatedAt  time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt  time.Time       `db:"updated_at" json:"updated_at"`
 }
@@ -104,6 +125,11 @@ func (c ComposerConfig) Decode() (Config, error) {
 	if len(c.Escalation) > 0 {
 		if err := json.Unmarshal(c.Escalation, &cfg.Escalation); err != nil {
 			return Config{}, fmt.Errorf("composer: decode escalation: %w", err)
+		}
+	}
+	if len(c.Capability) > 0 {
+		if err := json.Unmarshal(c.Capability, &cfg.Capability); err != nil {
+			return Config{}, fmt.Errorf("composer: decode capability: %w", err)
 		}
 	}
 	return cfg, nil

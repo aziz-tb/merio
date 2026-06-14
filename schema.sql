@@ -1189,10 +1189,17 @@ CREATE TABLE composer_config (
 	guidance    JSONB NOT NULL DEFAULT '[]'::jsonb,
 	automation  JSONB NOT NULL DEFAULT '{"auto_send":false,"approval_required_tool_slugs":[]}'::jsonb,
 	escalation  JSONB NOT NULL DEFAULT '{"rules":[],"guidance":[]}'::jsonb,
+	capability  JSONB NOT NULL DEFAULT '{"kb_scope":{"folder_ids":[],"article_ids":[]},"tool_slugs":[]}'::jsonb,
 	created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 	updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-INSERT INTO composer_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+-- Seed the singleton with one default verification guidance item (group "other",
+-- conditioned on ticket.verification_level) so a fresh install handles unverified
+-- customers out of the box. It is ordinary config — the operator can edit,
+-- recondition (per channel/inbox), or delete it like any guidance item.
+INSERT INTO composer_config (id, guidance) VALUES (1,
+	'[{"id":"verification-default","title":"Ask unverified customers to verify before account actions","group":"other","body_text":"If the customer is not verified and asks about or requests an action on their own account (billing, contract, personal data, or account changes), ask them to complete identity verification before acting on it. General questions — opening hours, how-to, product info — do not require verification.","inbox_scope":[],"conditions":{"op":"AND","children":[{"leaf":{"source":"ticket","path":"verification_level","operator":"<","value":2}}]},"status":"live"}]'::jsonb
+) ON CONFLICT (id) DO NOTHING;
 
 -- Agent write approvals — durable record of a proposed write tool call awaiting
 -- human approval (run-ends-at-write). References use FK ids (agent_id, tool_id);

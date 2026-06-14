@@ -31,6 +31,11 @@ type ValidationRefs struct {
 	WriteToolSlugs map[string]bool
 	InboxIDs       map[int]bool
 	AllowedSources []string
+	// CapabilityToolSlugs is the set of existing tool slugs (read OR write) the
+	// Composer's capability may reference. General tools are not a distinct
+	// category — the general-vs-domain boundary is operator judgment + a UI hint
+	// + approval, not a hard validation rule — so this only checks existence.
+	CapabilityToolSlugs map[string]bool
 }
 
 // DecodeStrict decodes an operator config payload, rejecting unknown fields at
@@ -70,6 +75,11 @@ func ValidateConfig(cfg models.Config, refs ValidationRefs) error {
 	for i := range cfg.Escalation.Guidance {
 		if err := validateGuidanceItem(cfg.Escalation.Guidance[i], refs, fmt.Sprintf("escalation.guidance[%d]", i)); err != nil {
 			return err
+		}
+	}
+	for _, slug := range cfg.Capability.ToolSlugs {
+		if !refs.CapabilityToolSlugs[slug] {
+			return fmt.Errorf("capability.tool_slugs references %q, which is not an existing tool", slug)
 		}
 	}
 	return nil

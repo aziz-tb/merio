@@ -40,6 +40,7 @@ exec-runner/.venv
 !internal/composer/resolve_test.go
 !internal/composer/validate_test.go
 !internal/composer/assemble_test.go
+!internal/composer/seed_test.go
 !internal/detection/validate_test.go
 !internal/ai/runner/approval_test.go
 !internal/ai/runner/guidance_test.go

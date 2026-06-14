@@ -13,6 +13,7 @@ type Effective struct {
 	Automation         models.Automation
 	EscalationRules    []detection.ConditionTree
 	EscalationGuidance []models.GuidanceItem
+	Capability         models.Capability
 }
 
 // Resolve filters a Config down to what applies to inboxID. It filters by inbox
@@ -30,6 +31,7 @@ func Resolve(cfg models.Config, inboxID int) Effective {
 		Automation:         cfg.Automation,
 		EscalationRules:    cfg.Escalation.Rules, // deterministic + global; no per-rule scope
 		EscalationGuidance: filterLiveScoped(cfg.Escalation.Guidance, inboxID),
+		Capability:         cfg.Capability, // general tier; global, not inbox-scoped
 	}
 }
 
