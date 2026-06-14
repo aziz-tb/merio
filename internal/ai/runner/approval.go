@@ -161,17 +161,27 @@ func (r *Runner) seedResumeMessages(
 func buildResumeSeedMessages(systemPrompt string, req RunRequest, composerInstructions string) []llm.Message {
 	out := make([]llm.Message, 0, 5)
 
+	// Same composer/sub-agent split as a fresh run: the Composer gets its full
+	// assembled ComposerSystemPrompt (skeleton + guidance + roster + decision),
+	// falling back to the skeleton+decision floor; sub-agents get the runtime
+	// prompt + the guidance block.
 	var runtimePrompt string
 	if req.IsComposer {
-		runtimePrompt = joinPromptSections(strings.TrimSpace(systemPrompt), composerInstructions)
+		if strings.TrimSpace(req.ComposerSystemPrompt) != "" {
+			runtimePrompt = req.ComposerSystemPrompt
+		} else {
+			runtimePrompt = MinimalComposerSystemPrompt(composerInstructions)
+		}
 	} else {
 		runtimePrompt = buildRuntimeSystemPrompt(systemPrompt)
 	}
 	if strings.TrimSpace(runtimePrompt) != "" {
 		out = append(out, llm.Message{Role: llm.RoleSystem, Content: []llm.ContentBlock{{Type: llm.ContentBlockTypeText, Text: runtimePrompt}}})
 	}
-	if msg, ok := guidanceSystemBlock(req.GuidanceProse); ok {
-		out = append(out, msg)
+	if !req.IsComposer {
+		if msg, ok := guidanceSystemBlock(req.GuidanceProse); ok {
+			out = append(out, msg)
+		}
 	}
 	if len(req.Context) > 0 {
 		if body, err := json.MarshalIndent(req.Context, "", "  "); err == nil {

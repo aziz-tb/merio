@@ -208,10 +208,20 @@ type RunRequest struct {
 	// GuidanceProse is the assembled Composer-config guidance that applies to
 	// this conversation — the matching guidance items' prose (Slice 5),
 	// pre-evaluated by the caller (composer.Assemble) against the live ticket.
-	// Injected as a system block after the persona prompt. Empty = none applies.
-	// Set on Composer runs and threaded into the sub-agents they spawn so
-	// guidance reaches domain work too.
+	// SUB-AGENT runs use it (injected as a system block after the persona
+	// prompt); a Composer run instead receives the full structured prompt via
+	// ComposerSystemPrompt, but still carries GuidanceProse to thread to the
+	// sub-agents it spawns. Empty = none applies.
 	GuidanceProse string
+
+	// ComposerSystemPrompt is the Composer's FULL assembled system prompt
+	// (skeleton + guidance sections + specialists roster + decision/escalation),
+	// built by the caller via composer.BuildComposerSystemPrompt (the same pure
+	// assembler the ticket-prompt preview uses). The runner uses it verbatim as
+	// the Composer's system message. Empty on a Composer run falls back to the
+	// skeleton+decision floor (MinimalComposerSystemPrompt). Ignored for
+	// non-composer runs. See call_subagent.go.
+	ComposerSystemPrompt string
 
 	// ComposerTools / ComposerKBScope carry the Composer's general-tier
 	// capability (Slice 5, §2): the general tool refs + general KB scope it

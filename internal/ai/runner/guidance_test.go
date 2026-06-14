@@ -27,33 +27,57 @@ func systemText(messages []llm.Message) string {
 	return b.String()
 }
 
-// TestRun_Composer_InjectsGuidance proves assembled guidance prose reaches the
-// Composer's system prompt (Slice 5 Stage B) — the seam by which an inbox-scoped
-// item (e.g. Sie vs Du) shapes the reply.
-func TestRun_Composer_InjectsGuidance(t *testing.T) {
+// firstSystemText returns the text of the FIRST system message — the assembled
+// system prompt, before any context/history blocks.
+func firstSystemText(messages []llm.Message) string {
+	for _, m := range messages {
+		if m.Role != llm.RoleSystem {
+			continue
+		}
+		var b strings.Builder
+		for _, c := range m.Content {
+			if c.Type == llm.ContentBlockTypeText {
+				b.WriteString(c.Text)
+			}
+		}
+		return b.String()
+	}
+	return ""
+}
+
+// TestRun_Composer_UsesAssembledSystemPrompt proves the runner uses the caller's
+// assembled ComposerSystemPrompt verbatim as the Composer's system message — the
+// seam by which composer.BuildComposerSystemPrompt (skeleton + guidance sections
+// + roster + decision) reaches the model. (The guidance→sections proof itself
+// lives in the composer builder tests.)
+func TestRun_Composer_UsesAssembledSystemPrompt(t *testing.T) {
+	const assembled = "ASSEMBLED COMPOSER PROMPT\n## How to communicate\n- Address the customer with Sie."
 	prov := answerTurn("Guten Tag.")
 	r := newApprovalRunner(t, prov, fakeResolver{tools: nil}, &fakeDispatcher{})
 
 	_, err := r.Run(context.Background(), RunRequest{
-		InboundMessage: "hallo", TraceID: "t-guid", InboxID: 1, ConversationID: 5, IsComposer: true,
-		GuidanceProse: "Operator guidance for this conversation (apply where relevant):\n- Address the customer with Sie.",
+		InboundMessage: "hallo", TraceID: "t-csp", InboxID: 1, ConversationID: 5, IsComposer: true,
+		SubAgentInvoker:      &fakeSubAgentInvoker{},
+		ComposerSystemPrompt: assembled,
 	})
 	require.NoError(t, err)
 	require.Len(t, prov.calls, 1)
-	require.Contains(t, systemText(prov.calls[0].Messages), "Address the customer with Sie.")
+	require.Equal(t, assembled, firstSystemText(prov.calls[0].Messages), "composer uses ComposerSystemPrompt verbatim")
 }
 
-// TestRun_Composer_NoGuidance_NoBlock proves an empty GuidanceProse injects
-// nothing (no stray guidance header).
-func TestRun_Composer_NoGuidance_NoBlock(t *testing.T) {
+// TestRun_Composer_FallsBackToFloor proves a Composer run with no assembled
+// prompt (not built by the activity) uses the skeleton+decision floor — exactly
+// MinimalComposerSystemPrompt, which is the builder's empty-input output.
+func TestRun_Composer_FallsBackToFloor(t *testing.T) {
 	prov := answerTurn("Hi.")
 	r := newApprovalRunner(t, prov, fakeResolver{tools: nil}, &fakeDispatcher{})
 
 	_, err := r.Run(context.Background(), RunRequest{
-		InboundMessage: "hi", TraceID: "t-noguid", InboxID: 1, ConversationID: 5, IsComposer: true,
+		InboundMessage: "hi", TraceID: "t-floor", InboxID: 1, ConversationID: 5, IsComposer: true,
+		SubAgentInvoker: &fakeSubAgentInvoker{},
 	})
 	require.NoError(t, err)
-	require.NotContains(t, systemText(prov.calls[0].Messages), "Operator guidance")
+	require.Equal(t, MinimalComposerSystemPrompt(ComposerDecisionInstructions()), firstSystemText(prov.calls[0].Messages))
 }
 
 // TestRun_ForceEscalate_ShortCircuits proves the deterministic escalation arm

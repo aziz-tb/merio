@@ -96,6 +96,14 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 			if conv, cErr := a.Conversation.GetConversation(params.ConversationID, "", ""); cErr != nil {
 				a.Lo.Warn("composer guidance: load conversation failed", "conversation_id", params.ConversationID, "error", cErr)
 			} else if assembled, ok := a.assembleFor(ctx, params.InboxID, conv); ok {
+				// Full structured system prompt: skeleton + guidance sections +
+				// live specialists roster + decision/escalation, built by the
+				// same pure assembler a future ticket-prompt preview uses.
+				req.ComposerSystemPrompt = composer.BuildComposerSystemPrompt(
+					runner.ComposerSkeleton, runner.ComposerDecisionInstructions(),
+					a.composerRoster(ctx), assembled)
+				// GuidanceProse stays for threading to the sub-agents this run
+				// spawns (their prompt isn't restructured this pass).
 				req.GuidanceProse = assembled.GuidanceProse()
 				// Rule-fired escalation (deterministic arm of the §4 union): a
 				// matched escalation rule forces escalation regardless of model

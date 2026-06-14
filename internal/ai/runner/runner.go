@@ -270,7 +270,9 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		// invoker only adds delegation. See call_subagent.go.
 		if req.SubAgentInvoker != nil {
 			toolDefs = append(toolDefs, callSubagentToolDef)
-			composerInstructions = composerInstructions + "\n\n" + callSubagentInstructions + "\n\n" + answerVsDelegateInstructions
+			// terminal + delegation + answer-vs-delegate — the same text the
+			// builder closes the assembled prompt with, and the fallback floor.
+			composerInstructions = ComposerDecisionInstructions()
 		} else {
 			r.opts.Lo.Warn("runner: composer run has no sub-agent invoker; call_subagent unavailable",
 				"trace_id", req.TraceID)
@@ -342,7 +344,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		trace = append(trace, extraTrace...)
 		toolCallLog = append(toolCallLog, extraLogs...)
 	} else {
-		messages = buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions, req.GuidanceProse)
+		messages = buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions, req.GuidanceProse, req.ComposerSystemPrompt)
 	}
 	systemCount := countSystemMessages(messages)
 	cacheMgr := newCacheMarkerManager(systemCount)
@@ -750,16 +752,22 @@ func guidanceSystemBlock(prose string) (llm.Message, bool) {
 // Distinct from the get_conversation_history capability: that surfaces
 // PRIOR conversations from the same customer; the history system block
 // here is the CURRENT ticket's running context.
-func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, isComposer bool, composerInstructions, guidanceProse string) []llm.Message {
+func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, isComposer bool, composerInstructions, guidanceProse, composerSystemPrompt string) []llm.Message {
 	out := make([]llm.Message, 0, 4)
 
-	// Composers terminate via answer/escalate, so their runtime prompt
-	// carries the terminal-decision (+ call_subagent) instructions and NOT the
-	// produce_draft rule. Every other agent gets the produce_draft rule and is
-	// byte-for-byte unchanged.
+	// The Composer's system prompt is the full structured briefing assembled by
+	// the caller (composer.BuildComposerSystemPrompt) — skeleton + guidance
+	// sections + specialists roster + decision/escalation. Absent it (a composer
+	// run not built by the activity — tests, the test endpoint) it falls back to
+	// the skeleton+decision floor, which is exactly that assembler's empty-input
+	// output. Every other agent gets the produce_draft runtime prompt, unchanged.
 	var runtimePrompt string
 	if isComposer {
-		runtimePrompt = joinPromptSections(strings.TrimSpace(systemPrompt), composerInstructions)
+		if strings.TrimSpace(composerSystemPrompt) != "" {
+			runtimePrompt = composerSystemPrompt
+		} else {
+			runtimePrompt = MinimalComposerSystemPrompt(composerInstructions)
+		}
 	} else {
 		runtimePrompt = buildRuntimeSystemPrompt(systemPrompt)
 	}
@@ -773,8 +781,12 @@ func buildInitialMessages(systemPrompt string, ctxData map[string]any, history [
 		})
 	}
 
-	if msg, ok := guidanceSystemBlock(guidanceProse); ok {
-		out = append(out, msg)
+	// Guidance is a SUB-AGENT-only block here — the Composer's guidance is
+	// already assembled into ComposerSystemPrompt's sections above.
+	if !isComposer {
+		if msg, ok := guidanceSystemBlock(guidanceProse); ok {
+			out = append(out, msg)
+		}
 	}
 
 	if len(ctxData) > 0 {

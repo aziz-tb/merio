@@ -9,6 +9,7 @@ import (
 
 	"github.com/aziz-tb/merio/internal/ai/runner"
 	approvalsmodels "github.com/aziz-tb/merio/internal/approvals/models"
+	"github.com/aziz-tb/merio/internal/composer"
 	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
 	"github.com/volatiletech/null/v9"
@@ -35,17 +36,18 @@ import (
 // time (so a customer message arriving during the approval gap is naturally
 // picked up — the situation changed).
 type resumeSeed struct {
-	conversationID    int
-	inboxID           int
-	verificationLevel int
-	invokerUserID     int
-	inbound           string
-	context           map[string]any
-	history           []runner.ConversationMessage
-	approvalSlugs     []string
-	guidanceProse     string
-	deadline          time.Duration
-	eventPublisher    runner.EventPublisher
+	conversationID       int
+	inboxID              int
+	verificationLevel    int
+	invokerUserID        int
+	inbound              string
+	context              map[string]any
+	history              []runner.ConversationMessage
+	approvalSlugs        []string
+	guidanceProse        string
+	composerSystemPrompt string
+	deadline             time.Duration
+	eventPublisher       runner.EventPublisher
 }
 
 // resumeInputs is everything runResume needs, loaded/decided by the caller.
@@ -90,6 +92,7 @@ func baseResumeReq(seed resumeSeed, traceID string) runner.RunRequest {
 		TraceID:               traceID,
 		ApprovalRequiredSlugs: seed.approvalSlugs,
 		GuidanceProse:         seed.guidanceProse,
+		ComposerSystemPrompt:  seed.composerSystemPrompt,
 		Deadline:              seed.deadline,
 		EventPublisher:        seed.eventPublisher,
 	}
@@ -248,24 +251,30 @@ func (a *Activities) buildResumeSeed(ctx context.Context, params wfairuns.AgentR
 	if params.DeadlineMs > 0 {
 		deadline = time.Duration(params.DeadlineMs) * time.Millisecond
 	}
-	// Guidance (Slice 5) shapes the resumed reply too. Best-effort: an assemble
-	// failure just yields no guidance. Approval slugs stay on the proven Slice-4
-	// path so resume gating is unchanged.
-	var guidanceProse string
+	// Guidance + the full structured Composer system prompt (Slice 5 + the
+	// prompt-assembly refinement) shape the resumed reply too, so a resumed
+	// Composer gets the same briefing as a fresh run. Best-effort: an assemble
+	// failure yields neither (the runner falls back to the floor). Approval slugs
+	// stay on the proven Slice-4 path so resume gating is unchanged.
+	var guidanceProse, composerSystemPrompt string
 	if assembled, ok := a.assembleFor(ctx, params.InboxID, conv); ok {
 		guidanceProse = assembled.GuidanceProse()
+		composerSystemPrompt = composer.BuildComposerSystemPrompt(
+			runner.ComposerSkeleton, runner.ComposerDecisionInstructions(),
+			a.composerRoster(ctx), assembled)
 	}
 	return resumeSeed{
-		conversationID:    conv.ID,
-		inboxID:           params.InboxID,
-		verificationLevel: conv.VerificationLevel,
-		invokerUserID:     params.InvokerUserID,
-		inbound:           resumeContinuationPrompt,
-		history:           history,
-		approvalSlugs:     a.approvalSlugs(params.InboxID),
-		guidanceProse:     guidanceProse,
-		deadline:          deadline,
-		eventPublisher:    pub,
+		conversationID:       conv.ID,
+		inboxID:              params.InboxID,
+		verificationLevel:    conv.VerificationLevel,
+		invokerUserID:        params.InvokerUserID,
+		inbound:              resumeContinuationPrompt,
+		history:              history,
+		approvalSlugs:        a.approvalSlugs(params.InboxID),
+		guidanceProse:        guidanceProse,
+		composerSystemPrompt: composerSystemPrompt,
+		deadline:             deadline,
+		eventPublisher:       pub,
 	}
 }
 

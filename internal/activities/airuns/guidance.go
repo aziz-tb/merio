@@ -3,6 +3,8 @@ package airuns
 import (
 	"context"
 	"encoding/json"
+	"sort"
+	"strings"
 
 	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
 	"github.com/aziz-tb/merio/internal/composer"
@@ -82,6 +84,45 @@ func (a *Activities) assembleFor(ctx context.Context, inboxID int, conv convmode
 		return composer.Assembled{}, false
 	}
 	return composer.Assemble(composer.Resolve(cfg, inboxID), a.evaluationContextFor(ctx, conv)), true
+}
+
+// composerRoster formats the live enabled sub-agents into the body of the
+// Composer's "Available specialists" section — one "- <slug> — <description>"
+// line per agent, sorted by id for deterministic output. It is the FULL catalog
+// of enabled specialists, always: detection may later SUGGEST relevance (Slice
+// 6, additive) but must never filter this list — the Composer sees every
+// specialist and decides who to call. Returns "" when none are enabled (the
+// section is omitted). Best-effort: a load failure logs and yields no roster.
+func (a *Activities) composerRoster(ctx context.Context) string {
+	if a.Agents == nil {
+		return ""
+	}
+	agents, err := a.Agents.ListEnabled(ctx)
+	if err != nil {
+		if a.Lo != nil {
+			a.Lo.Warn("composer roster: list enabled agents failed", "error", err)
+		}
+		return ""
+	}
+	return formatRoster(agents)
+}
+
+// formatRoster renders enabled sub-agents into the roster body — "- <slug> —
+// <description>" lines (description omitted when blank), sorted by id for
+// byte-deterministic output. "" when there are none. Pure (no DB) so it is
+// unit-testable.
+func formatRoster(agents []agentmodels.Agent) string {
+	sorted := append([]agentmodels.Agent(nil), agents...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
+	lines := make([]string, 0, len(sorted))
+	for _, ag := range sorted {
+		line := "- " + ag.Slug
+		if desc := strings.TrimSpace(ag.Description); desc != "" {
+			line += " — " + desc
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // composerCapabilityRefs converts the Composer's resolved general-tier

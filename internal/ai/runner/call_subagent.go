@@ -113,12 +113,9 @@ type SubAgentCall struct {
 
 // SubAgentToolOutput is the raw output of one write-category tool a sub-agent
 // ran. The composer reports these to the customer as fact, so they travel
-// unparaphrased (reads stay summarized in ReportText).
-//
-// Slice 1 ships no write tools, so the invoker returns an empty (non-nil)
-// slice. Slice 4 populates it by filtering the sub-agent's tool calls to
-// write-category outputs — the shape here is exactly the one Slice 4 fills,
-// so the contract does not change.
+// unparaphrased (reads stay summarized in ReportText). The invoker populates it
+// by filtering the sub-agent's tool calls to write-category outputs; a run that
+// took no write actions returns an empty (non-nil) slice.
 type SubAgentToolOutput struct {
 	ToolID   string `json:"tool_id"`
 	ToolName string `json:"tool_name,omitempty"`
@@ -144,7 +141,7 @@ type SubAgentReport struct {
 }
 
 // SubAgentInvoker runs one sub-agent and returns its report. It is the seam
-// between the generic runner and orchestration: the runner calls it when an
+// between the generic runner and orchestration: the runner calls it when a
 // composer emits call_subagent; the implementation
 // (internal/activities/airuns/subagent.go) runs a full Runner.Run, persists
 // the sub-agent trace, and shapes the report. A nil invoker on a RunRequest
@@ -161,14 +158,24 @@ type SubAgentInvoker interface {
 // lookup key.
 const composerAgentSlug = "composer"
 
-// composerStubPrompt is the platform-owned composer system prompt. The
-// composer is configured by the platform, not authored as an agent, so its
-// prompt lives in code rather than ai_agents.prompt.
-//
-// TODO(slice-3): composer behavioral guidance comes from Composer config —
-// this stub is replaced/augmented by per-inbox guidance items resolved at run
-// start. For now it is a minimal placeholder so the loop has a system prompt.
-const composerStubPrompt = `You are the support composer. You own the conversation: decide which specialized sub-agents to consult and in what order, then compose the single customer-facing reply yourself. Delegate scoped tasks to sub-agents via call_subagent and use their reports to write the final draft.`
+// ComposerSkeleton is the platform-owned base identity every Composer run is
+// built on. The Composer is configured by the platform, not authored as an
+// agent, so its skeleton lives in code rather than ai_agents.prompt. It is the
+// stable floor: at run start, Slice-5 Composer-config guidance, the live
+// specialists roster, and the general-tier capability are assembled ON TOP of it
+// (composer.BuildComposerSystemPrompt). The skeleton ALONE is a complete,
+// coherent instruction set — everything assembled above it is additive.
+const ComposerSkeleton = `You are the Composer: the single AI owner of this customer conversation. You answer general questions yourself, delegate domain work to specialist sub-agents, and compose the one reply the customer receives. Only you reply to the customer or decide the ticket — a specialist never does.
+
+- Answer directly: general questions from your own knowledge and general tools (hours, company info, how-to, general policy, greetings).
+- Delegate: anything needing domain expertise or a domain action (billing, contracts, meter readings, account-specific data or changes) goes to the relevant specialist; use its report. You hold no domain tools or knowledge by design. The line is general-vs-domain, not read-vs-write.
+- A message can need both — answer the general part and delegate the domain part, then compose one reply. There is no merge or voting: you read the reports and write a single coherent reply.
+
+Work the conversation at its current state. Read what earlier turns already did and continue from there; never repeat an action already completed. The request is the latest customer message read in full context.
+
+IMPORTANT — honesty: never tell the customer an action was done, started, or in progress unless a tool result confirms it. Never promise an action you cannot perform or claim a capability you lack. If you cannot resolve the request, escalate — an honest escalation beats a false promise, and beats looping on tools without deciding.
+
+Finish every turn with exactly one terminal decision: answer or escalate (detailed below).`
 
 // platformComposerAgent is the synthetic agent config a composer run executes
 // with. The composer is not loaded from ai_agents (it is a platform component,
@@ -181,12 +188,32 @@ const composerStubPrompt = `You are the support composer. You own the conversati
 func platformComposerAgent(tools, kbScope json.RawMessage) agentmodels.Agent {
 	return agentmodels.Agent{
 		Slug:          composerAgentSlug,
-		Prompt:        composerStubPrompt,
+		Prompt:        ComposerSkeleton,
 		Enabled:       true,
 		MaxIterations: defaultMaxIterations,
 		Tools:         tools,
 		KBScope:       kbScope,
 	}
+}
+
+// ComposerDecisionInstructions is the platform decision contract that closes the
+// Composer's system prompt: the terminal-decision rule + the delegation rule +
+// the answer-vs-delegate default. Exported so the activity (and the future
+// ticket-prompt preview) feed it into composer.BuildComposerSystemPrompt; the
+// runner uses the same text for its minimal fallback, so both stay identical.
+func ComposerDecisionInstructions() string {
+	return joinPromptSections(joinPromptSections(terminalDecisionInstructions, callSubagentInstructions), answerVsDelegateInstructions)
+}
+
+// MinimalComposerSystemPrompt is the Composer system-prompt FLOOR — skeleton +
+// decision, no guidance, no roster. The runner uses it for a composer run that
+// arrives without an assembled ComposerSystemPrompt (i.e. not built by the
+// activity — tests, the test endpoint). By construction it equals
+// composer.BuildComposerSystemPrompt(ComposerSkeleton, decision, "", Assembled{})
+// (same join semantics, every middle section empty); the airuns drift-guard test
+// pins that equality so the floor and the builder cannot diverge in structure.
+func MinimalComposerSystemPrompt(decision string) string {
+	return joinPromptSections(ComposerSkeleton, decision)
 }
 
 // subAgentParentContext projects the composer's RunRequest into the

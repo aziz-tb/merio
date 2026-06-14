@@ -41,6 +41,7 @@ exec-runner/.venv
 !internal/composer/validate_test.go
 !internal/composer/assemble_test.go
 !internal/composer/seed_test.go
+!internal/composer/systemprompt_test.go
 !internal/detection/validate_test.go
 !internal/ai/runner/approval_test.go
 !internal/ai/runner/guidance_test.go
@@ -50,3 +51,4 @@ exec-runner/.venv
 /graphify-out
 /ai_dump.txt
 !internal/activities/airuns/resume_test.go
+!internal/activities/airuns/prompt_assembly_test.go
