@@ -954,234 +954,9 @@ CREATE TABLE functions (
 );
 CREATE INDEX index_functions_on_domain ON functions (domain);
 
--- Seed the 4 customer-identification executors as functions rows with
--- starter code and preview parameters. Operators replace TODOs with their
--- ERP calls. A function is callable once it exists with non-empty code.
-INSERT INTO functions (name, domain, code, language, packages, timeout_ms, parameters)
-VALUES
-    ('search_customer_by_fields', 'customer_identification', $code$
-import sdk
-import requests
-
-# Inputs come from the AI's parameter extraction (configured in
-# the "AI-based identification" admin section). Any subset may be
-# present; absent fields are None.
-contract_id = sdk.input.get("contractId")
-customer_id = sdk.input.get("customerId")
-firstname = sdk.input.get("firstname")
-lastname = sdk.input.get("lastname")
-email = sdk.input.get("email")
-phone = sdk.input.get("phone")
-zip_code = sdk.input.get("zip")
-city = sdk.input.get("city")
-company = sdk.input.get("company")
-ticket_id = sdk.input.get("ticketId")
-
-# Reject calls with no useful inputs.
-if not any([contract_id, customer_id, firstname, lastname, email, phone, company]):
-    sdk.failure("no identifying attributes provided", code="MISSING_INPUT")
-    raise SystemExit
-
-# TODO: replace with your ERP endpoint + auth.
-# Example shape - adjust to your API.
-try:
-    resp = requests.get(
-        "https://your-erp.example.com/api/customers/search",
-        params={
-            "contractId": contract_id,
-            "customerId": customer_id,
-            "firstName": firstname,
-            "lastName": lastname,
-            "email": email,
-        },
-        timeout=10,
-    )
-except requests.RequestException as e:
-    sdk.error(f"ERP unreachable: {e}", retryable=True)
-    raise SystemExit
-
-if resp.status_code == 404:
-    sdk.failure("no customer matched the provided attributes", code="NOT_FOUND")
-    raise SystemExit
-if not resp.ok:
-    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
-    raise SystemExit
-
-# Return AT MOST ONE match. If multiple candidates exist, return the
-# most likely one. Empty {} is also a valid "no match" outcome via failure().
-match = resp.json()
-
-# Expected output shape:
-#
-#   {
-#     "contractId": "<external contract id>",   # required
-#     "customerId": "<external customer id>",   # required
-#
-#     # Optional override of the verification flow:
-#     #   "customerVerification": 2,
-#     #   "customerVerificationMessage": "<reason if not 2>",
-#     # When set, the engine uses these values directly and skips
-#     # the rule evaluation. Use sparingly.
-#
-#     # Optional preview shown to operators in the sidebar:
-#     #   "agentPreview": [{"label": "...", "value": "...", "tooltip": null, "url": null}],
-#   }
-
-sdk.success(data=match)
-$code$, 'python', '', 30000, '[
-      {"id":"11111111-1111-4111-8111-000000000001","key":"contractId","value":""},
-      {"id":"11111111-1111-4111-8111-000000000002","key":"customerId","value":""},
-      {"id":"11111111-1111-4111-8111-000000000003","key":"firstname","value":""},
-      {"id":"11111111-1111-4111-8111-000000000004","key":"lastname","value":""},
-      {"id":"11111111-1111-4111-8111-000000000005","key":"email","value":""},
-      {"id":"11111111-1111-4111-8111-000000000006","key":"phone","value":""},
-      {"id":"11111111-1111-4111-8111-000000000007","key":"zip","value":""},
-      {"id":"11111111-1111-4111-8111-000000000008","key":"city","value":""},
-      {"id":"11111111-1111-4111-8111-000000000009","key":"company","value":""},
-      {"id":"11111111-1111-4111-8111-000000000010","key":"ticketId","value":""}
-    ]'::jsonb),
-    ('search_contract_by_id', 'customer_identification', $code$
-import sdk
-import requests
-
-contract_id = sdk.input.get("contractId")
-if not contract_id:
-    sdk.failure("contractId is required", code="MISSING_INPUT")
-    raise SystemExit
-
-# TODO: fetch the contract from your ERP by ID.
-try:
-    resp = requests.get(
-        f"https://your-erp.example.com/api/contracts/{contract_id}",
-        timeout=10,
-    )
-except requests.RequestException as e:
-    sdk.error(f"ERP unreachable: {e}", retryable=True)
-    raise SystemExit
-
-if resp.status_code == 404:
-    sdk.failure(f"contract {contract_id} not found", code="NO_CONTRACT")
-    raise SystemExit
-if not resp.ok:
-    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
-    raise SystemExit
-
-contract = resp.json()
-
-# Expected output shape - the full contract record:
-#
-#   {
-#     "id": "<external contract id>",            # required (string or int)
-#     "customerId": "<external customer id>",    # required (FK to the customer)
-#     "business": false,                         # required (true if commercial)
-#     "lastname": "<surname>",                   # required if business=false
-#     "company": "<company name>",               # required if business=true
-#     "firstname": "<given name>",               # optional
-#     "email": "<contact email>",                # optional
-#     "phone": "<contact phone>",                # optional
-#     "deliveryAddress": "<full delivery address>",
-#     "billingAddress": "<full billing address>",
-#     "zip": "<delivery zip>",
-#     "agentPreview": [{"label": "...", "value": "...", "tooltip": null, "url": null}],
-#     "erpUrls": [{"label": "...", "url": "...", "icon": null}],
-#     # Any additional fields are preserved verbatim and available
-#     # to custom criteria via dot-notation (e.g., extra_data.malo).
-#   }
-
-sdk.success(data=contract)
-$code$, 'python', '', 30000, '[
-      {"id":"22222222-2222-4222-8222-000000000001","key":"contractId","value":""}
-    ]'::jsonb),
-    ('search_customer_by_id', 'customer_identification', $code$
-import sdk
-import requests
-
-customer_id = sdk.input.get("customerId")
-if not customer_id:
-    sdk.failure("customerId is required", code="MISSING_INPUT")
-    raise SystemExit
-
-# TODO: fetch the customer from your ERP by ID.
-try:
-    resp = requests.get(
-        f"https://your-erp.example.com/api/customers/{customer_id}",
-        timeout=10,
-    )
-except requests.RequestException as e:
-    sdk.error(f"ERP unreachable: {e}", retryable=True)
-    raise SystemExit
-
-if resp.status_code == 404:
-    sdk.failure(f"customer {customer_id} not found", code="NO_CUSTOMER")
-    raise SystemExit
-if not resp.ok:
-    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
-    raise SystemExit
-
-customer = resp.json()
-
-# Expected output shape - the full customer record:
-#
-#   {
-#     "id": "<external customer id>",            # required
-#     "business": false,                         # required (true if commercial)
-#     "lastname": "<surname>",                   # required if business=false
-#     "company": "<company name>",               # required if business=true
-#     "contractIds": ["<id>", "<id>"],           # required; at least one
-#     "firstname": "<given name>",               # optional
-#     "email": "<contact email>",                # optional
-#     "phone": "<contact phone>",                # optional
-#     "deliveryAddress": "<full delivery address>",
-#     "billingAddress": "<full billing address>",
-#   }
-
-sdk.success(data=customer)
-$code$, 'python', '', 30000, '[
-      {"id":"33333333-3333-4333-8333-000000000001","key":"customerId","value":""}
-    ]'::jsonb),
-    ('search_customer_by_free_text', 'customer_identification', $code$
-import sdk
-import requests
-
-q = sdk.input.get("q", "")
-offset = int(sdk.input.get("offset", 0))
-limit = int(sdk.input.get("limit", 10))
-
-if not q.strip():
-    sdk.failure("search query is empty", code="MISSING_INPUT")
-    raise SystemExit
-
-# TODO: free-text search across customers using q.
-# Used by the agent search bar at the top of the screen.
-try:
-    resp = requests.get(
-        "https://your-erp.example.com/api/customers/search",
-        params={"q": q, "offset": offset, "limit": limit},
-        timeout=10,
-    )
-except requests.RequestException as e:
-    sdk.error(f"ERP unreachable: {e}", retryable=True)
-    raise SystemExit
-
-if not resp.ok:
-    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
-    raise SystemExit
-
-# Expected output shape - array of partial customer records.
-# merio will fetch full details for each via search_customer_by_id,
-# so this only needs to return the IDs:
-#
-#   [ { "id": "<external customer id>" }, ... ]
-
-results = resp.json()
-sdk.success(data=results)
-$code$, 'python', '', 30000, '[
-      {"id":"44444444-4444-4444-8444-000000000001","key":"q","value":""},
-      {"id":"44444444-4444-4444-8444-000000000002","key":"offset","value":"0"},
-      {"id":"44444444-4444-4444-8444-000000000003","key":"limit","value":"10"}
-    ]'::jsonb)
-ON CONFLICT (name) DO NOTHING;
-
+-- ai_tools — low-code tool definitions created by users in the UI, linked to
+-- executable functions. ai_tools rows are the source of truth for what tools
+-- exist and their metadata; the linked function is the source of truth for the code that runs when the tool is called.
 CREATE TABLE ai_tools (
 	id                SERIAL PRIMARY KEY,
 	created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1849,3 +1624,231 @@ VALUES (
   '',
   true
 );
+
+-- Seed the 4 customer-identification executors as functions rows with
+-- starter code and preview parameters. Operators replace TODOs with their
+-- ERP calls. A function is callable once it exists with non-empty code.
+INSERT INTO functions (name, domain, code, language, packages, timeout_ms, parameters)
+VALUES
+    ('search_customer_by_fields', 'customer_identification', $code$
+import sdk
+import requests
+
+# Inputs come from the AIs parameter extraction (configured in
+# the "AI-based identification" admin section). Any subset may be
+# present; absent fields are None.
+contract_id = sdk.input.get("contractId")
+customer_id = sdk.input.get("customerId")
+firstname = sdk.input.get("firstname")
+lastname = sdk.input.get("lastname")
+email = sdk.input.get("email")
+phone = sdk.input.get("phone")
+zip_code = sdk.input.get("zip")
+city = sdk.input.get("city")
+company = sdk.input.get("company")
+ticket_id = sdk.input.get("ticketId")
+
+# Reject calls with no useful inputs.
+if not any([contract_id, customer_id, firstname, lastname, email, phone, company]):
+    sdk.failure("no identifying attributes provided", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: replace with your ERP endpoint + auth.
+# Example shape - adjust to your API.
+try:
+    resp = requests.get(
+        "https://your-erp.example.com/api/customers/search",
+        params={
+            "contractId": contract_id,
+            "customerId": customer_id,
+            "firstName": firstname,
+            "lastName": lastname,
+            "email": email,
+        },
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if resp.status_code == 404:
+    sdk.failure("no customer matched the provided attributes", code="NOT_FOUND")
+    raise SystemExit
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+# Return AT MOST ONE match. If multiple candidates exist, return the
+# most likely one. Empty {} is also a valid "no match" outcome via failure().
+match = resp.json()
+
+# Expected output shape:
+#
+#   {
+#     "contractId": "<external contract id>",   # required
+#     "customerId": "<external customer id>",   # required
+#
+#     # Optional override of the verification flow:
+#     #   "customerVerification": 2,
+#     #   "customerVerificationMessage": "<reason if not 2>",
+#     # When set, the engine uses these values directly and skips
+#     # the rule evaluation. Use sparingly.
+#
+#     # Optional preview shown to operators in the sidebar:
+#     #   "agentPreview": [{"label": "...", "value": "...", "tooltip": null, "url": null}],
+#   }
+
+sdk.success(data=match)
+$code$, 'python', '', 30000, '[
+      {"id":"11111111-1111-4111-8111-000000000001","key":"contractId","value":""},
+      {"id":"11111111-1111-4111-8111-000000000002","key":"customerId","value":""},
+      {"id":"11111111-1111-4111-8111-000000000003","key":"firstname","value":""},
+      {"id":"11111111-1111-4111-8111-000000000004","key":"lastname","value":""},
+      {"id":"11111111-1111-4111-8111-000000000005","key":"email","value":""},
+      {"id":"11111111-1111-4111-8111-000000000006","key":"phone","value":""},
+      {"id":"11111111-1111-4111-8111-000000000007","key":"zip","value":""},
+      {"id":"11111111-1111-4111-8111-000000000008","key":"city","value":""},
+      {"id":"11111111-1111-4111-8111-000000000009","key":"company","value":""},
+      {"id":"11111111-1111-4111-8111-000000000010","key":"ticketId","value":""}
+    ]'::jsonb),
+    ('search_contract_by_id', 'customer_identification', $code$
+import sdk
+import requests
+
+contract_id = sdk.input.get("contractId")
+if not contract_id:
+    sdk.failure("contractId is required", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: fetch the contract from your ERP by ID.
+try:
+    resp = requests.get(
+        f"https://your-erp.example.com/api/contracts/{contract_id}",
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if resp.status_code == 404:
+    sdk.failure(f"contract {contract_id} not found", code="NO_CONTRACT")
+    raise SystemExit
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+contract = resp.json()
+
+# Expected output shape - the full contract record:
+#
+#   {
+#     "id": "<external contract id>",            # required (string or int)
+#     "customerId": "<external customer id>",    # required (FK to the customer)
+#     "business": false,                         # required (true if commercial)
+#     "lastname": "<surname>",                   # required if business=false
+#     "company": "<company name>",               # required if business=true
+#     "firstname": "<given name>",               # optional
+#     "email": "<contact email>",                # optional
+#     "phone": "<contact phone>",                # optional
+#     "deliveryAddress": "<full delivery address>",
+#     "billingAddress": "<full billing address>",
+#     "zip": "<delivery zip>",
+#     "agentPreview": [{"label": "...", "value": "...", "tooltip": null, "url": null}],
+#     "erpUrls": [{"label": "...", "url": "...", "icon": null}],
+#     # Any additional fields are preserved verbatim and available
+#     # to custom criteria via dot-notation (e.g., extra_data.malo).
+#   }
+
+sdk.success(data=contract)
+$code$, 'python', '', 30000, '[
+      {"id":"22222222-2222-4222-8222-000000000001","key":"contractId","value":""}
+    ]'::jsonb),
+    ('search_customer_by_id', 'customer_identification', $code$
+import sdk
+import requests
+
+customer_id = sdk.input.get("customerId")
+if not customer_id:
+    sdk.failure("customerId is required", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: fetch the customer from your ERP by ID.
+try:
+    resp = requests.get(
+        f"https://your-erp.example.com/api/customers/{customer_id}",
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if resp.status_code == 404:
+    sdk.failure(f"customer {customer_id} not found", code="NO_CUSTOMER")
+    raise SystemExit
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+customer = resp.json()
+
+# Expected output shape - the full customer record:
+#
+#   {
+#     "id": "<external customer id>",            # required
+#     "business": false,                         # required (true if commercial)
+#     "lastname": "<surname>",                   # required if business=false
+#     "company": "<company name>",               # required if business=true
+#     "contractIds": ["<id>", "<id>"],           # required; at least one
+#     "firstname": "<given name>",               # optional
+#     "email": "<contact email>",                # optional
+#     "phone": "<contact phone>",                # optional
+#     "deliveryAddress": "<full delivery address>",
+#     "billingAddress": "<full billing address>",
+#   }
+
+sdk.success(data=customer)
+$code$, 'python', '', 30000, '[
+      {"id":"33333333-3333-4333-8333-000000000001","key":"customerId","value":""}
+    ]'::jsonb),
+    ('search_customer_by_free_text', 'customer_identification', $code$
+import sdk
+import requests
+
+q = sdk.input.get("q", "")
+offset = int(sdk.input.get("offset", 0))
+limit = int(sdk.input.get("limit", 10))
+
+if not q.strip():
+    sdk.failure("search query is empty", code="MISSING_INPUT")
+    raise SystemExit
+
+# TODO: free-text search across customers using q.
+# Used by the agent search bar at the top of the screen.
+try:
+    resp = requests.get(
+        "https://your-erp.example.com/api/customers/search",
+        params={"q": q, "offset": offset, "limit": limit},
+        timeout=10,
+    )
+except requests.RequestException as e:
+    sdk.error(f"ERP unreachable: {e}", retryable=True)
+    raise SystemExit
+
+if not resp.ok:
+    sdk.error(f"ERP returned {resp.status_code}", retryable=resp.status_code >= 500)
+    raise SystemExit
+
+# Expected output shape - array of partial customer records.
+# merio will fetch full details for each via search_customer_by_id,
+# so this only needs to return the IDs:
+#
+#   [ { "id": "<external customer id>" }, ... ]
+
+results = resp.json()
+sdk.success(data=results)
+$code$, 'python', '', 30000, '[
+      {"id":"44444444-4444-4444-8444-000000000001","key":"q","value":""},
+      {"id":"44444444-4444-4444-8444-000000000002","key":"offset","value":"0"},
+      {"id":"44444444-4444-4444-8444-000000000003","key":"limit","value":"10"}
+    ]'::jsonb)
+ON CONFLICT (name) DO NOTHING;
