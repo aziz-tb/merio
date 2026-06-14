@@ -152,6 +152,12 @@ func shapeSubAgentReport(resp runner.RunResponse, runErr error) runner.SubAgentR
 	switch {
 	case runErr != nil:
 		report.ReportText = "sub-agent could not complete: " + runErr.Error()
+	case resp.Status == runner.StatusAwaitingApproval && resp.ProposedWrite != nil:
+		// The sub-agent paused at an approval-gated write. Bubble it up so the
+		// composer run also ends awaiting approval (it persists no record; the
+		// invoker persisted one against the sub-agent run).
+		report.AwaitingApproval = resp.ProposedWrite
+		report.ReportText = "sub-agent paused awaiting human approval for tool " + resp.ProposedWrite.ToolSlug
 	case resp.Draft != nil && strings.TrimSpace(*resp.Draft) != "":
 		report.ReportText = strings.TrimSpace(*resp.Draft)
 	default:

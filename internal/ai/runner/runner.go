@@ -22,6 +22,7 @@ import (
 	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
 	"github.com/aziz-tb/merio/internal/customer"
+	execModels "github.com/aziz-tb/merio/internal/exec/runner/models"
 	"github.com/aziz-tb/merio/internal/knowledge"
 	"github.com/aziz-tb/merio/internal/user"
 )
@@ -32,6 +33,20 @@ import (
 // directly (it implements this).
 type AgentLoader interface {
 	Get(id int) (agentmodels.Agent, error)
+}
+
+// ToolResolver resolves an agent's tools JSONB into ResolvedTools. Defined as
+// an interface (like AgentLoader) so tests substitute a fake; production wires
+// *resolver.Resolver.
+type ToolResolver interface {
+	Resolve(rawTools json.RawMessage, kbScope builtin.KBScope) ([]resolver.ResolvedTool, map[int]string, error)
+}
+
+// ToolDispatcher dispatches one resolved tool call through the unified
+// dispatcher. Interface so tests substitute a fake (e.g. to assert the approval
+// resume executes a write exactly once); production wires *aitools.Dispatcher.
+type ToolDispatcher interface {
+	Dispatch(ctx context.Context, req aitools.DispatchRequest) (*execModels.Result, error)
 }
 
 // Defaults applied when RunRequest fields are zero. v1 hardcoded; the
@@ -106,8 +121,8 @@ type UsageRow struct {
 type Opts struct {
 	Provider     llm.LLMProvider
 	Agents       AgentLoader
-	Resolver     *resolver.Resolver
-	Dispatcher   *aitools.Dispatcher
+	Resolver     ToolResolver
+	Dispatcher   ToolDispatcher
 	PresetReg    *preset.Registry
 	Lo           *logf.Logger
 	Events       EventPublisher
@@ -265,14 +280,6 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		}, fmt.Errorf("runner: resolve preset: %w", err)
 	}
 
-	// Build initial messages. System prompt(s) first, then optional
-	// pre-prepared context as a second system message, then the inbound
-	// message as the user turn. The cache marker manager seeds with a
-	// marker after the last system message.
-	messages := buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions)
-	systemCount := countSystemMessages(messages)
-	cacheMgr := newCacheMarkerManager(systemCount)
-
 	// Build the runtime context handed to internal capabilities. The KB
 	// scope is decoded once per run and threaded into every dispatch
 	// (kb_search reads rt.KBScope to enforce intersection semantics).
@@ -296,6 +303,13 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		Contract:            r.opts.Contract,
 	}
 
+	// resolvedByName lets the approval gate and the resume path find a
+	// ResolvedTool by the slug the LLM emits as the tool name.
+	resolvedByName := make(map[string]resolver.ResolvedTool, len(resolved))
+	for _, tool := range resolved {
+		resolvedByName[tool.ID()] = tool
+	}
+
 	var (
 		trace       []TurnTrace
 		toolCallLog []ToolCallLog
@@ -305,6 +319,23 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		cacheHits   int
 		iterations  int
 	)
+
+	// Build the initial messages. A resuming run reconstructs prior context
+	// from the gated run's trace and pre-feeds the approved write's result
+	// (executing it exactly once); a fresh run builds the normal system +
+	// inbound seed. The cache marker manager seeds after the last system msg.
+	var messages []llm.Message
+	if req.Resume != nil {
+		var extraTrace []TurnTrace
+		var extraLogs []ToolCallLog
+		messages, extraTrace, extraLogs = r.seedResumeMessages(runCtx, req, agent, composerInstructions, resolvedByName, rt, pub)
+		trace = append(trace, extraTrace...)
+		toolCallLog = append(toolCallLog, extraLogs...)
+	} else {
+		messages = buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions)
+	}
+	systemCount := countSystemMessages(messages)
+	cacheMgr := newCacheMarkerManager(systemCount)
 
 	// Per-agent iteration cap. The agent's max_iterations (F9 schema)
 	// is one source; the request's MaxIterations override is another;
@@ -331,7 +362,9 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 	if req.IsComposer {
 		defer func() {
 			finalResp.IsComposer = true
-			if finalErr == nil && finalResp.Decision == nil {
+			// A run paused for write approval is a legitimate terminal state —
+			// leave it; the fail-safe only catches genuine no-decision exits.
+			if finalErr == nil && finalResp.Decision == nil && finalResp.Status != StatusAwaitingApproval {
 				finalResp = synthesizeEscalation(finalResp, composerNoDecisionReason(finalResp))
 			}
 		}()
@@ -538,6 +571,23 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 				return out, nil
 			}
 
+			// Approval gate (slug-driven, origin-agnostic): if the model wants
+			// to dispatch a tool whose slug is in the approval-required set,
+			// STOP before executing — record the proposed write and end the run
+			// awaiting human approval. A resuming run executes it. The same
+			// check covers a composer write and a sub-agent write because both
+			// run through this one loop. See approval.go.
+			if gated := firstGatedToolUse(turnToolUses, resolvedByName, req.ApprovalRequiredSlugs); gated != nil {
+				turn.ToolCalls = []ToolCallLog{newAwaitingApprovalLog(*gated)}
+				trace = append(trace, turn)
+				toolCallLog = append(toolCallLog, turn.ToolCalls...)
+				out := r.buildResponse(agent, nil, trace, toolCallLog, totalUsage, llmLatency, toolLatency, cacheHits, cacheMgr.Count(), iterations, drops)
+				out.Status = StatusAwaitingApproval
+				out.ProposedWrite = gated
+				r.emitRunLog(req.TraceID, agent, iterations, totalUsage, string(StatusAwaitingApproval), "awaiting approval for tool "+gated.ToolSlug)
+				return out, nil
+			}
+
 			// Dispatch the remaining non-terminal tool_use blocks.
 			// dispatchOneTool wraps each call in panic recovery +
 			// per-tool timeout.
@@ -560,6 +610,19 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 			turn.ToolCalls = results
 			trace = append(trace, turn)
 			toolCallLog = append(toolCallLog, results...)
+
+			// Sub-agent approval bubble-up: if a call_subagent's sub-agent
+			// paused at an approval-gated write, the composer run ends awaiting
+			// approval too — it can't compose without the sub-agent's real
+			// result. The gated run is the sub-agent's (one record, persisted by
+			// the invoker); the composer's ProposedWrite mirrors it for the UI.
+			if pw := bubbledApproval(results); pw != nil {
+				out := r.buildResponse(agent, nil, trace, toolCallLog, totalUsage, llmLatency, toolLatency, cacheHits, cacheMgr.Count(), iterations, drops)
+				out.Status = StatusAwaitingApproval
+				out.ProposedWrite = pw
+				r.emitRunLog(req.TraceID, agent, iterations, totalUsage, string(StatusAwaitingApproval), "sub-agent awaiting approval for tool "+pw.ToolSlug)
+				return out, nil
+			}
 
 			// Append assistant turn (with text + tool_use blocks) and
 			// the tool_result block(s) to messages for the next iteration.

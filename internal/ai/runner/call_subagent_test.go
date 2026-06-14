@@ -108,7 +108,7 @@ func TestRun_ComposerCallsSubAgent(t *testing.T) {
 		TraceID:         "trace-orch-1",
 		InboxID:         1,
 		ConversationID:  42,
-		IsComposer:  true,
+		IsComposer:      true,
 		SubAgentInvoker: invoker,
 	})
 	require.NoError(t, err)

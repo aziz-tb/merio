@@ -40,5 +40,7 @@ exec-runner/.venv
 !internal/composer/resolve_test.go
 !internal/composer/validate_test.go
 !internal/detection/validate_test.go
+!internal/ai/runner/approval_test.go
+!internal/approvals/approvals_test.go
 /graphify-out
 /ai_dump.txt

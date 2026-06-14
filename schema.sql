@@ -1419,6 +1419,37 @@ CREATE TABLE composer_config (
 );
 INSERT INTO composer_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
+-- Agent write approvals — durable record of a proposed write tool call awaiting
+-- human approval (run-ends-at-write). References use FK ids (agent_id, tool_id);
+-- the gate + LLM tool call stay slug-driven. gated_run_trace_id is the run this
+-- approval gates; parent_trace_id is the explicit composer run a sub-agent gate
+-- belongs to (NULL when the composer itself gated). The atomic status
+-- transition (pending → resolved) is the idempotency lock so the write executes
+-- at most once, in the resuming run. See internal/approvals.
+CREATE TABLE agent_write_approvals (
+	id                   BIGSERIAL PRIMARY KEY,
+	conversation_id      BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+	gated_run_trace_id   TEXT NOT NULL,
+	parent_trace_id      TEXT NULL,
+	agent_id             INT NULL REFERENCES ai_agents(id) ON DELETE SET NULL,
+	tool_id              INT NOT NULL REFERENCES ai_tools(id) ON DELETE CASCADE,
+	tool_use_id          TEXT NOT NULL,
+	proposed_inputs      JSONB NOT NULL DEFAULT '{}'::jsonb,
+	status               TEXT NOT NULL DEFAULT 'pending',
+	approved_inputs      JSONB NULL,
+	rejection_reason     TEXT NULL,
+	reviewed_by_user_id  BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+	resolved_at          TIMESTAMPTZ NULL,
+	created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	CONSTRAINT constraint_agent_write_approvals_on_status
+	    CHECK (status IN ('pending', 'approved', 'edited', 'rejected'))
+);
+CREATE INDEX index_agent_write_approvals_on_conversation
+	ON agent_write_approvals (conversation_id, status);
+CREATE UNIQUE INDEX index_agent_write_approvals_one_pending_per_run
+	ON agent_write_approvals (gated_run_trace_id) WHERE status = 'pending';
+
 -- System (Internal) inbox — sentinel FK target for ai_usage rows that
 -- have no real inbox context (rewrite manager calls, AgentTestPanel
 -- synthetic runs, future internal jobs). Channel is 'email' because

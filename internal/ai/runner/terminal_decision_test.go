@@ -54,7 +54,7 @@ func TestRun_ComposerEscalateCompletes(t *testing.T) {
 		TraceID:        "trace-esc-1",
 		InboxID:        1,
 		ConversationID: 7,
-		IsComposer: true,
+		IsComposer:     true,
 	})
 	require.NoError(t, err)
 
@@ -139,7 +139,7 @@ func TestRun_ComposerFailSafeEscalatesOnMaxIterations(t *testing.T) {
 		InboundMessage:  "help",
 		TraceID:         "trace-fs-2",
 		InboxID:         1,
-		IsComposer:  true,
+		IsComposer:      true,
 		MaxIterations:   2,
 		SubAgentInvoker: invoker,
 	})

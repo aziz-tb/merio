@@ -108,6 +108,13 @@ type SubAgentToolOutput struct {
 type SubAgentReport struct {
 	ReportText  string               `json:"report_text"`
 	ToolOutputs []SubAgentToolOutput `json:"tool_outputs"`
+
+	// AwaitingApproval is set when the sub-agent paused at an approval-gated
+	// write instead of completing. It bubbles up so the composer run ends
+	// StatusAwaitingApproval too (it can't compose without the sub-agent's real
+	// result). The approval record is persisted by the invoker against the
+	// sub-agent's run; the composer run carries no separate record. Slice 4.
+	AwaitingApproval *ProposedWrite `json:"awaiting_approval,omitempty"`
 }
 
 // SubAgentInvoker runs one sub-agent and returns its report. It is the seam

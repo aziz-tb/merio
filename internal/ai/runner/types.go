@@ -40,6 +40,13 @@ const (
 	// sending.
 	StatusComplete RunStatus = "complete"
 
+	// StatusAwaitingApproval — the run hit a tool whose slug is in the
+	// approval_required list and stopped BEFORE executing it (run-ends-at-
+	// write, Slice 4). RunResponse.ProposedWrite carries the proposed tool +
+	// inputs; a human approves/edits/rejects and a resuming run executes it.
+	// Terminal for this run; not a failure.
+	StatusAwaitingApproval RunStatus = "awaiting_approval"
+
 	// StatusPartial — reserved for future flows that intentionally
 	// commit partial drafts. The Batch 4 produce_draft contract does not
 	// currently emit this status from the agent runner.
@@ -188,6 +195,56 @@ type RunRequest struct {
 	// impossible. Per-call override in the spirit of EventPublisher. See
 	// call_subagent.go.
 	SubAgentInvoker SubAgentInvoker
+
+	// ApprovalRequiredSlugs is the set of custom-tool slugs that require
+	// human approval before execution (resolved from the composer_config by
+	// the caller). The gate is slug-driven and origin-agnostic: ANY run
+	// (composer or sub-agent) that is about to dispatch a tool whose slug is
+	// in this set stops with StatusAwaitingApproval instead of executing it.
+	// See the gate in runner.go and Slice 4.
+	ApprovalRequiredSlugs []string
+
+	// Resume, when non-nil, makes this a RESUMING run: instead of starting
+	// fresh, the runner reconstructs the prior context from Resume.PriorTrace,
+	// resolves the previously-gated tool call (execute the approved write /
+	// feed a rejection / inject a precomputed result), and continues the loop
+	// from there — it does NOT re-reason its way back to the write. See the
+	// resume path in runner.go and approval resume (Slice 4).
+	Resume *ResumeContext
+}
+
+// ProposedWrite is the tool call an approval-gated run stopped before
+// executing. It is the payload of a StatusAwaitingApproval run and the source
+// of the persisted approval record. ToolID is the canonical ai_tools FK
+// (resolved for free from the gated ResolvedTool); ToolSlug is what the LLM
+// emitted and what the resuming dispatch uses; ToolUseID is the per-call LLM id.
+type ProposedWrite struct {
+	ToolID    int            `json:"tool_id"`
+	ToolSlug  string         `json:"tool_slug"`
+	ToolUseID string         `json:"tool_use_id"`
+	Inputs    map[string]any `json:"inputs,omitempty"`
+}
+
+// ResumeContext drives a resuming run. PriorTrace is the gated run's persisted
+// trace, rendered into a read-only transcript so the model has its prior
+// context without replaying tool_use/thinking turns (avoids signature/pairing
+// fragility). The runner then authors a single assistant(tool_use) + tool_result
+// pair for the gated call and continues the loop. Exactly one resolution mode
+// applies: ExecuteWrite (dispatch ToolName(Inputs) once and feed the output),
+// Rejected (feed the rejection, no execution), or InjectedResult (feed the given
+// content verbatim — used to feed a resumed sub-agent's report back into the
+// composer at its call_subagent point).
+type ResumeContext struct {
+	PriorTrace []TurnTrace
+
+	ToolName  string         // gated tool (write slug, or the call_subagent tool name)
+	ToolUseID string         // original LLM tool_use id (informational; reconstruction uses a synthetic id)
+	Inputs    map[string]any // inputs shown in the authored assistant tool_use block
+
+	ExecuteWrite    bool    // dispatch ToolName(Inputs) once, feed its raw output
+	Rejected        bool    // feed a rejection tool_result, no dispatch
+	RejectionReason string  // rejection text fed back when Rejected
+	InjectedResult  *string // feed this content verbatim (no dispatch) — e.g. a resumed sub-agent report
 }
 
 // RunResponse is what Run() returns alongside its error. Even on
@@ -259,6 +316,11 @@ type RunResponse struct {
 	// (fail-safe to a human) rather than drop the ticket. Zero on the
 	// pre-load failure paths, which deliberately stay StatusFailed.
 	IsComposer bool `json:"is_composer,omitempty"`
+
+	// ProposedWrite is set only on Status=StatusAwaitingApproval: the
+	// approval-gated tool call the run stopped before executing. The activity
+	// persists it as a pending approval record; the resuming run executes it.
+	ProposedWrite *ProposedWrite `json:"proposed_write,omitempty"`
 }
 
 // TerminalDecision is the composer's exit: ANSWER or ESCALATE, and
