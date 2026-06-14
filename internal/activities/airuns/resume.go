@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/aziz-tb/merio/internal/ai/runner"
 	approvalsmodels "github.com/aziz-tb/merio/internal/approvals/models"
+	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
 	"github.com/volatiletech/null/v9"
 )
@@ -58,6 +60,13 @@ type resumeInputs struct {
 	rejected        bool
 	rejectionReason string
 
+	// held marks an approved write that must NOT auto-execute because the
+	// situation changed during the approval window (a customer replied — 4c).
+	// The resume feeds a neutral reconsider notice instead of dispatching, so
+	// the agent re-decides with the new message in view rather than acting blind.
+	held       bool
+	heldReason string
+
 	// Persisted traces (substance).
 	gatedTrace    []runner.TurnTrace // the loop that gated (sub-agent trace for a sub-agent gate; else the gated run)
 	composerTrace []runner.TurnTrace // the composer/parent trace (sub-agent gate only)
@@ -96,7 +105,12 @@ func runResume(ctx context.Context, r subRunner, invoker runner.SubAgentInvoker,
 		Inputs:          in.inputs,
 		Rejected:        in.rejected,
 		RejectionReason: in.rejectionReason,
-		ExecuteWrite:    !in.rejected,
+		Held:            in.held,
+		HeldReason:      in.heldReason,
+		// Execute only a clean approval: a reject or a staleness hold feeds a
+		// notice instead of dispatching. The sub-agent step copies this struct,
+		// so a hold propagates to the 2-step unchanged.
+		ExecuteWrite: !in.rejected && !in.held,
 	}
 
 	if in.subAgentGate {
@@ -161,8 +175,8 @@ func deref(p *int) int {
 // unit-tested with a fake runner.
 func (a *Activities) resumeApproval(ctx context.Context, params wfairuns.AgentRunWorkflowParams, pub runner.EventPublisher) (runner.RunResponse, error) {
 	failed := runner.RunResponse{Status: runner.StatusFailed}
-	if a.Approvals == nil || a.Executions == nil || a.Tools == nil {
-		return failed, errors.New("resume: approvals/executions/tools manager is required")
+	if a.Approvals == nil || a.Executions == nil || a.Tools == nil || a.Conversation == nil {
+		return failed, errors.New("resume: approvals/executions/tools/conversation manager is required")
 	}
 
 	ap, err := a.Approvals.GetByID(params.ResumeApprovalID)
@@ -178,17 +192,35 @@ func (a *Activities) resumeApproval(ctx context.Context, params wfairuns.AgentRu
 		return failed, err
 	}
 
+	// 4c: re-derive the conversation so the resume reasons against current
+	// reality, and detect customer messages that landed during the approval
+	// window. A gap on an approve/edit HOLDS the write. Fail closed — a load
+	// failure aborts (Temporal retries) rather than risk executing a stale write.
+	conv, err := a.Conversation.GetConversation(int(ap.ConversationID), "", "")
+	if err != nil {
+		return failed, err
+	}
+	msgs, err := a.Conversation.LoadMessagesForLLM(ctx, conv.UUID)
+	if err != nil {
+		return failed, err
+	}
+	rejected := ap.Status == approvalsmodels.StatusRejected
+	gap := gapCustomerMessages(msgs, ap.CreatedAt)
+	held := len(gap) > 0 && !rejected
+
 	in := resumeInputs{
 		subAgentGate:    ap.ParentTraceID.Valid,
 		agentID:         nullIntToPtr(ap.AgentID),
 		toolSlug:        tool.Slug,
 		toolUseID:       ap.ToolUseID,
 		inputs:          decodeJSONMap(ap.ApprovedInputs),
-		rejected:        ap.Status == approvalsmodels.StatusRejected,
+		rejected:        rejected,
 		rejectionReason: ap.RejectionReason.String,
+		held:            held,
+		heldReason:      formatGapReason(gap),
 		gatedTrace:      decodeTrace(gatedExec.Trace),
 		resumeTraceID:   params.TraceID,
-		seed:            a.resumeSeed(params, ap, pub),
+		seed:            a.buildResumeSeed(params, conv, toRunnerHistory(msgs), pub),
 	}
 	if in.subAgentGate {
 		compExec, cErr := a.Executions.GetByTraceID(ap.ParentTraceID.String)
@@ -201,24 +233,92 @@ func (a *Activities) resumeApproval(ctx context.Context, params wfairuns.AgentRu
 	return runResume(ctx, a.Runner, a.subAgentInvoker(), in)
 }
 
-// resumeSeed builds the minimal framing seed for a resuming run. v1 keeps it
-// minimal — the persisted trace is the substance; fuller conversation
-// re-derivation (the customer message + history + customer/contract context) is
-// a deferred refinement.
-func (a *Activities) resumeSeed(params wfairuns.AgentRunWorkflowParams, ap approvalsmodels.WriteApproval, pub runner.EventPublisher) resumeSeed {
+const resumeContinuationPrompt = "Continue and finalize your response, grounded in the work already done, the conversation history, and the latest tool result above."
+
+// buildResumeSeed assembles the framing seed for a resuming run from the CURRENT
+// conversation — history + verification level — so the resumed agent sees any
+// message that arrived during the approval window. The persisted trace remains
+// the substance (prior reasoning); this seed is the up-to-date framing. Customer/
+// contract context-map hydration (inline in the fresh-run handler) is not
+// reachable from the activity and is left to the trace for now.
+func (a *Activities) buildResumeSeed(params wfairuns.AgentRunWorkflowParams, conv convmodels.Conversation, history []runner.ConversationMessage, pub runner.EventPublisher) resumeSeed {
 	var deadline time.Duration
 	if params.DeadlineMs > 0 {
 		deadline = time.Duration(params.DeadlineMs) * time.Millisecond
 	}
 	return resumeSeed{
-		conversationID: int(ap.ConversationID),
-		inboxID:        params.InboxID,
-		invokerUserID:  params.InvokerUserID,
-		inbound:        "Continue and finalize your response, grounded in the work already done and the latest tool result above.",
-		approvalSlugs:  a.approvalSlugs(params.InboxID),
-		deadline:       deadline,
-		eventPublisher: pub,
+		conversationID:    conv.ID,
+		inboxID:           params.InboxID,
+		verificationLevel: conv.VerificationLevel,
+		invokerUserID:     params.InvokerUserID,
+		inbound:           resumeContinuationPrompt,
+		history:           history,
+		approvalSlugs:     a.approvalSlugs(params.InboxID),
+		deadline:          deadline,
+		eventPublisher:    pub,
 	}
+}
+
+// gapCustomerMessages returns customer (contact) messages created after `since`
+// — those that arrived during the approval window. Pure (no DB) so the
+// staleness decision is unit-testable.
+func gapCustomerMessages(msgs []convmodels.Message, since time.Time) []convmodels.Message {
+	var gap []convmodels.Message
+	for _, m := range msgs {
+		if m.SenderType == convmodels.SenderTypeContact && m.CreatedAt.After(since) {
+			gap = append(gap, m)
+		}
+	}
+	return gap
+}
+
+// toRunnerHistory maps conversation messages to the runner's history shape,
+// labelling the contact sender as "customer" (what formatConversationHistory
+// expects). Empty-text messages are dropped.
+func toRunnerHistory(msgs []convmodels.Message) []runner.ConversationMessage {
+	out := make([]runner.ConversationMessage, 0, len(msgs))
+	for _, m := range msgs {
+		text := messageText(m)
+		if text == "" {
+			continue
+		}
+		sender := "agent"
+		if m.SenderType == convmodels.SenderTypeContact {
+			sender = "customer"
+		}
+		out = append(out, runner.ConversationMessage{Sender: sender, Text: text})
+	}
+	return out
+}
+
+// formatGapReason renders the gap messages into the neutral held-reason detail
+// the resume seam feeds back (heldResultText), so the agent reconsiders with the
+// customer's words in view.
+func formatGapReason(gap []convmodels.Message) string {
+	parts := make([]string, 0, len(gap))
+	for _, m := range gap {
+		if t := messageText(m); t != "" {
+			parts = append(parts, "\""+clipText(t, 280)+"\"")
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "the customer replied while it awaited approval: " + strings.Join(parts, "; ")
+}
+
+func messageText(m convmodels.Message) string {
+	if t := strings.TrimSpace(m.TextContent); t != "" {
+		return t
+	}
+	return strings.TrimSpace(m.Content)
+}
+
+func clipText(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 func nullIntToPtr(n null.Int) *int {

@@ -123,6 +123,10 @@ func (r *Runner) seedResumeMessages(
 		resultContent = rejectionResultText(rc.RejectionReason)
 		isErr = true
 		log = newResumeToolLog(rc, "rejected", resultContent)
+	case rc.Held:
+		resultContent = heldResultText(rc.HeldReason)
+		isErr = true
+		log = newResumeToolLog(rc, "held", resultContent)
 	case rc.InjectedResult != nil:
 		resultContent = *rc.InjectedResult
 		log = newResumeToolLog(rc, "success", resultContent)
@@ -235,6 +239,19 @@ func rejectionResultText(reason string) string {
 	return "This action was rejected by a human reviewer (" + reason + "). Do not retry it; reconsider and either answer without it or escalate."
 }
 
+// heldResultText is the tool_result fed back when a write was approved but HELD
+// because the situation changed during the approval window (e.g. the customer
+// replied). The action was not executed; the agent re-reasons with the change in
+// view and re-proposes only if still appropriate (which re-gates for fresh
+// review) — it never silently executes the stale write.
+func heldResultText(detail string) string {
+	detail = strings.TrimSpace(detail)
+	if detail == "" {
+		detail = "the situation changed while this action awaited approval"
+	}
+	return "This action was approved but HELD and NOT executed because " + detail + ". Reconsider with that in view: take the action again only if it is still appropriate (it will be re-reviewed), otherwise respond or escalate accordingly."
+}
+
 func newResumeToolLog(rc *ResumeContext, status, content string) ToolCallLog {
 	now := time.Now().UTC()
 	log := ToolCallLog{
@@ -246,7 +263,7 @@ func newResumeToolLog(rc *ResumeContext, status, content string) ToolCallLog {
 		StartedAt:  now,
 		FinishedAt: now,
 	}
-	if status == "rejected" {
+	if status == "rejected" || status == "held" {
 		log.Error = content
 	} else {
 		log.Data = content

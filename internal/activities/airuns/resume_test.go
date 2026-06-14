@@ -3,8 +3,10 @@ package airuns
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aziz-tb/merio/internal/ai/runner"
+	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -159,6 +161,91 @@ func TestRunResume_ComposerOwn(t *testing.T) {
 	require.Equal(t, 0, fr.reqs[0].AgentID)
 	require.True(t, fr.reqs[0].Resume.ExecuteWrite)
 	require.Equal(t, "issue_credit", fr.reqs[0].Resume.ToolName)
+}
+
+// TestRunResume_Held proves a staleness HOLD on an orchestrator-own write feeds
+// the held notice (no execution) on a single resume — the 4c failure-mode fix:
+// a customer message during the approval window holds the write.
+func TestRunResume_Held(t *testing.T) {
+	fr := &fakeResumeRunner{resps: []runner.RunResponse{
+		{Status: runner.StatusComplete, Draft: strptr("re-checked — not cancelling"),
+			Decision: &runner.TerminalDecision{Kind: runner.DecisionKindAnswer}},
+	}}
+	_, err := runResume(context.Background(), fr, nil, resumeInputs{
+		subAgentGate: false, agentID: nil, // orchestrator-own
+		toolSlug: "cancel_contract", inputs: map[string]any{"id": 1},
+		held: true, heldReason: `the customer replied while it awaited approval: "wait, don't cancel"`,
+		gatedTrace: []runner.TurnTrace{{}}, resumeTraceID: "r", seed: resumeSeed{},
+	})
+	require.NoError(t, err)
+	require.Len(t, fr.reqs, 1)
+	require.True(t, fr.reqs[0].IsComposer)
+	require.NotNil(t, fr.reqs[0].Resume)
+	require.True(t, fr.reqs[0].Resume.Held)
+	require.False(t, fr.reqs[0].Resume.ExecuteWrite, "a held write must NOT execute")
+	require.False(t, fr.reqs[0].Resume.Rejected)
+	require.Contains(t, fr.reqs[0].Resume.HeldReason, "don't cancel")
+}
+
+// TestRunResume_SubAgentHeld proves the hold propagates through the 2-step: the
+// sub-agent step holds (does not execute) the approved write, and the composer
+// still composes from the resumed report. The orchestration is unchanged — only
+// the copied Resume carries Held.
+func TestRunResume_SubAgentHeld(t *testing.T) {
+	fr := &fakeResumeRunner{resps: []runner.RunResponse{
+		{Status: runner.StatusComplete, Draft: strptr("held the cancel; awaiting guidance")},
+		{Status: runner.StatusComplete, Draft: strptr("You asked to keep it — no changes made."),
+			Decision: &runner.TerminalDecision{Kind: runner.DecisionKindAnswer}},
+	}}
+	_, err := runResume(context.Background(), fr, nil, resumeInputs{
+		subAgentGate: true, agentID: intptr(7),
+		toolSlug: "cancel_contract", inputs: map[string]any{"id": 1},
+		held: true, heldReason: `the customer replied while it awaited approval: "keep my plan"`,
+		gatedTrace:    []runner.TurnTrace{{}},
+		composerTrace: []runner.TurnTrace{{}},
+		resumeTraceID: "r", seed: resumeSeed{},
+	})
+	require.NoError(t, err)
+	require.Len(t, fr.reqs, 2)
+	// Step 1: the sub-agent HOLDS the write (no execute).
+	require.True(t, fr.reqs[0].Resume.Held)
+	require.False(t, fr.reqs[0].Resume.ExecuteWrite)
+	require.Contains(t, fr.reqs[0].Resume.HeldReason, "keep my plan")
+	// Step 2: composer still composes from the (held) report.
+	require.True(t, fr.reqs[1].IsComposer)
+	require.Equal(t, runner.CallSubagentToolName, fr.reqs[1].Resume.ToolName)
+	require.NotNil(t, fr.reqs[1].Resume.InjectedResult)
+}
+
+// TestGapAndHistoryHelpers covers the pure 4c logic: gap detection (contact
+// messages after the approval), the held reason, and history mapping.
+func TestGapAndHistoryHelpers(t *testing.T) {
+	base := time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC)
+	msgs := []convmodels.Message{
+		{SenderType: convmodels.SenderTypeContact, Content: "please cancel", CreatedAt: base.Add(-time.Minute)},
+		{SenderType: convmodels.SenderTypeAgent, Content: "on it", CreatedAt: base.Add(time.Minute)},
+		{SenderType: convmodels.SenderTypeContact, TextContent: "wait, don't cancel", CreatedAt: base.Add(2 * time.Minute)},
+	}
+
+	// Gap = only the contact message AFTER the approval timestamp.
+	gap := gapCustomerMessages(msgs, base)
+	require.Len(t, gap, 1)
+	require.Equal(t, "wait, don't cancel", messageText(gap[0]))
+	require.Contains(t, formatGapReason(gap), "wait, don't cancel")
+
+	// An agent message in the window is NOT a gap (only customer replies hold).
+	require.Empty(t, gapCustomerMessages([]convmodels.Message{
+		{SenderType: convmodels.SenderTypeAgent, Content: "fyi", CreatedAt: base.Add(time.Minute)},
+	}, base))
+
+	// History maps contact→customer, prefers TextContent, drops empties.
+	hist := toRunnerHistory(msgs)
+	require.Len(t, hist, 3)
+	require.Equal(t, "customer", hist[0].Sender)
+	require.Equal(t, "please cancel", hist[0].Text)
+	require.Equal(t, "agent", hist[1].Sender)
+	require.Equal(t, "wait, don't cancel", hist[2].Text)
+	require.Empty(t, toRunnerHistory([]convmodels.Message{{SenderType: convmodels.SenderTypeContact, Content: "  "}}))
 }
 
 // TestRunResume_SingleAgent proves a single-agent write resumes that agent (not

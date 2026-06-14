@@ -262,6 +262,36 @@ func TestRun_Resume_Reject_DoesNotExecute(t *testing.T) {
 	require.Equal(t, "rejected", resp.ToolCalls[0].Status)
 }
 
+// TestRun_Resume_Held_DoesNotExecute proves an approved-but-HELD write (the
+// situation changed during the approval window) feeds a neutral reconsider
+// notice carrying the customer's words and does NOT execute — the agent
+// re-reasons with the change in view instead of acting on a stale approval.
+func TestRun_Resume_Held_DoesNotExecute(t *testing.T) {
+	prov := answerTurn("I see you asked to keep your plan — I've made no changes.")
+	disp := &fakeDispatcher{}
+	r := newApprovalRunner(t, prov,
+		fakeResolver{tools: []resolver.ResolvedTool{customWriteTool(7, "cancel_contract")}}, disp)
+
+	resp, err := r.Run(context.Background(), RunRequest{
+		InboundMessage: "cancel", TraceID: "t-held", InboxID: 1, ConversationID: 5, IsComposer: true,
+		Resume: &ResumeContext{
+			PriorTrace: []TurnTrace{{TurnIndex: 0}},
+			ToolName:   "cancel_contract",
+			Inputs:     map[string]any{"id": 1},
+			Held:       true,
+			HeldReason: `the customer replied while it awaited approval: "wait, don't cancel"`,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, StatusComplete, resp.Status)
+	require.Empty(t, disp.calls, "a held write must NOT execute")
+	require.Equal(t, "held", resp.ToolCalls[0].Status)
+	// The neutral hold notice (with the customer's words) was fed to the model.
+	fed := toolResultText(prov.calls[0].Messages)
+	require.Contains(t, fed, "HELD")
+	require.Contains(t, fed, "don't cancel")
+}
+
 // TestRun_Resume_Inject_FeedsReport proves the inject mode (used to feed a
 // resumed sub-agent's report back into the composer) feeds the content with no
 // dispatch and the loop continues.

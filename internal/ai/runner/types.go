@@ -243,9 +243,11 @@ type ProposedWrite struct {
 // fragility). The runner then authors a single assistant(tool_use) + tool_result
 // pair for the gated call and continues the loop. Exactly one resolution mode
 // applies: ExecuteWrite (dispatch ToolName(Inputs) once and feed the output),
-// Rejected (feed the rejection, no execution), or InjectedResult (feed the given
-// content verbatim — used to feed a resumed sub-agent's report back into the
-// composer at its call_subagent point).
+// Rejected (feed the rejection, no execution), Held (the write was approved but
+// the situation changed during the approval window, so feed a neutral
+// reconsider notice instead of executing — see HeldReason), or InjectedResult
+// (feed the given content verbatim — used to feed a resumed sub-agent's report
+// back into the composer at its call_subagent point).
 type ResumeContext struct {
 	PriorTrace []TurnTrace
 
@@ -256,6 +258,8 @@ type ResumeContext struct {
 	ExecuteWrite    bool    // dispatch ToolName(Inputs) once, feed its raw output
 	Rejected        bool    // feed a rejection tool_result, no dispatch
 	RejectionReason string  // rejection text fed back when Rejected
+	Held            bool    // approved-but-held: feed a neutral reconsider notice, no dispatch
+	HeldReason      string  // what changed during approval (fed back when Held)
 	InjectedResult  *string // feed this content verbatim (no dispatch) — e.g. a resumed sub-agent report
 }
 

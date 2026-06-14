@@ -18,32 +18,35 @@ import (
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
 	"github.com/aziz-tb/merio/internal/approvals"
 	"github.com/aziz-tb/merio/internal/composer"
+	"github.com/aziz-tb/merio/internal/conversation"
 	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
 	"github.com/zerodha/logf"
 	"go.temporal.io/sdk/activity"
 )
 
 type Activities struct {
-	Runner     *runner.Runner
-	Agents     *aiagents.Manager
-	Tools      *aitools.Manager
-	Executions *executions.Manager
-	Composer   *composer.Manager
-	Approvals  *approvals.Manager
-	Events     runner.EventPublisher
-	Lo         *logf.Logger
+	Runner       *runner.Runner
+	Agents       *aiagents.Manager
+	Tools        *aitools.Manager
+	Executions   *executions.Manager
+	Composer     *composer.Manager
+	Approvals    *approvals.Manager
+	Conversation *conversation.Manager
+	Events       runner.EventPublisher
+	Lo           *logf.Logger
 }
 
 func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 	return &Activities{
-		Runner:     deps.AgentRunner,
-		Agents:     deps.Agents,
-		Tools:      deps.Tools,
-		Executions: deps.Executions,
-		Composer:   deps.Composer,
-		Approvals:  deps.Approvals,
-		Events:     deps.RunEvents,
-		Lo:         deps.Logger("ai-run-activities"),
+		Runner:       deps.AgentRunner,
+		Agents:       deps.Agents,
+		Tools:        deps.Tools,
+		Executions:   deps.Executions,
+		Composer:     deps.Composer,
+		Approvals:    deps.Approvals,
+		Conversation: deps.Conversation,
+		Events:       deps.RunEvents,
+		Lo:           deps.Logger("ai-run-activities"),
 	}, nil
 }
 
