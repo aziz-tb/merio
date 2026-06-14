@@ -1402,6 +1402,23 @@ CREATE TABLE agent_execution_outcomes (
 CREATE INDEX index_agent_execution_outcomes_on_outcome_committed_at
 	ON agent_execution_outcomes (outcome, committed_at DESC);
 
+-- Composer config — the single GLOBAL configuration for the Composer (the
+-- runtime that calls sub-agents and decides answer/escalate). Holds situational
+-- behavior layered on the platform-owned Composer persona: guidance items,
+-- automation switches, escalation rules + guidance. One row only (id=1 CHECK);
+-- per-inbox differences are inbox scope on individual items (Model A), not
+-- separate config objects. Sections are JSONB, decoded to typed structs at the
+-- handler/runtime boundary (internal/composer).
+CREATE TABLE composer_config (
+	id          INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+	guidance    JSONB NOT NULL DEFAULT '[]'::jsonb,
+	automation  JSONB NOT NULL DEFAULT '{"auto_send":false,"approval_required_tool_slugs":[]}'::jsonb,
+	escalation  JSONB NOT NULL DEFAULT '{"rules":[],"guidance":[]}'::jsonb,
+	created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO composer_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
 -- System (Internal) inbox — sentinel FK target for ai_usage rows that
 -- have no real inbox context (rewrite manager calls, AgentTestPanel
 -- synthetic runs, future internal jobs). Channel is 'email' because

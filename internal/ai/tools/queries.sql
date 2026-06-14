@@ -37,6 +37,14 @@ FROM   ai_tools t
 JOIN   functions f ON f.id = t.function_id
 WHERE  t.id = ANY($1::INT[]);
 
+-- name: get-by-slugs
+SELECT t.id, t.created_at, t.updated_at, t.name, t.slug, t.description,
+       t.input_parameters, t.output_schema, t.category, t.timeout_ms, t.async, t.enabled,
+       t.function_id, f.code AS fn_code, f.language AS fn_language, f.packages AS fn_packages
+FROM   ai_tools t
+JOIN   functions f ON f.id = t.function_id
+WHERE  t.slug = ANY($1::TEXT[]);
+
 -- name: insert
 INSERT INTO ai_tools (
     name, slug, description,

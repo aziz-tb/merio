@@ -39,6 +39,7 @@ import (
 	"github.com/aziz-tb/merio/internal/automation"
 	businesshours "github.com/aziz-tb/merio/internal/business_hours"
 	"github.com/aziz-tb/merio/internal/colorlog"
+	"github.com/aziz-tb/merio/internal/composer"
 	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
 	"github.com/aziz-tb/merio/internal/conversation/priority"
@@ -767,6 +768,20 @@ func initAIAgents(db *sqlx.DB, i18n *i18n.I18n) *aiagents.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing ai agents manager: %v", err)
+	}
+	return m
+}
+
+// initComposer initializes the single-global Composer config CRUD manager.
+func initComposer(db *sqlx.DB, i18n *i18n.I18n) *composer.Manager {
+	var lo = initLogger("composer")
+	m, err := composer.New(composer.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing composer manager: %v", err)
 	}
 	return m
 }

@@ -291,6 +291,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/ai/agents/{id}", perm(handleUpdateAIAgent, "ai_agents:manage"))
 	g.DELETE("/api/v1/ai/agents/{id}", perm(handleDeleteAIAgent, "ai_agents:manage"))
 
+	// Composer config — the single global Composer configuration.
+	g.GET("/api/v1/ai/composer-config", perm(handleGetComposerConfig, "ai_agents:manage"))
+	g.PUT("/api/v1/ai/composer-config", perm(handleUpdateComposerConfig, "ai_agents:manage"))
+
 	// AI tools (F9).
 	g.GET("/api/v1/ai/tools", perm(handleListAITools, "ai_tools:manage"))
 	g.GET("/api/v1/ai/tools/{id}", perm(handleGetAITool, "ai_tools:manage"))

@@ -51,6 +51,7 @@ import (
 	// builtin.Default().
 	aicapabilities "github.com/aziz-tb/merio/internal/ai/tools/builtin/capabilities"
 	"github.com/aziz-tb/merio/internal/automation"
+	"github.com/aziz-tb/merio/internal/composer"
 	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
 	"github.com/aziz-tb/merio/internal/conversation/priority"
@@ -141,6 +142,7 @@ type App struct {
 	rewrite          *airewrite.Manager
 	aiAgents         *aiagents.Manager
 	aiTools          *aitools.Manager
+	composer         *composer.Manager
 	aiToolDispatcher *aitools.Dispatcher
 	function         *function.Manager
 	secret           *secret.Manager
@@ -435,6 +437,7 @@ func main() {
 		rewrite:         initRewrite(db, i18n),
 		aiAgents:        initAIAgents(db, i18n),
 		aiTools:         initAITools(db, i18n),
+		composer:        initComposer(db, i18n),
 		function:        functionMgr,
 		secret:          secretMgr,
 		customer:        customerMgr,

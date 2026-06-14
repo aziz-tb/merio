@@ -37,14 +37,15 @@ type Opts struct {
 }
 
 type queries struct {
-	GetAll    *sqlx.Stmt `query:"get-all"`
-	CountAll  *sqlx.Stmt `query:"count-all"`
-	GetByID   *sqlx.Stmt `query:"get-by-id"`
-	GetBySlug *sqlx.Stmt `query:"get-by-slug"`
-	GetByIDs  *sqlx.Stmt `query:"get-by-ids"`
-	Insert    *sqlx.Stmt `query:"insert"`
-	Update    *sqlx.Stmt `query:"update"`
-	Delete    *sqlx.Stmt `query:"delete"`
+	GetAll     *sqlx.Stmt `query:"get-all"`
+	CountAll   *sqlx.Stmt `query:"count-all"`
+	GetByID    *sqlx.Stmt `query:"get-by-id"`
+	GetBySlug  *sqlx.Stmt `query:"get-by-slug"`
+	GetByIDs   *sqlx.Stmt `query:"get-by-ids"`
+	GetBySlugs *sqlx.Stmt `query:"get-by-slugs"`
+	Insert     *sqlx.Stmt `query:"insert"`
+	Update     *sqlx.Stmt `query:"update"`
+	Delete     *sqlx.Stmt `query:"delete"`
 }
 
 // New builds a Manager.
@@ -120,6 +121,27 @@ func (m *Manager) GetByIDs(ids []int) ([]models.Tool, error) {
 	}
 	if err := m.q.GetByIDs.Select(&out, intArr); err != nil {
 		m.lo.Error("error fetching ai tools by ids", "error", err)
+		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	for i := range out {
+		buildImplementation(&out[i])
+	}
+	return out, nil
+}
+
+// GetBySlugs returns tools whose slug is in the provided list. Mirrors
+// GetByIDs; used by the composer-config handler to validate that
+// approval_required_tool_slugs reference existing custom tools (and to read
+// their category).
+func (m *Manager) GetBySlugs(slugs []string) ([]models.Tool, error) {
+	out := make([]models.Tool, 0, len(slugs))
+	if len(slugs) == 0 {
+		return out, nil
+	}
+	strArr := make(pq.StringArray, len(slugs))
+	copy(strArr, slugs)
+	if err := m.q.GetBySlugs.Select(&out, strArr); err != nil {
+		m.lo.Error("error fetching ai tools by slugs", "error", err)
 		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	for i := range out {
