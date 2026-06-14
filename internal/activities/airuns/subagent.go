@@ -29,11 +29,11 @@ type subRunPersister interface {
 	PersistFailedRun(ctx context.Context, params wfairuns.AgentRunWorkflowParams, resp runner.RunResponse, msg string) (int64, error)
 }
 
-// TODO(slice-6): move orchestrator logic to internal/workflows/orchestrator.
-// In slice 6 the orchestrator becomes its own Temporal workflow and runs each
+// TODO(slice-6): move composer logic to internal/workflows/composer.
+// In slice 6 the composer becomes its own Temporal workflow and runs each
 // sub-agent as a CHILD workflow (reusing the bulk_reindex bounded-fan-out
 // pattern). Until then a sub-agent runs synchronously, in-process, inside the
-// orchestrator's RunAgentActivity via this invoker. The brief->report contract
+// composer's RunAgentActivity via this invoker. The brief->report contract
 // is designed so that move is a relocation, not a rewrite. This file is the
 // only place orchestration logic lives on the airuns side; the runner stays a
 // primitive behind the runner.SubAgentInvoker seam.
@@ -41,7 +41,7 @@ type subRunPersister interface {
 // subAgentInvoker implements runner.SubAgentInvoker. It runs one sub-agent to
 // completion using the same Runner, persists the full sub-agent trace as a
 // normal agent_executions row (source="subagent"), and returns only the report
-// to the orchestrator (reads summarized in report_text; raw write outputs in
+// to the composer (reads summarized in report_text; raw write outputs in
 // tool_outputs).
 type subAgentInvoker struct {
 	runner     subRunner
@@ -52,7 +52,7 @@ type subAgentInvoker struct {
 
 // subAgentInvoker builds the invoker from the activity's deps, or returns nil
 // when a dep needed to run a sub-agent is missing — in which case the runner
-// simply doesn't offer call_subagent (an orchestrator logs a warning and runs
+// simply doesn't offer call_subagent (a composer logs a warning and runs
 // without it).
 func (a *Activities) subAgentInvoker() runner.SubAgentInvoker {
 	if a == nil || a.Runner == nil || a.Agents == nil || a.Executions == nil {
@@ -70,7 +70,7 @@ func (a *Activities) subAgentInvoker() runner.SubAgentInvoker {
 // persists its trace, and returns the report. Sub-agent slugs are unique
 // (ai_agents.slug UNIQUE constraint) and stable (locked after create in the
 // edit UI), so a slug reference resolves deterministically; an unknown slug
-// surfaces as a recoverable tool error to the orchestrator, never a silent
+// surfaces as a recoverable tool error to the composer, never a silent
 // break.
 func (s *subAgentInvoker) InvokeSubAgent(
 	ctx context.Context,
@@ -81,11 +81,11 @@ func (s *subAgentInvoker) InvokeSubAgent(
 	if err != nil {
 		return runner.SubAgentReport{}, fmt.Errorf("unknown sub-agent %q", call.AgentRef)
 	}
-	// Every ai_agents row is a sub-agent now (orchestrators are not rows), so
+	// Every ai_agents row is a sub-agent now (composers are not rows), so
 	// there is nothing to guard against here.
 
 	// TODO(slice-6): consider a real parent_execution_id column. For now the
-	// child run's trace id is derived from the parent's plus the orchestrator
+	// child run's trace id is derived from the parent's plus the composer
 	// tool_use id (unique within the run), which links the two runs without a
 	// schema change. Revisit a real FK when multi-agent parentage matters.
 	childTraceID := parent.TraceID + ":sub:" + call.CallID
@@ -108,8 +108,8 @@ func (s *subAgentInvoker) InvokeSubAgent(
 }
 
 // persistSubRun writes the sub-agent's full trace as an agent_executions row so
-// it shows up alongside the orchestrator run. Best effort: a persistence
-// failure never fails the orchestrator's run.
+// it shows up alongside the composer run. Best effort: a persistence
+// failure never fails the composer's run.
 func (s *subAgentInvoker) persistSubRun(
 	ctx context.Context,
 	parent runner.SubAgentParentContext,
@@ -140,7 +140,7 @@ func (s *subAgentInvoker) persistSubRun(
 }
 
 // shapeSubAgentReport turns a sub-agent RunResponse into the report the
-// orchestrator sees. report_text is ALWAYS non-empty so the orchestrator can
+// composer sees. report_text is ALWAYS non-empty so the composer can
 // always reason about the outcome (an incomplete sub-agent yields an explicit
 // "could not complete" line, never ""). tool_outputs is a typed empty slice in
 // slice 1 (no write tools yet); slice 4 fills it by filtering write-category

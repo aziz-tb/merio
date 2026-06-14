@@ -58,7 +58,7 @@ func newInvoker(run subRunner, res subAgentResolver, per subRunPersister) *subAg
 // TestSubAgentInvoker_PersistsCompleteSubRun is the "trace shows both runs"
 // guarantee: a successful sub-agent run persists a SECOND agent_executions row
 // with source="subagent" and the derived child trace id, while only the report
-// (reads summarized; typed-empty tool_outputs) flows back to the orchestrator.
+// (reads summarized; typed-empty tool_outputs) flows back to the composer.
 func TestSubAgentInvoker_PersistsCompleteSubRun(t *testing.T) {
 	draft := "open balance is 80€"
 	run := &fakeSubRunner{resp: runner.RunResponse{Status: runner.StatusComplete, Draft: &draft}}
@@ -80,13 +80,13 @@ func TestSubAgentInvoker_PersistsCompleteSubRun(t *testing.T) {
 	require.Empty(t, report.ToolOutputs)
 
 	// The sub-agent run inherited parent scope, got a derived child trace id,
-	// and carried NO invoker / not-orchestrator (recursion impossible).
+	// and carried NO invoker / not-composer (recursion impossible).
 	require.Equal(t, 7, run.gotReq.AgentID)
 	require.Equal(t, "check the balance", run.gotReq.InboundMessage)
 	require.Equal(t, 42, run.gotReq.ConversationID)
 	require.Equal(t, "trace-orch:sub:tu_call_1", run.gotReq.TraceID)
 	require.Nil(t, run.gotReq.SubAgentInvoker)
-	require.False(t, run.gotReq.IsOrchestrator)
+	require.False(t, run.gotReq.IsComposer)
 
 	// The full sub-agent trace persisted as a COMPLETE run, source=subagent.
 	require.Equal(t, 1, persister.completeCalls)
@@ -121,7 +121,7 @@ func TestSubAgentInvoker_PersistsFailedSubRun(t *testing.T) {
 
 // TestSubAgentInvoker_UnknownSlugIsRecoverableError confirms an unknown
 // sub-agent slug surfaces as an error (which the runner turns into a tool error
-// the orchestrator can re-reason about) and persists nothing.
+// the composer can re-reason about) and persists nothing.
 func TestSubAgentInvoker_UnknownSlugIsRecoverableError(t *testing.T) {
 	persister := &recordingPersister{}
 	inv := newInvoker(&fakeSubRunner{}, fakeResolver{err: errors.New("not found")}, persister)

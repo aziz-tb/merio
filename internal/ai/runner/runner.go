@@ -152,7 +152,7 @@ func New(opts Opts) (*Runner, error) {
 // the second return is the terminal error (if any). Run never panics
 // — every panic source (LLM provider, tool dispatch, JSON encode) is
 // either recovered locally or wrapped at a deeper boundary.
-func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
+func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse, finalErr error) {
 	var err error
 	req, err = applyDefaults(req)
 	if err != nil {
@@ -164,9 +164,9 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 		return RunResponse{Status: StatusFailed, PartialReason: "inbound_message is required"},
 			errors.New("runner: inbound_message is required")
 	}
-	// An orchestrator run has no ai_agents row (it uses the platform config),
+	// A composer run has no ai_agents row (it uses the platform config),
 	// so AgentID is required only for ordinary agent runs.
-	if !req.IsOrchestrator && req.AgentID <= 0 {
+	if !req.IsComposer && req.AgentID <= 0 {
 		return RunResponse{Status: StatusFailed, PartialReason: "agent_id is required"},
 			errors.New("runner: agent_id is required")
 	}
@@ -178,13 +178,13 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 
 	startedAt := time.Now()
 
-	// Load the agent. An orchestrator run is NOT backed by an ai_agents row —
-	// the orchestrator is a platform component executed via the Runner — so it
-	// uses the platform orchestrator config instead of a DB lookup. See
+	// Load the agent. A composer run is NOT backed by an ai_agents row —
+	// the composer is a platform component executed via the Runner — so it
+	// uses the platform composer config instead of a DB lookup. See
 	// call_subagent.go (TODO(slice-3): config comes from Composer).
 	var agent agentmodels.Agent
-	if req.IsOrchestrator {
-		agent = platformOrchestratorAgent()
+	if req.IsComposer {
+		agent = platformComposerAgent()
 	} else {
 		agent, err = r.opts.Agents.Get(req.AgentID)
 		if err != nil {
@@ -228,22 +228,30 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 			Status: StatusFailed, PartialReason: "tool translation failed", AgentSlug: agent.Slug, Drops: drops,
 		}, fmt.Errorf("runner: translate tools: %w", err)
 	}
-	toolDefs = append(toolDefs, produceDraftToolDef)
+	// Terminal-tool injection. Composers terminate via a real decision
+	// (answer/escalate); every other agent terminates via produce_draft.
+	// produce_draft is NOT offered to composers — a successful composer
+	// run requires a terminal DECISION, not a draft. Gated on the run-level
+	// IsComposer flag (the composer's identity comes from how the run is
+	// started, not from a row). See terminal_decision.go.
+	composerInstructions := ""
+	if req.IsComposer {
+		toolDefs = append(toolDefs, answerToolDef, escalateToolDef)
+		composerInstructions = terminalDecisionInstructions
 
-	// Orchestrator seam: an orchestrator run carrying a sub-agent invoker also
-	// gets the call_subagent tool + its instructions. Gated on the run-level
-	// IsOrchestrator flag (the orchestrator's identity comes from how the run
-	// is started, not from a row) — generic agents and every sub-agent run
-	// never see it, so the runner stays a primitive. See call_subagent.go.
-	orchestratorInstructions := ""
-	if req.IsOrchestrator {
+		// A composer run carrying a sub-agent invoker also gets
+		// call_subagent. The decision tools above are always present (an
+		// composer must be able to terminate even with no invoker); the
+		// invoker only adds delegation. See call_subagent.go.
 		if req.SubAgentInvoker != nil {
 			toolDefs = append(toolDefs, callSubagentToolDef)
-			orchestratorInstructions = callSubagentInstructions
+			composerInstructions = composerInstructions + "\n\n" + callSubagentInstructions
 		} else {
-			r.opts.Lo.Warn("runner: orchestrator run has no sub-agent invoker; call_subagent unavailable",
+			r.opts.Lo.Warn("runner: composer run has no sub-agent invoker; call_subagent unavailable",
 				"trace_id", req.TraceID)
 		}
+	} else {
+		toolDefs = append(toolDefs, produceDraftToolDef)
 	}
 
 	// Resolve preset for the agent's main reasoning purpose. v1 hardcodes
@@ -261,7 +269,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	// pre-prepared context as a second system message, then the inbound
 	// message as the user turn. The cache marker manager seeds with a
 	// marker after the last system message.
-	messages := buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, orchestratorInstructions)
+	messages := buildInitialMessages(agent.Prompt, req.Context, req.ConversationHistory, req.InboundMessage, req.IsComposer, composerInstructions)
 	systemCount := countSystemMessages(messages)
 	cacheMgr := newCacheMarkerManager(systemCount)
 
@@ -308,6 +316,25 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	}
 	if maxIters <= 0 {
 		maxIters = defaultMaxIterations
+	}
+
+	// Composer fail-safe. Registered HERE — after every pre-loop config
+	// failure has already returned StatusFailed — so a misconfigured
+	// composer fails loud, but once the agentic loop starts the run is
+	// structurally incapable of ending without a terminal decision: any exit
+	// that did not reach answer/escalate (model stopped, max-iterations,
+	// refusal, between-turns deadline, token budget) defaults to ESCALATE (fail
+	// safe to a human), never a silent incomplete that drops the ticket. Error
+	// returns (finalErr != nil) are deliberately left untouched here — the
+	// activity boundary owns the retry-vs-escalate-vs-fail-loud decision so we
+	// don't cannibalize Temporal's retry net. See terminal_decision.go.
+	if req.IsComposer {
+		defer func() {
+			finalResp.IsComposer = true
+			if finalErr == nil && finalResp.Decision == nil {
+				finalResp = synthesizeEscalation(finalResp, composerNoDecisionReason(finalResp))
+			}
+		}()
 	}
 
 	// Loop. Pre-flight checks run at the TOP of each iteration so we
@@ -456,7 +483,43 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 			return out, nil
 
 		case llm.StopReasonToolUse:
-			if handled, draft, produceLogs, partialReason := maybeHandleProduceDraftTurn(turnToolUses); handled {
+			// Composers terminate via answer/escalate (checked first; they
+			// have no produce_draft). A non-decision tool turn (e.g.
+			// call_subagent) falls through to normal dispatch below.
+			if req.IsComposer {
+				if handled, decision, decisionLogs, partialReason := maybeHandleTerminalDecisionTurn(turnToolUses); handled {
+					turn.ToolCalls = decisionLogs
+					trace = append(trace, turn)
+					toolCallLog = append(toolCallLog, decisionLogs...)
+					if decision != nil {
+						out := r.buildResponse(agent, decisionDraft(decision), trace, toolCallLog, totalUsage, llmLatency, toolLatency, cacheHits, cacheMgr.Count(), iterations, drops)
+						out.Status = StatusComplete
+						out.Decision = &TerminalDecision{Kind: decision.kind, InternalReason: decision.internalReason}
+						if decision.kind == DecisionKindAnswer {
+							r.emit(runCtx, req.TraceID, EventTypeDraftCommitted, DraftCommittedPayload{
+								TurnIndex: iter,
+							}, pub)
+						}
+						r.emitRunLog(req.TraceID, agent, iterations, totalUsage, string(StatusComplete), "terminal decision: "+decision.kind)
+						return out, nil
+					}
+
+					// Malformed terminal call (empty message, missing reason, or
+					// not the only tool in its turn). Feed the validation error
+					// back as the tool result so the composer can correct
+					// itself on the next turn — the same reject-feeds-back pattern
+					// as call_subagent. The run does NOT end and does NOT
+					// re-dispatch: max-iterations bounds the retries and the
+					// fail-safe escalates a persistent failure, so a formatting
+					// slip never escalates a ticket to a human.
+					messages = append(messages,
+						llm.Message{Role: llm.RoleAssistant, Content: resp.Content},
+						llm.Message{Role: llm.RoleUser, Content: terminalDecisionErrorResults(turnToolUses, partialReason)},
+					)
+					cacheMgr.AddMarkerAfter(len(messages) - 1)
+					continue
+				}
+			} else if handled, draft, produceLogs, partialReason := maybeHandleProduceDraftTurn(turnToolUses); handled {
 				turn.ToolCalls = produceLogs
 				trace = append(trace, turn)
 				toolCallLog = append(toolCallLog, produceLogs...)
@@ -475,7 +538,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 				return out, nil
 			}
 
-			// Dispatch the remaining non-produce_draft tool_use blocks.
+			// Dispatch the remaining non-terminal tool_use blocks.
 			// dispatchOneTool wraps each call in panic recovery +
 			// per-tool timeout.
 			toolStart := time.Now()
@@ -603,20 +666,18 @@ func applyDefaults(req RunRequest) (RunRequest, error) {
 // Distinct from the get_conversation_history capability: that surfaces
 // PRIOR conversations from the same customer; the history system block
 // here is the CURRENT ticket's running context.
-func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, orchestratorInstructions string) []llm.Message {
+func buildInitialMessages(systemPrompt string, ctxData map[string]any, history []ConversationMessage, inbound string, isComposer bool, composerInstructions string) []llm.Message {
 	out := make([]llm.Message, 0, 4)
 
-	// Orchestrator instructions (call_subagent) are appended after the
-	// produce_draft rule, mirroring how buildRuntimeSystemPrompt appends it to
-	// the operator prompt. Empty for non-orchestrators, keeping their prompt
+	// Composers terminate via answer/escalate, so their runtime prompt
+	// carries the terminal-decision (+ call_subagent) instructions and NOT the
+	// produce_draft rule. Every other agent gets the produce_draft rule and is
 	// byte-for-byte unchanged.
-	runtimePrompt := buildRuntimeSystemPrompt(systemPrompt)
-	if strings.TrimSpace(orchestratorInstructions) != "" {
-		if strings.TrimSpace(runtimePrompt) == "" {
-			runtimePrompt = orchestratorInstructions
-		} else {
-			runtimePrompt = runtimePrompt + "\n\n" + orchestratorInstructions
-		}
+	var runtimePrompt string
+	if isComposer {
+		runtimePrompt = joinPromptSections(strings.TrimSpace(systemPrompt), composerInstructions)
+	} else {
+		runtimePrompt = buildRuntimeSystemPrompt(systemPrompt)
 	}
 	if strings.TrimSpace(runtimePrompt) != "" {
 		out = append(out, llm.Message{

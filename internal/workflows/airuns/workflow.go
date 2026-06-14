@@ -19,6 +19,15 @@ import (
 
 const WorkflowKind = "ai-run"
 
+// RunAgentMaxAttempts is the Temporal retry cap for RunAgentActivity, and the
+// single source of truth shared with the activity. The activity reads it to
+// decide whether a failed composer run still has a retry pending (willRetry)
+// before converting a terminal transient failure into an escalation — so a
+// drift between the policy and that check can't silently disable the retry net.
+// v1 = 1: no Temporal-level retry; the LLM client retries transients internally
+// before an error ever surfaces here.
+const RunAgentMaxAttempts = 1
+
 type ConversationMessage struct {
 	Sender string `json:"sender"`
 	Text   string `json:"text"`
@@ -58,7 +67,7 @@ func AgentRunWorkflow(ctx workflow.Context, params AgentRunWorkflowParams) (*Age
 		ScheduleToCloseTimeout: 10 * time.Minute,
 		HeartbeatTimeout:       30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 1,
+			MaximumAttempts: RunAgentMaxAttempts,
 		},
 	})
 

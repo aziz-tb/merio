@@ -62,27 +62,28 @@ func (f *fakeSubAgentInvoker) InvokeSubAgent(_ context.Context, parent SubAgentP
 	return f.report, nil
 }
 
-// TestRun_OrchestratorCallsSubAgent proves the Slice 1 call boundary end to
-// end at the runner level: an orchestrator RUN (not an ai_agents row) gets the
+// TestRun_ComposerCallsSubAgent proves the Slice 1 call boundary end to
+// end at the runner level: a composer RUN (not an ai_agents row) gets the
 // call_subagent tool, calling it routes to the invoker, the invoker's report is
-// fed back as the tool result, and the orchestrator composes a draft from it.
-func TestRun_OrchestratorCallsSubAgent(t *testing.T) {
+// fed back as the tool result, and the composer composes a draft from it.
+func TestRun_ComposerCallsSubAgent(t *testing.T) {
 	draft := "Your open balance is 80€; we'll send the Q2 invoice again."
 	prov := &scriptedProvider{responses: []llm.CompletionResponse{
-		// Turn 1: orchestrator delegates to the billing sub-agent.
+		// Turn 1: composer delegates to the billing sub-agent.
 		{StopReason: llm.StopReasonToolUse, Content: []llm.ContentBlock{{
 			Type:      llm.ContentBlockTypeToolUse,
 			ToolUseID: "tu_call_1",
 			ToolName:  callSubagentToolName,
 			ToolInput: map[string]any{"agent": "billing", "brief": "check the customer's balance"},
 		}}},
-		// Turn 2: orchestrator composes the final draft (Slice 1 still ends via
-		// produce_draft; terminal decision tools arrive in Slice 2).
+		// Turn 2: composer commits the final reply via the terminal answer
+		// decision. Slice 2 — composers terminate via answer/escalate, not
+		// produce_draft.
 		{StopReason: llm.StopReasonToolUse, Content: []llm.ContentBlock{{
 			Type:      llm.ContentBlockTypeToolUse,
-			ToolUseID: "tu_draft_1",
-			ToolName:  "produce_draft",
-			ToolInput: map[string]any{"draft": draft},
+			ToolUseID: "tu_answer_1",
+			ToolName:  answerToolName,
+			ToolInput: map[string]any{"message": draft},
 		}}},
 	}}
 
@@ -94,9 +95,9 @@ func TestRun_OrchestratorCallsSubAgent(t *testing.T) {
 	lo := logf.New(logf.Opts{Writer: io.Discard})
 	r, err := New(Opts{
 		Provider:   prov,
-		Agents:     fakeAgentLoader{}, // never consulted: an orchestrator run uses the platform config, not a row
+		Agents:     fakeAgentLoader{}, // never consulted: a composer run uses the platform config, not a row
 		Resolver:   resolver.New(nil, builtin.Default()),
-		Dispatcher: &aitools.Dispatcher{}, // never invoked: call_subagent + produce_draft are intercepted
+		Dispatcher: &aitools.Dispatcher{}, // never invoked: call_subagent + answer are intercepted
 		PresetReg:  testPresetRegistry(t),
 		Lo:         &lo,
 	})
@@ -107,19 +108,24 @@ func TestRun_OrchestratorCallsSubAgent(t *testing.T) {
 		TraceID:         "trace-orch-1",
 		InboxID:         1,
 		ConversationID:  42,
-		IsOrchestrator:  true,
+		IsComposer:  true,
 		SubAgentInvoker: invoker,
 	})
 	require.NoError(t, err)
 
-	// Orchestrator completed by composing a draft from the report, running as
-	// the synthetic platform orchestrator (not an ai_agents row).
+	// Composer completed by composing the reply from the report and
+	// committing it via the terminal answer decision, running as the synthetic
+	// platform composer (not an ai_agents row).
 	require.Equal(t, StatusComplete, resp.Status)
 	require.NotNil(t, resp.Draft)
 	require.Equal(t, draft, *resp.Draft)
-	require.Equal(t, orchestratorAgentSlug, resp.AgentSlug)
+	require.Equal(t, composerAgentSlug, resp.AgentSlug)
+	require.True(t, resp.IsComposer)
+	require.NotNil(t, resp.Decision)
+	require.Equal(t, DecisionKindAnswer, resp.Decision.Kind)
+	require.Empty(t, resp.Decision.InternalReason)
 
-	// The invoker was called exactly once with the orchestrator's brief, and
+	// The invoker was called exactly once with the composer's brief, and
 	// the parent context flowed through (so the sub-agent inherits scope).
 	require.Len(t, invoker.calls, 1)
 	require.Equal(t, "billing", invoker.calls[0].AgentRef)
@@ -144,17 +150,21 @@ func TestRun_OrchestratorCallsSubAgent(t *testing.T) {
 	require.NotNil(t, report.ToolOutputs)
 	require.Empty(t, report.ToolOutputs)
 
-	// The orchestrator's first turn was offered the call_subagent tool...
+	// The composer's first turn was offered call_subagent + the terminal
+	// decision tools, and NOT produce_draft.
 	require.Len(t, prov.calls, 2)
-	require.True(t, hasTool(prov.calls[0].Tools, callSubagentToolName), "orchestrator should be offered call_subagent")
+	require.True(t, hasTool(prov.calls[0].Tools, callSubagentToolName), "composer should be offered call_subagent")
+	require.True(t, hasTool(prov.calls[0].Tools, answerToolName), "composer should be offered answer")
+	require.True(t, hasTool(prov.calls[0].Tools, escalateToolName), "composer should be offered escalate")
+	require.False(t, hasTool(prov.calls[0].Tools, produceDraftToolName), "composer must NOT be offered produce_draft")
 	// ...and the report was fed back as the tool_result on the second turn.
 	require.Contains(t, toolResultText(prov.calls[1].Messages), "open balance is 80€")
 }
 
-// TestRun_NonOrchestratorHasNoCallSubagent confirms a normal agent run is never
+// TestRun_NonComposerHasNoCallSubagent confirms a normal agent run is never
 // offered call_subagent, even when an invoker is attached — the runner gates
-// injection on the run-level IsOrchestrator flag, not on invoker-presence.
-func TestRun_NonOrchestratorHasNoCallSubagent(t *testing.T) {
+// injection on the run-level IsComposer flag, not on invoker-presence.
+func TestRun_NonComposerHasNoCallSubagent(t *testing.T) {
 	prov := &scriptedProvider{responses: []llm.CompletionResponse{
 		{StopReason: llm.StopReasonToolUse, Content: []llm.ContentBlock{{
 			Type:      llm.ContentBlockTypeToolUse,
@@ -180,13 +190,20 @@ func TestRun_NonOrchestratorHasNoCallSubagent(t *testing.T) {
 
 	resp, err := r.Run(context.Background(), RunRequest{
 		AgentID: 2, InboundMessage: "hi", TraceID: "trace-sub-1", InboxID: 1,
-		// IsOrchestrator deliberately false; invoker present but must be ignored.
+		// IsComposer deliberately false; invoker present but must be ignored.
 		SubAgentInvoker: &fakeSubAgentInvoker{},
 	})
 	require.NoError(t, err)
 	require.Equal(t, StatusComplete, resp.Status)
 	require.Len(t, prov.calls, 1)
 	require.False(t, hasTool(prov.calls[0].Tools, callSubagentToolName), "normal run must not be offered call_subagent")
+	// Regression: a normal run still terminates via produce_draft (Slice 1) and
+	// is never offered the composer-only terminal decision tools.
+	require.True(t, hasTool(prov.calls[0].Tools, produceDraftToolName), "normal run should be offered produce_draft")
+	require.False(t, hasTool(prov.calls[0].Tools, answerToolName), "normal run must not be offered answer")
+	require.False(t, hasTool(prov.calls[0].Tools, escalateToolName), "normal run must not be offered escalate")
+	require.False(t, resp.IsComposer)
+	require.Nil(t, resp.Decision)
 }
 
 func hasTool(tools []llm.ToolDef, name string) bool {

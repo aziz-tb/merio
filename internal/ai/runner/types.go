@@ -172,17 +172,17 @@ type RunRequest struct {
 	// Must reference an existing users.id — Postgres FK enforces this.
 	InvokerUserID int
 
-	// IsOrchestrator marks this as an orchestrator run. The orchestrator is a
+	// IsComposer marks this as a composer run. The composer is a
 	// platform component, NOT an ai_agents row, so when this is set the runner
-	// uses the platform orchestrator config (platformOrchestratorAgent) instead
+	// uses the platform composer config (platformComposerAgent) instead
 	// of loading AgentID from the DB, and injects call_subagent (given an
-	// invoker). The orchestrator's identity comes from how the run is started,
+	// invoker). The composer's identity comes from how the run is started,
 	// not from a row. See call_subagent.go.
-	IsOrchestrator bool
+	IsComposer bool
 
-	// SubAgentInvoker, when non-nil on an orchestrator run, lets the
-	// orchestrator call sub-agents via the call_subagent tool. The runner
-	// injects the tool only when IsOrchestrator && SubAgentInvoker != nil;
+	// SubAgentInvoker, when non-nil on a composer run, lets the
+	// composer call sub-agents via the call_subagent tool. The runner
+	// injects the tool only when IsComposer && SubAgentInvoker != nil;
 	// generic agents and every (recursively-invoked) sub-agent run leave both
 	// unset — which both hides the tool and makes sub-agent recursion
 	// impossible. Per-call override in the spirit of EventPublisher. See
@@ -244,7 +244,43 @@ type RunResponse struct {
 	// Surfaced so the operator can see why a tool the agent declared
 	// wasn't available.
 	Drops map[int]string `json:"drops,omitempty"`
+
+	// Decision is the composer's terminal decision (ANSWER or
+	// ESCALATE). Nil for non-composer runs (which terminate via
+	// produce_draft) and for any run that failed before the composer
+	// loop started. A successful composer run always carries one.
+	// For ANSWER the customer reply lives in Draft; for ESCALATE the
+	// internal reason lives here and any customer holding message in Draft.
+	Decision *TerminalDecision `json:"decision,omitempty"`
+
+	// IsComposer records whether the run was a composer run,
+	// stamped once the agent loads. The activity boundary reads this on
+	// the error path to decide whether a terminal failure should escalate
+	// (fail-safe to a human) rather than drop the ticket. Zero on the
+	// pre-load failure paths, which deliberately stay StatusFailed.
+	IsComposer bool `json:"is_composer,omitempty"`
 }
+
+// TerminalDecision is the composer's exit: ANSWER or ESCALATE, and
+// nothing else (no complete/ask split, no confidence — see
+// AI_LAYER_DESIGN.md §4). It is the platform-enforced terminal contract for
+// a composer run: every successful composer run reaches exactly one,
+// and the platform synthesizes an ESCALATE for any run that would otherwise
+// end without a decision (the fail-safe).
+type TerminalDecision struct {
+	// Kind is DecisionKindAnswer or DecisionKindEscalate.
+	Kind string `json:"kind"`
+
+	// InternalReason is the human-facing reason a run was escalated.
+	// Set only for DecisionKindEscalate; never shown to the customer.
+	InternalReason string `json:"internal_reason,omitempty"`
+}
+
+// Terminal decision kinds. The composer ends with exactly one.
+const (
+	DecisionKindAnswer   = "answer"
+	DecisionKindEscalate = "escalate"
+)
 
 // TurnTrace is the audit record of one LLM call within Run(). Captured
 // before the loop reacts to stop_reason so partial failures still

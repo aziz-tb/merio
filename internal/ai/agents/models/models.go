@@ -11,7 +11,7 @@ import (
 
 // Agent is the DB-wire representation of an ai_agents row. Every ai_agents row
 // is a sub-agent (user-authored: prompt, tools, detection, knowledge); the
-// orchestrator is a platform component, not a row (see internal/ai/runner).
+// composer is a platform component, not a row (see internal/ai/runner).
 //
 // Detection, Tools, and PresetOverrides are stored as raw JSONB and
 // unmarshalled at the handler/runtime layer where the structured shape matters:

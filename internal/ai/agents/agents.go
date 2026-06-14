@@ -105,7 +105,7 @@ func (m *Manager) Get(id int) (models.Agent, error) {
 	return a, nil
 }
 
-// GetBySlug returns one agent by its unique slug. Used by the orchestrator
+// GetBySlug returns one agent by its unique slug. Used by the composer
 // to resolve a sub-agent reference (call_subagent passes a slug). Slugs are
 // UNIQUE in the schema and locked after create in the edit UI, so a slug is a
 // stable handle.

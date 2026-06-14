@@ -56,23 +56,37 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 	pub := a.publisherForSource(params.Source)
 	req := buildRunRequest(params)
 	req.EventPublisher = pub
-	// Attach the sub-agent invoker. The runner only uses it on an orchestrator
-	// run (gated on RunRequest.IsOrchestrator), so this is a no-op for ordinary
+	// Attach the sub-agent invoker. The runner only uses it on a composer
+	// run (gated on RunRequest.IsComposer), so this is a no-op for ordinary
 	// composer/pipeline runs. Sub-agent runs the invoker itself spawns leave
 	// SubAgentInvoker nil, so recursion can't occur.
-	// TODO(slice-3): orchestrator runs (which set IsOrchestrator) are wired when
-	// orchestrator provisioning lands; until then this invoker is inert here and
+	// TODO(slice-3): composer runs (which set IsComposer) are wired when
+	// composer provisioning lands; until then this invoker is inert here and
 	// exercised directly by the sub-agent invoker's tests.
 	req.SubAgentInvoker = a.subAgentInvoker()
 
 	resp, runErr := a.Runner.Run(ctx, req)
 	if runErr != nil {
-		executionID, persistErr := a.Executions.PersistFailedRun(ctx, params, resp, runErr.Error())
-		a.emitTerminalFailure(ctx, params, resp, executionID, runErr)
-		if persistErr != nil {
-			return nil, persistErr
+		// Composer fail-safe (Layer 2): a terminal transient failure with no
+		// Temporal retry pending becomes an escalation, so the ticket reaches a
+		// human instead of being dropped. Bugs/config errors, unrecognized
+		// errors, and runs that still have a retry pending fall through to the
+		// loud-failure path below — preserving Temporal's retry net and never
+		// masking a real bug as "escalated". See composerErrorDisposition.
+		willRetry := activity.GetInfo(ctx).Attempt < wfairuns.RunAgentMaxAttempts
+		if composerErrorDisposition(runErr, resp.IsComposer, willRetry) == dispositionEscalate {
+			resp = escalateAfterTerminalError(resp, runErr)
+			runErr = nil
+			// Fall through to the complete-run path: it records the escalated
+			// outcome (PersistCompleteRun) and emits run.completed.
+		} else {
+			executionID, persistErr := a.Executions.PersistFailedRun(ctx, params, resp, runErr.Error())
+			a.emitTerminalFailure(ctx, params, resp, executionID, runErr)
+			if persistErr != nil {
+				return nil, persistErr
+			}
+			return nil, runErr
 		}
-		return nil, runErr
 	}
 
 	executionID, persistErr := a.Executions.PersistCompleteRun(ctx, params, resp)
@@ -195,6 +209,14 @@ func (a *Activities) emitTerminalFailure(
 			"error", err,
 		)
 	}
+}
+
+// escalateAfterTerminalError converts a terminally-failed composer run into
+// a committed escalation so the ticket reaches a human. The internal reason
+// records the sanitized failure (the same operator-safe string a run.failed
+// event would carry — no raw provider internals leak to reviewers).
+func escalateAfterTerminalError(resp runner.RunResponse, runErr error) runner.RunResponse {
+	return runner.EscalateOnTerminalError(resp, "AI run failed terminally: "+sanitizeRunFailure(runErr, resp))
 }
 
 func sanitizeRunFailure(err error, resp runner.RunResponse) string {

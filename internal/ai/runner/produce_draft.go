@@ -47,35 +47,53 @@ complete cleanly without it.`,
 }
 
 func maybeHandleProduceDraftTurn(turnToolUses []llm.ContentBlock) (handled bool, draft *string, logs []ToolCallLog, partialReason string) {
-	var produceUses []llm.ContentBlock
-	for _, tu := range turnToolUses {
-		if tu.ToolName == produceDraftToolName {
-			produceUses = append(produceUses, tu)
-		}
-	}
-	if len(produceUses) == 0 {
+	tu, present, errMsg := loneTerminalToolUse(turnToolUses, func(name string) bool { return name == produceDraftToolName })
+	if !present {
 		return false, nil, nil, ""
 	}
-
-	if len(produceUses) != 1 || len(turnToolUses) != 1 {
-		log := newProduceDraftLog(produceUses[0], "validation_error", "produce_draft must be the only tool call in its turn and appear exactly once", nil)
-		return true, nil, []ToolCallLog{log}, "produce_draft must be the only tool call in its turn and appear exactly once"
+	if errMsg != "" {
+		full := produceDraftToolName + " " + errMsg
+		return true, nil, []ToolCallLog{newProduceDraftLog(tu, "validation_error", full, nil)}, full
 	}
 
-	raw, ok := produceUses[0].ToolInput["draft"]
+	raw, ok := tu.ToolInput["draft"]
 	if !ok {
-		log := newProduceDraftLog(produceUses[0], "validation_error", "produce_draft missing required draft argument", nil)
+		log := newProduceDraftLog(tu, "validation_error", "produce_draft missing required draft argument", nil)
 		return true, nil, []ToolCallLog{log}, "produce_draft called with missing draft argument"
 	}
 	draftText, ok := raw.(string)
 	if !ok || strings.TrimSpace(draftText) == "" {
-		log := newProduceDraftLog(produceUses[0], "validation_error", "produce_draft draft argument must be a non-empty string", nil)
+		log := newProduceDraftLog(tu, "validation_error", "produce_draft draft argument must be a non-empty string", nil)
 		return true, nil, []ToolCallLog{log}, "produce_draft called with missing or empty draft argument"
 	}
 
 	trimmed := draftText
-	log := newProduceDraftLog(produceUses[0], "success", "", map[string]any{"committed": true})
+	log := newProduceDraftLog(tu, "success", "", map[string]any{"committed": true})
 	return true, &trimmed, []ToolCallLog{log}, ""
+}
+
+// loneTerminalToolUse finds the single terminal tool_use in a turn. A terminal
+// tool (produce_draft for ordinary agents; answer/escalate for composers)
+// must be the ONLY tool call in its turn and appear exactly once — terminating
+// a run is not something to mix with other work. Returns present=false when no
+// terminal tool was called, so the caller proceeds to normal tool dispatch.
+// When a terminal tool is present but the turn is malformed (mixed with other
+// tools, or duplicated), errMsg is non-empty (sans tool-name prefix) so the
+// caller surfaces a recoverable validation error naming its own tool.
+func loneTerminalToolUse(turnToolUses []llm.ContentBlock, isTerminal func(name string) bool) (tu llm.ContentBlock, present bool, errMsg string) {
+	var terminal []llm.ContentBlock
+	for _, t := range turnToolUses {
+		if isTerminal(t.ToolName) {
+			terminal = append(terminal, t)
+		}
+	}
+	if len(terminal) == 0 {
+		return llm.ContentBlock{}, false, ""
+	}
+	if len(terminal) != 1 || len(turnToolUses) != 1 {
+		return terminal[0], true, "must be the only tool call in its turn and appear exactly once"
+	}
+	return terminal[0], true, ""
 }
 
 func newProduceDraftLog(tu llm.ContentBlock, status, errMsg string, data any) ToolCallLog {
@@ -108,4 +126,21 @@ func buildRuntimeSystemPrompt(operatorPrompt string) string {
 		return produceDraftInstructions
 	}
 	return operatorPrompt + "\n\n" + produceDraftInstructions
+}
+
+// joinPromptSections joins two prompt sections with a blank line, dropping
+// either when empty. Used to assemble a composer's runtime prompt
+// (operator/stub prompt + terminal-decision/call_subagent instructions)
+// without the produce_draft rule.
+func joinPromptSections(a, b string) string {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	switch {
+	case a == "":
+		return b
+	case b == "":
+		return a
+	default:
+		return a + "\n\n" + b
+	}
 }

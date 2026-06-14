@@ -24,9 +24,9 @@ const (
 	SourceComposer = "composer"
 	SourcePipeline = "pipeline"
 
-	// SourceSubagent marks a sub-agent run invoked by an orchestrator via
-	// call_subagent. Its trace persists alongside the orchestrator run; only
-	// the sub-agent's report flows back to the orchestrator.
+	// SourceSubagent marks a sub-agent run invoked by a composer via
+	// call_subagent. Its trace persists alongside the composer run; only
+	// the sub-agent's report flows back to the composer.
 	SourceSubagent = "subagent"
 )
 

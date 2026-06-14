@@ -63,7 +63,7 @@ func (r *Runner) dispatchAllTools(
 	var reads, writes []plannedToolCall
 	for i, tu := range turnToolUses {
 		plan := plannedToolCall{idx: i, tu: tu}
-		// call_subagent is the orchestrator seam, not a dispatcher tool: it
+		// call_subagent is the composer seam, not a dispatcher tool: it
 		// routes to the sub-agent invoker (in dispatchOneTool) and always runs
 		// sequentially — a future multi-sub-agent turn must not parallelize
 		// world-changing sub-agent calls.
@@ -139,7 +139,7 @@ func (r *Runner) dispatchOneTool(
 	subInvoker SubAgentInvoker,
 	subParent SubAgentParentContext,
 ) (logEntry ToolCallLog) {
-	// Orchestrator seam: call_subagent is not a dispatcher tool — route it to
+	// Composer seam: call_subagent is not a dispatcher tool — route it to
 	// the sub-agent invoker. Handled before the timing/defer setup so it owns
 	// its own events. See call_subagent.go.
 	if tu.ToolName == callSubagentToolName {

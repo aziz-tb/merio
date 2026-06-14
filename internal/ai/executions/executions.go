@@ -13,6 +13,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/aziz-tb/merio/internal/ai/executions/models"
 	"github.com/aziz-tb/merio/internal/ai/runner"
@@ -310,7 +311,41 @@ func (m *Manager) PersistCompleteRun(
 	if err != nil {
 		return 0, err
 	}
+
+	// A composer run that escalated records the escalated outcome so a
+	// human sees it (and why) — the same agent_execution_outcomes mechanism an
+	// operator commits through, here platform-committed (committed_by NULL).
+	// Best-effort: an outcome write failure must not lose the execution row.
+	// ErrOutcomeExists is benign (a prior attempt or operator already committed).
+	if op, ok := escalationOutcomeParams(row.ID, resp); ok {
+		if _, oerr := m.InsertOutcome(op); oerr != nil && !errors.Is(oerr, ErrOutcomeExists) {
+			m.lo.Warn("executions: failed to record escalated outcome",
+				"agent_execution_id", row.ID, "trace_id", params.TraceID, "error", oerr)
+		}
+	}
 	return row.ID, nil
+}
+
+// escalationOutcomeParams maps an ESCALATE terminal decision to the
+// agent_execution_outcomes row that records it for human review. Returns
+// ok=false for any run that is not a committed escalation (answers, drafts,
+// sub-agent runs, ordinary composer runs) — those leave outcome commitment to
+// the operator (or Slice 7 auto-send). Pure, so the mapping is unit-testable
+// without a DB.
+func escalationOutcomeParams(executionID int64, resp runner.RunResponse) (InsertOutcomeParams, bool) {
+	if resp.Decision == nil || resp.Decision.Kind != runner.DecisionKindEscalate {
+		return InsertOutcomeParams{}, false
+	}
+	var reasonPtr *string
+	if reason := strings.TrimSpace(resp.Decision.InternalReason); reason != "" {
+		reasonPtr = &reason
+	}
+	return InsertOutcomeParams{
+		AgentExecutionID: executionID,
+		Outcome:          models.OutcomeEscalated,
+		OutcomeReason:    reasonPtr,
+		// MessageID / CommittedByUserID nil — platform-committed, no message.
+	}, true
 }
 
 func (m *Manager) PersistFailedRun(
