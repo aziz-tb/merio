@@ -12,8 +12,9 @@ import (
 )
 
 // composerConditionSources are the detection sources a Composer condition leaf
-// (escalation rule or guidance condition) may reference. Slice 5 adds the
-// stored verification level to this set.
+// (escalation rule or guidance condition) may reference. The stored verification
+// level needs no dedicated source — it is already referenceable as
+// ticket.verification_level (the Conversation marshals it into the ticket JSON).
 var composerConditionSources = []string{
 	detection.SourceTicket,
 	detection.SourceCustomer,

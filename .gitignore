@@ -43,6 +43,7 @@ exec-runner/.venv
 !internal/detection/validate_test.go
 !internal/ai/runner/approval_test.go
 !internal/ai/runner/guidance_test.go
+!internal/ai/runner/verification_test.go
 !internal/approvals/approvals_test.go
 /graphify-out
 /ai_dump.txt

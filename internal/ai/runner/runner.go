@@ -60,10 +60,8 @@ const (
 // Sentinel errors returned alongside RunResponse{Status: StatusFailed}.
 // Callers errors.Is against these for HTTP status mapping.
 var (
-	ErrAgentNotFound                    = errors.New("runner: agent not found")
-	ErrAgentDisabled                    = errors.New("runner: agent is disabled")
-	ErrAgentVerificationInsufficient    = aitools.ErrAgentVerificationInsufficient
-	agentVerificationInsufficientReason = "agent requires a verified customer; conversation is not sufficiently verified"
+	ErrAgentNotFound = errors.New("runner: agent not found")
+	ErrAgentDisabled = errors.New("runner: agent is disabled")
 )
 
 // UsageRecorder is the runner's view of the ai_usage write surface.
@@ -211,13 +209,16 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 			Status: StatusFailed, PartialReason: "agent is disabled", AgentSlug: agent.Slug,
 		}, ErrAgentDisabled
 	}
-	if err := verifyAgentVerification(req, agent); err != nil {
-		return RunResponse{
-			Status:        StatusFailed,
-			PartialReason: agentVerificationInsufficientReason,
-			AgentSlug:     agent.Slug,
-		}, err
-	}
+	// Verification behavior is Composer config, not a hardcoded gate (Slice 5,
+	// §7). The engine still computes + stores the level; how an agent behaves
+	// given it is expressed as guidance/conditions referencing
+	// ticket.verification_level (e.g. "if not verified and requesting an account
+	// action → ask for verification before acting"). The old run-failing gate
+	// (verifyAgentVerification, on agent.MinVerification) is removed: an
+	// under-verified run now PROCEEDS and asks, rather than failing. Consequential
+	// writes remain gated by approval (Slice 4); customer-data reads remain scoped
+	// to the conversation's linked (verified) customer/contract. MinVerification
+	// is now vestigial data — not enforced here, not dropped from the schema.
 	r.emit(runCtx, req.TraceID, EventTypeRunStarted, RunStartedPayload{
 		AgentID:        agent.ID,
 		AgentSlug:      agent.Slug,
@@ -695,13 +696,6 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 	out.PartialReason = incompleteWithoutProduceDraft(fmt.Sprintf("hit max_iterations=%d", maxIters))
 	_ = startedAt
 	return out, nil
-}
-
-func verifyAgentVerification(req RunRequest, agent agentmodels.Agent) error {
-	if req.VerificationLevel < agent.MinVerification {
-		return ErrAgentVerificationInsufficient
-	}
-	return nil
 }
 
 // applyDefaults fills zero-value knobs with their canonical defaults and
