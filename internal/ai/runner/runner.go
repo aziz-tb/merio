@@ -197,7 +197,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 	// call_subagent.go (TODO(slice-3): config comes from Composer).
 	var agent agentmodels.Agent
 	if req.IsComposer {
-		agent = platformComposerAgent()
+		agent = platformComposerAgent(req.ComposerTools, req.ComposerKBScope)
 	} else {
 		agent, err = r.opts.Agents.Get(req.AgentID)
 		if err != nil {
@@ -270,7 +270,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 		// invoker only adds delegation. See call_subagent.go.
 		if req.SubAgentInvoker != nil {
 			toolDefs = append(toolDefs, callSubagentToolDef)
-			composerInstructions = composerInstructions + "\n\n" + callSubagentInstructions
+			composerInstructions = composerInstructions + "\n\n" + callSubagentInstructions + "\n\n" + answerVsDelegateInstructions
 		} else {
 			r.opts.Lo.Warn("runner: composer run has no sub-agent invoker; call_subagent unavailable",
 				"trace_id", req.TraceID)

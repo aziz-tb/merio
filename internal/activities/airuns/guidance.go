@@ -2,8 +2,11 @@ package airuns
 
 import (
 	"context"
+	"encoding/json"
 
+	agentmodels "github.com/aziz-tb/merio/internal/ai/agents/models"
 	"github.com/aziz-tb/merio/internal/composer"
+	composermodels "github.com/aziz-tb/merio/internal/composer/models"
 	"github.com/aziz-tb/merio/internal/contract"
 	convmodels "github.com/aziz-tb/merio/internal/conversation/models"
 	"github.com/aziz-tb/merio/internal/customer"
@@ -79,4 +82,42 @@ func (a *Activities) assembleFor(ctx context.Context, inboxID int, conv convmode
 		return composer.Assembled{}, false
 	}
 	return composer.Assemble(composer.Resolve(cfg, inboxID), a.evaluationContextFor(ctx, conv)), true
+}
+
+// composerCapabilityRefs converts the Composer's resolved general-tier
+// capability (Slice 5, §2) into the agent.Tools (ToolRef array) + agent.KBScope
+// JSON the runner resolves — so the Composer gets its general tools + general KB
+// through the SAME resolve path sub-agents use (and the resolver auto-adds
+// kb_search when the scope is non-empty). Capability tool slugs are existing
+// custom (ai_tools) slugs — enforced at config-save — so each becomes a custom
+// ToolRef by id. Empty scope/slugs yields nil (no general capability). Best-
+// effort: a slug-lookup failure logs and omits those tools, never blocks the run.
+func (a *Activities) composerCapabilityRefs(capability composermodels.Capability) (tools, kbScope json.RawMessage) {
+	if len(capability.KBScope.FolderIDs) > 0 || len(capability.KBScope.ArticleIDs) > 0 {
+		if b, err := json.Marshal(capability.KBScope); err == nil {
+			kbScope = b
+		}
+	}
+	if len(capability.ToolSlugs) == 0 || a.Tools == nil {
+		return tools, kbScope
+	}
+	fetched, err := a.Tools.GetBySlugs(capability.ToolSlugs)
+	if err != nil {
+		a.Lo.Warn("composer capability: resolve tool slugs failed", "error", err)
+		return tools, kbScope
+	}
+	refs := make([]agentmodels.ToolRef, 0, len(fetched))
+	for _, t := range fetched {
+		idJSON, mErr := json.Marshal(t.ID)
+		if mErr != nil {
+			continue
+		}
+		refs = append(refs, agentmodels.ToolRef{Kind: agentmodels.ToolRefKindCustom, ID: idJSON})
+	}
+	if len(refs) > 0 {
+		if b, err := json.Marshal(refs); err == nil {
+			tools = b
+		}
+	}
+	return tools, kbScope
 }

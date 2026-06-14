@@ -103,6 +103,9 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 				if escalate, reason := assembled.Escalate(); escalate {
 					req.ForceEscalateReason = reason
 				}
+				// General-tier capability (§2): the Composer's general tools + KB
+				// so it can answer general questions directly without delegating.
+				req.ComposerTools, req.ComposerKBScope = a.composerCapabilityRefs(assembled.Capability)
 			}
 		}
 		resp, runErr = a.Runner.Run(ctx, req)

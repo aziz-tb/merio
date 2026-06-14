@@ -23,6 +23,7 @@ type Assembled struct {
 	EscalationGuidance   []models.GuidanceItem
 	FiredEscalationRules []detection.ConditionTree
 	Automation           models.Automation
+	Capability           models.Capability
 }
 
 // Assemble evaluates each live, in-scope item's conditions against the ticket
@@ -44,6 +45,7 @@ func Assemble(eff Effective, ec detection.EvaluationContext) Assembled {
 		EscalationGuidance:   matchingGuidance(eff.EscalationGuidance, ec),
 		FiredEscalationRules: firedRules(eff.EscalationRules, ec),
 		Automation:           eff.Automation,
+		Capability:           eff.Capability, // global; not condition-evaluated
 	}
 }
 

@@ -24,6 +24,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/aziz-tb/merio/internal/ai/llm"
@@ -211,6 +212,16 @@ type RunRequest struct {
 	// Set on Composer runs and threaded into the sub-agents they spawn so
 	// guidance reaches domain work too.
 	GuidanceProse string
+
+	// ComposerTools / ComposerKBScope carry the Composer's general-tier
+	// capability (Slice 5, §2): the general tool refs + general KB scope it
+	// answers directly with. Same wire shapes as agent.Tools / agent.KBScope, so
+	// platformComposerAgent feeds them through the SAME resolve path sub-agents
+	// use (incl. auto-adding kb_search when the scope is non-empty). Empty = no
+	// general capability — the Composer answers from its base prompt only
+	// (today's behavior). Composer-only; ignored on non-composer runs.
+	ComposerTools   json.RawMessage
+	ComposerKBScope json.RawMessage
 
 	// ForceEscalateReason, when non-empty, makes this run escalate
 	// deterministically without calling the model — the hard arm of the

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -45,6 +46,18 @@ const callSubagentInstructions = `Platform rule for delegating to sub-agents:
 - Pass a clear "brief": what you need that sub-agent to do for this customer.
 - It returns a short report of what it did and found, plus the raw outputs of any actions it took. Treat the report like a colleague's hand-off; you compose the final reply yourself.
 - A sub-agent never replies to the customer and never decides the ticket — only you do.`
+
+// answerVsDelegateInstructions is the platform default for the general tier
+// (Slice 5, §2): the Composer answers general questions directly and delegates
+// domain work to a sub-agent. Appended to the composer prompt when delegation is
+// available (an invoker is attached); operator answer-vs-delegate guidance rides
+// on top as ordinary guidance items. The capability boundary backs this up — the
+// Composer lacks domain tools/KB, so it cannot do domain work even if it tried.
+const answerVsDelegateInstructions = `Answering vs delegating — decide per customer request:
+- ANSWER DIRECTLY, in one pass, for general questions you can cover from your own knowledge, general tools, and general knowledge base: opening hours, company info, how-to, general policy, greetings/status. Do not delegate these.
+- DELEGATE to a specialist sub-agent (call_subagent) for anything needing domain expertise or a domain action: billing/invoices, contracts/cancellation, meter readings, account-specific data or changes. You do not have domain tools or domain knowledge by design — delegate instead of guessing.
+- A mixed message can be both: answer the general part yourself AND delegate the domain part, then compose one reply.
+- When a request is domain-specific and you are unsure, delegate.`
 
 var callSubagentToolDef = llm.ToolDef{
 	Name: callSubagentToolName,
@@ -157,18 +170,22 @@ const composerAgentSlug = "composer"
 // start. For now it is a minimal placeholder so the loop has a system prompt.
 const composerStubPrompt = `You are the support composer. You own the conversation: decide which specialized sub-agents to consult and in what order, then compose the single customer-facing reply yourself. Delegate scoped tasks to sub-agents via call_subagent and use their reports to write the final draft.`
 
-// platformComposerAgent is the synthetic agent config a composer run
-// executes with. The composer is not loaded from ai_agents (it is a
-// platform component, not a user-authored agent), so the runner uses this
-// instead of Agents.Get when RunRequest.IsComposer is set. It carries no
-// user tools and no KB scope; its only tools are the platform-owned
-// produce_draft + call_subagent injected by the runner.
-func platformComposerAgent() agentmodels.Agent {
+// platformComposerAgent is the synthetic agent config a composer run executes
+// with. The composer is not loaded from ai_agents (it is a platform component,
+// not a user-authored agent), so the runner uses this instead of Agents.Get when
+// RunRequest.IsComposer is set. Its general-tier capability — general tool refs +
+// general KB scope (Slice 5, §2) — is supplied by the caller from Composer
+// config and flows through the SAME resolve path sub-agents use; on top, the
+// runner injects the platform-owned answer/escalate (+ call_subagent) tools.
+// Empty tools/scope = no general capability (answer from the base prompt only).
+func platformComposerAgent(tools, kbScope json.RawMessage) agentmodels.Agent {
 	return agentmodels.Agent{
 		Slug:          composerAgentSlug,
 		Prompt:        composerStubPrompt,
 		Enabled:       true,
 		MaxIterations: defaultMaxIterations,
+		Tools:         tools,
+		KBScope:       kbScope,
 	}
 }
 
