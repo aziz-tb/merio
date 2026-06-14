@@ -15,6 +15,9 @@ import (
 	"github.com/aziz-tb/merio/internal/ai/llm"
 	"github.com/aziz-tb/merio/internal/ai/runner"
 	runnerevents "github.com/aziz-tb/merio/internal/ai/runner/events"
+	aitools "github.com/aziz-tb/merio/internal/ai/tools"
+	"github.com/aziz-tb/merio/internal/approvals"
+	"github.com/aziz-tb/merio/internal/composer"
 	wfairuns "github.com/aziz-tb/merio/internal/workflows/airuns"
 	"github.com/zerodha/logf"
 	"go.temporal.io/sdk/activity"
@@ -23,7 +26,10 @@ import (
 type Activities struct {
 	Runner     *runner.Runner
 	Agents     *aiagents.Manager
+	Tools      *aitools.Manager
 	Executions *executions.Manager
+	Composer   *composer.Manager
+	Approvals  *approvals.Manager
 	Events     runner.EventPublisher
 	Lo         *logf.Logger
 }
@@ -32,7 +38,10 @@ func NewActivities(deps activitydeps.Dependencies) (*Activities, error) {
 	return &Activities{
 		Runner:     deps.AgentRunner,
 		Agents:     deps.Agents,
+		Tools:      deps.Tools,
 		Executions: deps.Executions,
+		Composer:   deps.Composer,
+		Approvals:  deps.Approvals,
 		Events:     deps.RunEvents,
 		Lo:         deps.Logger("ai-run-activities"),
 	}, nil
@@ -54,18 +63,24 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 	go a.heartbeatLoop(hbCtx)
 
 	pub := a.publisherForSource(params.Source)
-	req := buildRunRequest(params)
-	req.EventPublisher = pub
-	// Attach the sub-agent invoker. The runner only uses it on a composer
-	// run (gated on RunRequest.IsComposer), so this is a no-op for ordinary
-	// composer/pipeline runs. Sub-agent runs the invoker itself spawns leave
-	// SubAgentInvoker nil, so recursion can't occur.
-	// TODO(slice-3): composer runs (which set IsComposer) are wired when
-	// composer provisioning lands; until then this invoker is inert here and
-	// exercised directly by the sub-agent invoker's tests.
-	req.SubAgentInvoker = a.subAgentInvoker()
 
-	resp, runErr := a.Runner.Run(ctx, req)
+	var resp runner.RunResponse
+	var runErr error
+	if params.ResumeApprovalID > 0 {
+		// Resume a resolved write approval (Slice 4b): reconstruct context from
+		// the gated run's trace and run the resume (single-loop or sub-agent
+		// 2-step). The result flows through the same persist/gate/event path.
+		resp, runErr = a.resumeApproval(ctx, params, pub)
+	} else {
+		req := buildRunRequest(params)
+		req.EventPublisher = pub
+		// The runner uses the invoker only on a composer run (gated on
+		// RunRequest.IsComposer); sub-agent runs it spawns leave it nil, so
+		// recursion can't occur.
+		req.SubAgentInvoker = a.subAgentInvoker()
+		req.ApprovalRequiredSlugs = a.approvalSlugs(params.InboxID)
+		resp, runErr = a.Runner.Run(ctx, req)
+	}
 	if runErr != nil {
 		// Composer fail-safe (Layer 2): a terminal transient failure with no
 		// Temporal retry pending becomes an escalation, so the ticket reaches a
@@ -89,12 +104,24 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 		}
 	}
 
+	// Approval gate: a run that stopped at an approval-required write persists a
+	// pending record (idempotent — the partial-unique index dedupes activity
+	// retries). The run itself is still persisted below so a resume can read its
+	// trace.
+	if resp.Status == runner.StatusAwaitingApproval && resp.ProposedWrite != nil {
+		a.persistGateApproval(params, resp.ProposedWrite)
+	}
+
 	executionID, persistErr := a.Executions.PersistCompleteRun(ctx, params, resp)
 	if persistErr != nil {
 		a.emitTerminalFailure(ctx, params, resp, 0, persistErr)
 		return nil, persistErr
 	}
 
+	eventType := runner.EventTypeRunCompleted
+	if resp.Status == runner.StatusAwaitingApproval {
+		eventType = runner.EventTypeAwaitingApproval
+	}
 	payload := runner.RunCompletedPayload{
 		ExecutionID: executionID,
 		Source:      params.Source,
@@ -105,7 +132,7 @@ func (a *Activities) RunAgentActivity(ctx context.Context, params wfairuns.Agent
 	}
 	if pub != nil {
 		if err := pub.Publish(ctx, params.TraceID, runner.RunEvent{
-			Type:      runner.EventTypeRunCompleted,
+			Type:      eventType,
 			EmittedAt: time.Now().UTC(),
 			Payload:   mustMarshalPayload(payload),
 		}); err != nil {
@@ -151,6 +178,7 @@ func buildRunRequest(params wfairuns.AgentRunWorkflowParams) runner.RunRequest {
 		TotalTokenBudget:    params.TotalTokenBudget,
 		TraceID:             params.TraceID,
 		InvokerUserID:       params.InvokerUserID,
+		IsComposer:          params.IsComposer,
 	}
 	if params.DeadlineMs > 0 {
 		req.Deadline = time.Duration(params.DeadlineMs) * time.Millisecond

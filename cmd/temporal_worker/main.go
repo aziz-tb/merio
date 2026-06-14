@@ -61,7 +61,9 @@ import (
 	aicapabilities "github.com/aziz-tb/merio/internal/ai/tools/builtin/capabilities"
 	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
 	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
+	"github.com/aziz-tb/merio/internal/approvals"
 	businesshours "github.com/aziz-tb/merio/internal/business_hours"
+	"github.com/aziz-tb/merio/internal/composer"
 	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
 	"github.com/aziz-tb/merio/internal/conversation/priority"
@@ -630,6 +632,14 @@ func buildDependencies(ko *koanf.Koanf, queues []string, lo *logf.Logger) activi
 		deps.Executions, err = aiexecutions.New(aiexecutions.Opts{DB: deps.DB, Lo: logger("ai-executions"), I18n: deps.I18n})
 		if err != nil {
 			log.Fatalf("temporal-worker: ai executions manager: %v", err)
+		}
+		deps.Composer, err = composer.New(composer.Opts{DB: deps.DB, Lo: logger("composer"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: composer manager: %v", err)
+		}
+		deps.Approvals, err = approvals.New(approvals.Opts{DB: deps.DB, Lo: logger("approvals"), I18n: deps.I18n})
+		if err != nil {
+			log.Fatalf("temporal-worker: approvals manager: %v", err)
 		}
 		dispatcher := aitools.NewDispatcher(deps.Tools, deps.ExecRunner, deps.Functions)
 		deps.AgentRunner, err = airunner.New(airunner.Opts{

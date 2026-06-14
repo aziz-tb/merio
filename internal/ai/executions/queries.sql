@@ -9,6 +9,17 @@ RETURNING id, conversation_id, agent_id, source, resolution_attempt_id,
           trace_id, format_version, status, draft, trace, usage, duration_ms,
           run_by_user_id, run_at, agent_updated_at, created_at, updated_at;
 
+-- name: get-latest-execution-by-trace
+-- Loads the most recent run for a trace id (the approval resume reconstructs
+-- context from the gated run's persisted trace via this).
+SELECT id, conversation_id, agent_id, source, resolution_attempt_id,
+       trace_id, format_version, status, draft, trace, usage, duration_ms,
+       run_by_user_id, run_at, agent_updated_at, created_at, updated_at
+FROM   agent_executions
+WHERE  trace_id = $1
+ORDER  BY id DESC
+LIMIT  1;
+
 -- name: list-by-agent
 -- Past runs for an agent's History tab. Paginated by an opaque
 -- before-cursor (run_at, id) so newer runs surface in stable order

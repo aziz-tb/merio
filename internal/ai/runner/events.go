@@ -35,6 +35,10 @@ const (
 	EventTypeDraftCommitted = "draft.committed"
 	EventTypeRunCompleted   = "run.completed"
 	EventTypeRunFailed      = "run.failed"
+	// EventTypeAwaitingApproval — the run paused at an approval-required write
+	// (Slice 4). Reuses RunCompletedPayload (Status=awaiting_approval); the
+	// reviewer UI surfaces the proposed write from the run's trace.
+	EventTypeAwaitingApproval = "run.awaiting_approval"
 )
 
 type RunEnqueuedPayload struct {

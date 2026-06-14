@@ -59,6 +59,7 @@ type Opts struct {
 type queries struct {
 	InsertExecution         *sqlx.Stmt `query:"insert-execution"`
 	GetExecutionByID        *sqlx.Stmt `query:"get-execution-by-id"`
+	LatestByTrace           *sqlx.Stmt `query:"get-latest-execution-by-trace"`
 	LatestForConversation   *sqlx.Stmt `query:"latest-executions-by-conversation"`
 	LatestExecutionSingle   *sqlx.Stmt `query:"latest-execution-for-conversation"`
 	ListByAgent             *sqlx.Stmt `query:"list-by-agent"`
@@ -121,6 +122,21 @@ func (m *Manager) InsertExecution(p InsertParams) (models.AgentExecution, error)
 		runBy, p.AgentUpdatedAt,
 	); err != nil {
 		m.lo.Error("error inserting agent_execution", "agent_id", p.AgentID, "conversation_id", p.ConversationID, "error", err)
+		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return out, nil
+}
+
+// GetByTraceID loads the most recent execution row for a trace id. Used by the
+// approval resume to reconstruct context from the gated run's persisted trace.
+// Returns ErrNotFound when no run exists for the trace.
+func (m *Manager) GetByTraceID(traceID string) (models.AgentExecution, error) {
+	var out models.AgentExecution
+	if err := m.q.LatestByTrace.Get(&out, traceID); err != nil {
+		if err == sql.ErrNoRows {
+			return out, ErrNotFound
+		}
+		m.lo.Error("error fetching agent_execution by trace", "trace_id", traceID, "error", err)
 		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return out, nil

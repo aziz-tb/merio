@@ -347,6 +347,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 		perm(handleListLatestAgentExecutions, "ai_agents:run"))
 	g.POST("/api/v1/conversations/{uuid}/agent-executions/{execution_id}/send",
 		perm(handleSendAgentExecution, "ai_agents:run"))
+	g.POST("/api/v1/conversations/{uuid}/write-approvals/{id}/resolve",
+		perm(handleResolveWriteApproval, "ai_agents:run"))
 
 	// Custom attributes.
 	g.GET("/api/v1/custom-attributes", auth(handleGetCustomAttributes))

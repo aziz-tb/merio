@@ -20,7 +20,7 @@ func newTestManager(t *testing.T) (*Manager, sqlmock.Sqlmock) {
 	t.Cleanup(func() { _ = db.Close() })
 	dbx := sqlx.NewDb(db, "sqlmock")
 	mock.MatchExpectationsInOrder(false)
-	for i := 0; i < 4; i++ { // insert, get-by-id, list-pending-by-conversation, resolve
+	for i := 0; i < 5; i++ { // insert, get-by-id, get-pending-by-trace, list-pending-by-conversation, resolve
 		mock.ExpectPrepare(".*")
 	}
 	lo := logf.New(logf.Opts{Level: logf.ErrorLevel})
@@ -45,6 +45,35 @@ func approvalRow(status string) *sqlmock.Rows {
 }
 
 func i64ptr(v int64) *int64 { return &v }
+
+// TestCreate_IdempotentOnConflict proves the gate persists exactly once: a 2nd
+// insert for the same gated run (e.g. a Temporal activity retry) conflicts on
+// the partial-unique index (ON CONFLICT DO NOTHING → no row) and the manager
+// returns the existing pending record — never a 2nd row.
+func TestCreate_IdempotentOnConflict(t *testing.T) {
+	m, mock := newTestManager(t)
+	p := CreateParams{
+		ConversationID: 5, GatedRunTraceID: "trace-1", ToolID: 7, ToolUseID: "w1",
+		ProposedInputs: json.RawMessage(`{"id":1}`),
+	}
+
+	// 1st insert lands the pending row.
+	mock.ExpectQuery("INSERT INTO agent_write_approvals").
+		WillReturnRows(approvalRow(models.StatusPending))
+	first, err := m.Create(p)
+	require.NoError(t, err)
+	require.Equal(t, models.StatusPending, first.Status)
+
+	// 2nd insert conflicts (DO NOTHING → no row); the manager loads the existing.
+	mock.ExpectQuery("INSERT INTO agent_write_approvals").
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(approvalRow(models.StatusPending))
+	second, err := m.Create(p)
+	require.NoError(t, err)
+	require.Equal(t, first.ID, second.ID, "the existing record is returned, not a new one")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
 
 // TestResolve_IdempotencyLock proves the atomic status transition is the lock:
 // the first resolve flips pending → approved and returns the row; a second

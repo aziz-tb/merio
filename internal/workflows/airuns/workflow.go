@@ -48,6 +48,16 @@ type AgentRunWorkflowParams struct {
 	DeadlineMs          int                   `json:"deadline_ms"`
 	InvokerUserID       int                   `json:"invoker_user_id"`
 	EnqueuedAt          time.Time             `json:"enqueued_at"`
+
+	// IsComposer marks this as a composer (orchestrator) run — the activity sets
+	// RunRequest.IsComposer so the run uses the platform composer config and the
+	// answer/escalate terminal decision. Zero for ordinary single-agent runs.
+	IsComposer bool `json:"is_composer,omitempty"`
+
+	// ResumeApprovalID, when > 0, makes this a RESUMING run for a resolved write
+	// approval: the activity loads the approval + the gated run's trace and runs
+	// the resume (Slice 4b) instead of starting fresh.
+	ResumeApprovalID int64 `json:"resume_approval_id,omitempty"`
 }
 
 type AgentRunResult struct {

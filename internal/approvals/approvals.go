@@ -51,6 +51,7 @@ type Opts struct {
 type queries struct {
 	Insert            *sqlx.Stmt `query:"insert"`
 	GetByID           *sqlx.Stmt `query:"get-by-id"`
+	GetPendingByTrace *sqlx.Stmt `query:"get-pending-by-trace"`
 	ListPendingByConv *sqlx.Stmt `query:"list-pending-by-conversation"`
 	Resolve           *sqlx.Stmt `query:"resolve"`
 }
@@ -86,7 +87,31 @@ func (m *Manager) Create(p CreateParams) (models.WriteApproval, error) {
 		p.ConversationID, p.GatedRunTraceID, nullStr(p.ParentTraceID), nullInt(p.AgentID),
 		p.ToolID, p.ToolUseID, p.ProposedInputs,
 	); err != nil {
+		if err == sql.ErrNoRows {
+			// ON CONFLICT DO NOTHING: a pending record for this gated run
+			// already exists (a retry/duplicate). Return it — idempotent, the
+			// write is recorded exactly once.
+			existing, gErr := m.GetPendingByTrace(p.GatedRunTraceID)
+			if gErr != nil {
+				return out, gErr
+			}
+			return existing, nil
+		}
 		m.lo.Error("error inserting write approval", "trace_id", p.GatedRunTraceID, "tool_id", p.ToolID, "error", err)
+		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return out, nil
+}
+
+// GetPendingByTrace loads the open approval for a gated run, if any. Returns
+// ErrNotFound when none is pending.
+func (m *Manager) GetPendingByTrace(gatedRunTraceID string) (models.WriteApproval, error) {
+	var out models.WriteApproval
+	if err := m.q.GetPendingByTrace.Get(&out, gatedRunTraceID); err != nil {
+		if err == sql.ErrNoRows {
+			return out, ErrNotFound
+		}
+		m.lo.Error("error fetching pending write approval", "trace_id", gatedRunTraceID, "error", err)
 		return out, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return out, nil

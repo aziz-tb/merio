@@ -12,7 +12,9 @@ import (
 	airunner "github.com/aziz-tb/merio/internal/ai/runner"
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
 	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
+	"github.com/aziz-tb/merio/internal/approvals"
 	businesshours "github.com/aziz-tb/merio/internal/business_hours"
+	"github.com/aziz-tb/merio/internal/composer"
 	"github.com/aziz-tb/merio/internal/contract"
 	"github.com/aziz-tb/merio/internal/conversation"
 	"github.com/aziz-tb/merio/internal/conversation/priority"
@@ -74,6 +76,8 @@ type Dependencies struct {
 	Agents     *aiagents.Manager
 	Tools      *aitools.Manager
 	Executions *aiexecutions.Manager
+	Composer   *composer.Manager
+	Approvals  *approvals.Manager
 
 	ExecToken  *exectoken.Manager
 	ExecRunner *execrunner.Manager

@@ -32,6 +32,11 @@ import (
 // stored in ai_agents.tools and never offered to sub-agents.
 const callSubagentToolName = "call_subagent"
 
+// CallSubagentToolName is the exported tool name, used by the approval resume
+// path to inject a resumed sub-agent's report back into the composer at its
+// call_subagent point.
+const CallSubagentToolName = callSubagentToolName
+
 // callSubagentInstructions is appended to a composer's runtime system
 // prompt (after the produce_draft rule). Kept as one constant for clean
 // localization later, mirroring produceDraftInstructions.
@@ -74,6 +79,10 @@ type SubAgentParentContext struct {
 	InvokerUserID     int
 	TraceID           string
 	History           []ConversationMessage
+
+	// ApprovalRequiredSlugs threads the composer's approval gate set into each
+	// sub-agent run so the gate is origin-agnostic.
+	ApprovalRequiredSlugs []string
 }
 
 // SubAgentCall is one call_subagent invocation parsed from a tool_use block.
@@ -163,12 +172,13 @@ func platformComposerAgent() agentmodels.Agent {
 // context the invoker needs to build the sub-agent run.
 func subAgentParentContext(req RunRequest) SubAgentParentContext {
 	return SubAgentParentContext{
-		ConversationID:    req.ConversationID,
-		InboxID:           req.InboxID,
-		VerificationLevel: req.VerificationLevel,
-		InvokerUserID:     req.InvokerUserID,
-		TraceID:           req.TraceID,
-		History:           req.ConversationHistory,
+		ConversationID:        req.ConversationID,
+		InboxID:               req.InboxID,
+		VerificationLevel:     req.VerificationLevel,
+		InvokerUserID:         req.InvokerUserID,
+		TraceID:               req.TraceID,
+		History:               req.ConversationHistory,
+		ApprovalRequiredSlugs: req.ApprovalRequiredSlugs,
 	}
 }
 

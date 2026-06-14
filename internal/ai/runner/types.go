@@ -223,6 +223,18 @@ type ProposedWrite struct {
 	ToolSlug  string         `json:"tool_slug"`
 	ToolUseID string         `json:"tool_use_id"`
 	Inputs    map[string]any `json:"inputs,omitempty"`
+
+	// Persistence identity — set so the activity (the single persister) can
+	// record the approval uniformly whether the gate fired in the top-level
+	// run or bubbled up from a sub-agent. GatedTraceID is the trace of the run
+	// that actually gated (top-level trace for an own gate; the sub-agent's
+	// child trace when bubbled). AgentID is that run's agent (nil for the
+	// orchestrator, which is not an ai_agents row). ParentTraceID is the
+	// composer run a sub-agent gate belongs to (empty for an own gate); the
+	// invoker fills it on bubble-up.
+	GatedTraceID  string `json:"gated_trace_id,omitempty"`
+	ParentTraceID string `json:"parent_trace_id,omitempty"`
+	AgentID       *int   `json:"agent_id,omitempty"`
 }
 
 // ResumeContext drives a resuming run. PriorTrace is the gated run's persisted

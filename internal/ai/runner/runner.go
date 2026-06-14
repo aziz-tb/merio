@@ -578,6 +578,11 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (finalResp RunResponse
 			// check covers a composer write and a sub-agent write because both
 			// run through this one loop. See approval.go.
 			if gated := firstGatedToolUse(turnToolUses, resolvedByName, req.ApprovalRequiredSlugs); gated != nil {
+				// Stamp the run identity so the activity persists this gate
+				// uniformly. The bubble-up path keeps the sub-agent's identity
+				// (set here in its own run) and the invoker adds ParentTraceID.
+				gated.GatedTraceID = req.TraceID
+				gated.AgentID = agentIDPtr(agent.ID)
 				turn.ToolCalls = []ToolCallLog{newAwaitingApprovalLog(*gated)}
 				trace = append(trace, turn)
 				toolCallLog = append(toolCallLog, turn.ToolCalls...)

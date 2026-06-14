@@ -33,6 +33,7 @@ import (
 	aitools "github.com/aziz-tb/merio/internal/ai/tools"
 	"github.com/aziz-tb/merio/internal/ai/tools/resolver"
 	aiusage "github.com/aziz-tb/merio/internal/ai/usage"
+	"github.com/aziz-tb/merio/internal/approvals"
 	auth_ "github.com/aziz-tb/merio/internal/auth"
 	"github.com/aziz-tb/merio/internal/authz"
 	"github.com/aziz-tb/merio/internal/autoassigner"
@@ -782,6 +783,20 @@ func initComposer(db *sqlx.DB, i18n *i18n.I18n) *composer.Manager {
 	})
 	if err != nil {
 		log.Fatalf("error initializing composer manager: %v", err)
+	}
+	return m
+}
+
+// initApprovals initializes the write-approval records CRUD manager.
+func initApprovals(db *sqlx.DB, i18n *i18n.I18n) *approvals.Manager {
+	var lo = initLogger("approvals")
+	m, err := approvals.New(approvals.Opts{
+		DB:   db,
+		Lo:   lo,
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing approvals manager: %v", err)
 	}
 	return m
 }

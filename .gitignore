@@ -44,3 +44,4 @@ exec-runner/.venv
 !internal/approvals/approvals_test.go
 /graphify-out
 /ai_dump.txt
+!internal/activities/airuns/resume_test.go

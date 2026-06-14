@@ -99,12 +99,22 @@ func (s *subAgentInvoker) InvokeSubAgent(
 		VerificationLevel:   parent.VerificationLevel,
 		InvokerUserID:       parent.InvokerUserID,
 		TraceID:             childTraceID,
+		// The approval gate is origin-agnostic: a sub-agent gates on the same
+		// slugs as the composer.
+		ApprovalRequiredSlugs: parent.ApprovalRequiredSlugs,
 		// SubAgentInvoker left nil — a sub-agent cannot call sub-agents.
 	}
 
 	resp, runErr := s.runner.Run(ctx, subReq)
 	s.persistSubRun(ctx, parent, sub.ID, childTraceID, resp, runErr)
-	return shapeSubAgentReport(resp, runErr), nil
+	report := shapeSubAgentReport(resp, runErr)
+	// On a sub-agent gate, stamp the parent (composer) trace so the activity
+	// persists the approval record with its explicit parentage. The sub-agent's
+	// own run already stamped GatedTraceID + AgentID.
+	if report.AwaitingApproval != nil {
+		report.AwaitingApproval.ParentTraceID = parent.TraceID
+	}
+	return report, nil
 }
 
 // persistSubRun writes the sub-agent's full trace as an agent_executions row so

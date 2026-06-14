@@ -71,6 +71,15 @@ func bubbledApproval(results []ToolCallLog) *ProposedWrite {
 	return nil
 }
 
+// agentIDPtr returns a pointer to id, or nil when id is 0 (the orchestrator,
+// which has no ai_agents row).
+func agentIDPtr(id int) *int {
+	if id <= 0 {
+		return nil
+	}
+	return &id
+}
+
 // newAwaitingApprovalLog records the gated proposal as a runner-owned tool log
 // so the trace shows where the run paused for approval.
 func newAwaitingApprovalLog(pw ProposedWrite) ToolCallLog {
